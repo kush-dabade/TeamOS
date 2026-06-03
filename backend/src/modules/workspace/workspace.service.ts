@@ -1,5 +1,6 @@
 import { prisma } from "../../lib/prisma.js";
 import { generateSlug } from "../../lib/slug.js";
+import type { Prisma } from "../../generated/prisma/client.js";
 
 import type { CreateWorkspaceData } from "./workspace.types.js";
 
@@ -28,7 +29,7 @@ async function generateUniqueSlug(name: string): Promise<string> {
 export async function createWorkspace(data: CreateWorkspaceData) {
   const slug = await generateUniqueSlug(data.name);
 
-  const workspace = await prisma.$transaction(async (tx) => {
+  const workspace = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     const workspace = await tx.workspace.create({
       data: {
         name: data.name,
@@ -69,7 +70,7 @@ export async function getUserWorkspaces(userId: string) {
     },
   });
 
-  return memberships.map((membership) => ({
+  return memberships.map((membership: Prisma.WorkspaceMemberGetPayload<{include: {workspace: true}}>) => ({
     id: membership.workspace.id,
     name: membership.workspace.name,
     slug: membership.workspace.slug,

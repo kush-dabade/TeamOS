@@ -14,6 +14,13 @@ enum WorkspaceRole {
   GUEST
 }
 
+enum ProjectStatus {
+  PLANNED
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
 model User {
   id            String   @id
   name          String
@@ -27,6 +34,7 @@ model User {
   accounts Account[]
 
   ownedWorkspaces Workspace[]       @relation("OwnedWorkspaces")
+  ownedProjects   Project[]         @relation("ProjectOwner")
   memberships     WorkspaceMember[]
 
   @@unique([email])
@@ -94,9 +102,11 @@ model Workspace {
   slug String @unique
 
   ownerId String
-  owner   User   @relation("OwnedWorkspaces", fields: [ownerId], references: [id])
 
-  members WorkspaceMember[]
+  owner User @relation("OwnedWorkspaces", fields: [ownerId], references: [id])
+
+  members  WorkspaceMember[]
+  projects Project[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -113,7 +123,8 @@ model WorkspaceMember {
   role WorkspaceRole @default(MEMBER)
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   joinedAt DateTime @default(now())
 
@@ -124,4 +135,34 @@ model WorkspaceMember {
   @@index([workspaceId])
   @@index([userId])
   @@index([workspaceId, role])
+}
+
+model Project {
+  id String @id @default(cuid())
+
+  workspaceId String
+  ownerId     String
+
+  name String
+  slug String
+
+  description String?
+
+  status ProjectStatus @default(PLANNED)
+
+  startDate DateTime?
+  endDate   DateTime?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  owner User @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId])
+  @@index([ownerId])
+  @@index([workspaceId, status])
+  @@index([workspaceId, createdAt])
 }

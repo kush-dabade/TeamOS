@@ -19,9 +19,9 @@ export const createProjectSchema = z
       .trim()
       .min(1, "Owner ID is required"),
 
-    startDate: z.string().optional(),
+    startDate: z.iso.date().optional(),
 
-    endDate: z.string().optional(),
+    endDate: z.iso.date().optional(),
   })
   .refine(
     (data) => {

@@ -4,6 +4,7 @@ import { toNodeHandler } from "better-auth/node";
 import { auth } from "./lib/auth.js";
 import workspaceRoutes from "./modules/workspace/workspace.routes.js";
 import projectRoutes from "./modules/project/project.routes.js";
+import taskRoutes from "./modules/task/task.routes.js";
 
 const app = express();
 
@@ -13,6 +14,7 @@ app.use(express.json());
 
 app.use("/api/v1/workspaces", workspaceRoutes);
 app.use("/api/v1/workspaces", projectRoutes);
+app.use("/api/v1/projects", taskRoutes);
 
 app.get("/health", (_req, res) => {
   res.status(200).json({

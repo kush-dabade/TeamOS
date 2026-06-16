@@ -4,6 +4,7 @@ import { ZodError } from "zod";
 import { listActivitiesQuerySchema } from "./activity.schemas.js";
 
 import { listWorkspaceActivities } from "./activity.service.js";
+import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
 
 export async function listWorkspaceActivitiesHandler(
   req: Request,
@@ -42,10 +43,7 @@ export async function listWorkspaceActivitiesHandler(
       });
     }
 
-    if (
-      error instanceof Error &&
-      error.message === "You are not a member of this workspace"
-    ) {
+    if (error instanceof ForbiddenError) {
       return res.status(403).json({
         success: false,
         error: {
@@ -54,7 +52,6 @@ export async function listWorkspaceActivitiesHandler(
         },
       });
     }
-
     console.error("List activities error:", error);
 
     return res.status(500).json({

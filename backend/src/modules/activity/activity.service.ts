@@ -1,5 +1,6 @@
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
+import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
 
 import type {
   ActivityResponse,
@@ -86,7 +87,7 @@ export async function listWorkspaceActivities(
   const membership = await getWorkspaceMembership(options.workspaceId, actorId);
 
   if (!membership) {
-    throw new Error("You are not a member of this workspace");
+    throw new ForbiddenError("You are not a member of this workspace");
   }
 
   const skip = (options.page - 1) * options.limit;

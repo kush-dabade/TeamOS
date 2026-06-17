@@ -1,14 +1,15 @@
 import { prisma } from "../../lib/prisma.js";
 
-import type {
-  CreateTaskData,
-  ListTasksOptions,
-} from "./task.types.js";
+import type { CreateTaskData, ListTasksOptions } from "./task.types.js";
 
-async function getWorkspaceMembership(
-  workspaceId: string,
-  userId: string,
-) {
+import { createActivity } from "../activity/activity.service.js";
+
+import {
+  ActivityEntityType,
+  ActivityType,
+} from "../../generated/prisma/enums.js";
+
+async function getWorkspaceMembership(workspaceId: string, userId: string) {
   return prisma.workspaceMember.findUnique({
     where: {
       workspaceId_userId: {
@@ -19,10 +20,7 @@ async function getWorkspaceMembership(
   });
 }
 
-export async function createTask(
-  actorId: string,
-  data: CreateTaskData,
-) {
+export async function createTask(actorId: string, data: CreateTaskData) {
   const project = await prisma.project.findUnique({
     where: {
       id: data.projectId,
@@ -33,34 +31,24 @@ export async function createTask(
     throw new Error("Project not found");
   }
 
-  const membership = await getWorkspaceMembership(
-    project.workspaceId,
-    actorId,
-  );
+  const membership = await getWorkspaceMembership(project.workspaceId, actorId);
 
   if (!membership) {
-    throw new Error(
-      "You are not a member of this workspace",
-    );
+    throw new Error("You are not a member of this workspace");
   }
 
   if (membership.role === "GUEST") {
-    throw new Error(
-      "Guests cannot create tasks",
-    );
+    throw new Error("Guests cannot create tasks");
   }
 
   if (data.assigneeId) {
-    const assigneeMembership =
-      await getWorkspaceMembership(
-        project.workspaceId,
-        data.assigneeId,
-      );
+    const assigneeMembership = await getWorkspaceMembership(
+      project.workspaceId,
+      data.assigneeId,
+    );
 
     if (!assigneeMembership) {
-      throw new Error(
-        "Assignee must be a workspace member",
-      );
+      throw new Error("Assignee must be a workspace member");
     }
   }
 
@@ -91,6 +79,20 @@ export async function createTask(
     },
   });
 
+  await createActivity({
+    workspaceId: project.workspaceId,
+    actorId,
+
+    type: ActivityType.TASK_CREATED,
+
+    entityType: ActivityEntityType.TASK,
+    entityId: task.id,
+
+    metadata: {
+      taskTitle: task.title,
+    },
+  });
+
   return {
     id: task.id,
 
@@ -115,10 +117,7 @@ export async function createTask(
   };
 }
 
-export async function listTasks(
-  actorId: string,
-  options: ListTasksOptions,
-) {
+export async function listTasks(actorId: string, options: ListTasksOptions) {
   const project = await prisma.project.findUnique({
     where: {
       id: options.projectId,
@@ -129,15 +128,10 @@ export async function listTasks(
     throw new Error("Project not found");
   }
 
-  const membership = await getWorkspaceMembership(
-    project.workspaceId,
-    actorId,
-  );
+  const membership = await getWorkspaceMembership(project.workspaceId, actorId);
 
   if (!membership) {
-    throw new Error(
-      "You are not a member of this workspace",
-    );
+    throw new Error("You are not a member of this workspace");
   }
 
   const tasks = await prisma.task.findMany({

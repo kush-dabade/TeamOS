@@ -6,10 +6,14 @@ import type {
   ListCommentsOptions,
 } from "./comments.types.js";
 
-async function getWorkspaceMembership(
-  workspaceId: string,
-  userId: string,
-) {
+import { createActivity } from "../activity/activity.service.js";
+
+import {
+  ActivityEntityType,
+  ActivityType,
+} from "../../generated/prisma/enums.js";
+
+async function getWorkspaceMembership(workspaceId: string, userId: string) {
   return prisma.workspaceMember.findUnique({
     where: {
       workspaceId_userId: {
@@ -60,21 +64,14 @@ export async function createComment(
     throw new Error("Task not found");
   }
 
-  const membership = await getWorkspaceMembership(
-    task.workspaceId,
-    actorId,
-  );
+  const membership = await getWorkspaceMembership(task.workspaceId, actorId);
 
   if (!membership) {
-    throw new Error(
-      "You are not a member of this workspace",
-    );
+    throw new Error("You are not a member of this workspace");
   }
 
   if (membership.role === "GUEST") {
-    throw new Error(
-      "Guests cannot create comments",
-    );
+    throw new Error("Guests cannot create comments");
   }
 
   const comment = await prisma.comment.create({
@@ -95,6 +92,20 @@ export async function createComment(
     },
   });
 
+  await createActivity({
+    workspaceId: task.workspaceId,
+    actorId,
+
+    type: ActivityType.COMMENT_CREATED,
+
+    entityType: ActivityEntityType.COMMENT,
+    entityId: comment.id,
+
+    metadata: {
+      taskId: task.id,
+    },
+  });
+
   return toCommentResponse(comment);
 }
 
@@ -112,15 +123,10 @@ export async function listComments(
     throw new Error("Task not found");
   }
 
-  const membership = await getWorkspaceMembership(
-    task.workspaceId,
-    actorId,
-  );
+  const membership = await getWorkspaceMembership(task.workspaceId, actorId);
 
   if (!membership) {
-    throw new Error(
-      "You are not a member of this workspace",
-    );
+    throw new Error("You are not a member of this workspace");
   }
 
   const comments = await prisma.comment.findMany({

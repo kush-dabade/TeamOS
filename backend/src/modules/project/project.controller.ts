@@ -1,11 +1,18 @@
 import type { Request, Response } from "express";
 import { ZodError } from "zod";
 
-import { createProjectSchema } from "./project.schema.js";
-import { createProject } from "./project.service.js";
+import {
+  createProjectSchema,
+  listProjectsQuerySchema,
+  updateProjectSchema,
+} from "./project.schema.js";
 
-import { listProjectsQuerySchema } from "./project.schema.js";
-import { listProjects } from "./project.service.js";
+import {
+  createProject,
+  listProjects,
+  getProject,
+  updateProject,
+} from "./project.service.js";
 
 export async function createProjectHandler(req: Request, res: Response) {
   try {
@@ -124,6 +131,128 @@ export async function listProjectsHandler(req: Request, res: Response) {
     }
 
     console.error("List projects error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "An internal error occurred",
+      },
+    });
+  }
+}
+
+export async function getProjectHandler(req: Request, res: Response) {
+  try {
+    const project = await getProject(
+      req.user!.id,
+      req.params.projectId as string,
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: project,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "Project not found") {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: "PROJECT_NOT_FOUND",
+          message: error.message,
+        },
+      });
+    }
+
+    if (
+      error instanceof Error &&
+      error.message.includes("You are not a member of this workspace")
+    ) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: error.message,
+        },
+      });
+    }
+
+    console.error("Get project error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "An internal error occurred",
+      },
+    });
+  }
+}
+
+export async function updateProjectHandler(req: Request, res: Response) {
+  try {
+    const body = updateProjectSchema.parse(req.body);
+
+    const project = await updateProject(
+      req.user!.id,
+      req.params.projectId as string,
+      body,
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: project,
+    });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: error.issues[0]?.message || "Invalid request",
+        },
+      });
+    }
+
+    if (error instanceof Error && error.message === "Project not found") {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: "PROJECT_NOT_FOUND",
+          message: error.message,
+        },
+      });
+    }
+
+    if (
+      error instanceof Error &&
+      error.message.includes(
+        "Only workspace owners and admins can update projects",
+      )
+    ) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: error.message,
+        },
+      });
+    }
+
+    if (
+      error instanceof Error &&
+      error.message.includes("You are not a member of this workspace")
+    ) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: error.message,
+        },
+      });
+    }
+
+    console.error("Update project error:", error);
 
     return res.status(500).json({
       success: false,

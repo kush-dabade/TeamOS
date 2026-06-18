@@ -8,6 +8,7 @@ import taskRoutes from "./modules/task/task.routes.js";
 import commentRoutes from "./modules/comments/comments.routes.js";
 import activityRoutes from "./modules/activity/activity.routes.js";
 import taskItemRoutes from "./modules/task/task-item.routes.js";
+import projectItemRoutes from "./modules/project/project-item.routes.js";
 
 const app = express();
 
@@ -20,6 +21,7 @@ app.use("/api/v1/workspaces", projectRoutes);
 app.use("/api/v1/workspaces", activityRoutes);
 
 app.use("/api/v1/projects", taskRoutes);
+app.use("/api/v1/projects", projectItemRoutes);
 app.use("/api/v1/tasks", taskItemRoutes);
 app.use("/api/v1/tasks", commentRoutes);
 

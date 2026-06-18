@@ -9,16 +9,8 @@ import {
 
 const router = Router();
 
-router.post(
-  "/:taskId/comments",
-  requireAuth,
-  createCommentHandler,
-);
+router.post("/:taskId/comments", requireAuth, createCommentHandler);
 
-router.get(
-  "/:taskId/comments",
-  requireAuth,
-  listCommentsHandler,
-);
+router.get("/:taskId/comments", requireAuth, listCommentsHandler);
 
 export default router;

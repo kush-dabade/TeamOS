@@ -5,6 +5,8 @@ import type {
   ListProjectsOptions,
 } from "./project.types.js";
 
+import type { UpdateProjectInput } from "./project.schema.js";
+
 import { createActivity } from "../activity/activity.service.js";
 
 import {
@@ -21,6 +23,147 @@ async function getWorkspaceMembership(workspaceId: string, userId: string) {
       },
     },
   });
+}
+
+async function findProjectById(projectId: string) {
+  return prisma.project.findUnique({
+    where: {
+      id: projectId,
+    },
+    include: {
+      owner: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+    },
+  });
+}
+
+export async function getProject(actorId: string, projectId: string) {
+  const project = await findProjectById(projectId);
+
+  if (!project) {
+    throw new Error("Project not found");
+  }
+
+  const membership = await getWorkspaceMembership(project.workspaceId, actorId);
+
+  if (!membership) {
+    throw new Error("You are not a member of this workspace");
+  }
+
+  return {
+    id: project.id,
+    workspaceId: project.workspaceId,
+    ownerId: project.ownerId,
+
+    name: project.name,
+    slug: project.slug,
+    description: project.description,
+    status: project.status,
+
+    startDate: project.startDate,
+    endDate: project.endDate,
+
+    createdAt: project.createdAt,
+    updatedAt: project.updatedAt,
+
+    owner: {
+      id: project.owner.id,
+      name: project.owner.name,
+      email: project.owner.email,
+    },
+  };
+}
+
+export async function updateProject(
+  actorId: string,
+  projectId: string,
+  data: UpdateProjectInput,
+) {
+  const project = await findProjectById(projectId);
+
+  if (!project) {
+    throw new Error("Project not found");
+  }
+
+  const membership = await getWorkspaceMembership(project.workspaceId, actorId);
+
+  if (!membership) {
+    throw new Error("You are not a member of this workspace");
+  }
+
+  if (membership.role !== "OWNER" && membership.role !== "ADMIN") {
+    throw new Error("Only workspace owners and admins can update projects");
+  }
+
+  const oldName = project.name;
+  const oldStatus = project.status;
+
+  const updatedProject = await prisma.project.update({
+    where: {
+      id: project.id,
+    },
+    data: {
+      ...(data.name !== undefined && {
+        name: data.name,
+      }),
+
+      ...(data.description !== undefined && {
+        description: data.description,
+      }),
+
+      ...(data.status !== undefined && {
+        status: data.status,
+      }),
+    },
+  });
+
+  const metadata: Record<string, string> = {};
+
+  if (data.name !== undefined && data.name !== oldName) {
+    metadata.oldName = oldName;
+    metadata.newName = data.name;
+  }
+
+  if (data.status !== undefined && data.status !== oldStatus) {
+    metadata.oldStatus = oldStatus;
+    metadata.newStatus = data.status;
+  }
+
+  if (Object.keys(metadata).length > 0) {
+    await createActivity({
+      workspaceId: updatedProject.workspaceId,
+      actorId,
+
+      type: ActivityType.PROJECT_UPDATED,
+
+      entityType: ActivityEntityType.PROJECT,
+      entityId: updatedProject.id,
+
+      metadata,
+    });
+  }
+
+  return {
+    id: updatedProject.id,
+    workspaceId: updatedProject.workspaceId,
+    ownerId: updatedProject.ownerId,
+
+    name: updatedProject.name,
+    slug: updatedProject.slug,
+    description: updatedProject.description,
+    status: updatedProject.status,
+
+    startDate: updatedProject.startDate,
+    endDate: updatedProject.endDate,
+
+    createdAt: updatedProject.createdAt,
+    updatedAt: updatedProject.updatedAt,
+  };
 }
 
 async function generateUniqueProjectSlug(

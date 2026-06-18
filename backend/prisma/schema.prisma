@@ -37,6 +37,7 @@ enum TaskPriority {
 
 enum ActivityType {
   PROJECT_CREATED
+  PROJECT_UPDATED
 
   TASK_CREATED
   TASK_STATUS_CHANGED

@@ -1,9 +1,13 @@
 import type { Request, Response } from "express";
 import { ZodError } from "zod";
 
-import { createTaskSchema, listTasksQuerySchema } from "./task.schema.js";
+import {
+  createTaskSchema,
+  listTasksQuerySchema,
+  updateTaskSchema,
+} from "./task.schema.js";
 
-import { createTask, listTasks } from "./task.service.js";
+import { createTask, listTasks, updateTask } from "./task.service.js";
 
 export async function createTaskHandler(req: Request, res: Response) {
   try {
@@ -123,6 +127,97 @@ export async function listTasksHandler(req: Request, res: Response) {
     }
 
     console.error("List tasks error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "An internal error occurred",
+      },
+    });
+  }
+}
+
+export async function updateTaskHandler(req: Request, res: Response) {
+  try {
+    const body = updateTaskSchema.parse(req.body);
+
+    const updateData = {
+      ...(body.title !== undefined && {
+        title: body.title,
+      }),
+
+      ...(body.description !== undefined && {
+        description: body.description,
+      }),
+
+      ...(body.status !== undefined && {
+        status: body.status,
+      }),
+
+      ...(body.priority !== undefined && {
+        priority: body.priority,
+      }),
+
+      ...(body.assigneeId !== undefined && {
+        assigneeId: body.assigneeId,
+      }),
+
+      ...(body.dueDate !== undefined && {
+        dueDate: body.dueDate === null ? null : new Date(body.dueDate),
+      }),
+    };
+
+    const task = await updateTask(
+      req.user!.id,
+      req.params.taskId as string,
+      updateData,
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: task,
+    });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: error.issues[0]?.message || "Invalid request",
+        },
+      });
+    }
+
+    if (
+      error instanceof Error &&
+      (error.message.includes("You are not a member of this workspace") ||
+        error.message.includes("Guests cannot update tasks"))
+    ) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: error.message,
+        },
+      });
+    }
+
+    if (
+      error instanceof Error &&
+      (error.message.includes("Task not found") ||
+        error.message.includes("Assignee must be a workspace member"))
+    ) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: "TASK_NOT_FOUND",
+          message: error.message,
+        },
+      });
+    }
+
+    console.error("Task update error:", error);
 
     return res.status(500).json({
       success: false,

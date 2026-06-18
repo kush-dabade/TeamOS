@@ -1,6 +1,10 @@
 import { prisma } from "../../lib/prisma.js";
 
-import type { CreateTaskData, ListTasksOptions } from "./task.types.js";
+import type {
+  CreateTaskData,
+  ListTasksOptions,
+  UpdateTaskData,
+} from "./task.types.js";
 
 import { createActivity } from "../activity/activity.service.js";
 
@@ -166,4 +170,157 @@ export async function listTasks(actorId: string, options: ListTasksOptions) {
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
   }));
+}
+
+export async function updateTask(
+  actorId: string,
+  taskId: string,
+  data: UpdateTaskData,
+) {
+  const task = await prisma.task.findUnique({
+    where: {
+      id: taskId,
+    },
+  });
+
+  if (!task) {
+    throw new Error("Task not found");
+  }
+
+  const membership = await getWorkspaceMembership(task.workspaceId, actorId);
+
+  if (!membership) {
+    throw new Error("You are not a member of this workspace");
+  }
+
+  if (membership.role === "GUEST") {
+    throw new Error("Guests cannot update tasks");
+  }
+
+  if (data.assigneeId !== undefined && data.assigneeId !== null) {
+    const assigneeMembership = await getWorkspaceMembership(
+      task.workspaceId,
+      data.assigneeId,
+    );
+
+    if (!assigneeMembership) {
+      throw new Error("Assignee must be a workspace member");
+    }
+  }
+
+  const oldStatus = task.status;
+
+  const updateData: {
+    title?: string;
+    description?: string | null;
+    status?: typeof task.status;
+    priority?: typeof task.priority;
+    assigneeId?: string | null;
+    dueDate?: Date | null;
+    completedAt?: Date | null;
+  } = {};
+
+  if (data.title !== undefined) {
+    updateData.title = data.title;
+  }
+
+  if (data.description !== undefined) {
+    updateData.description = data.description;
+  }
+
+  if (data.status !== undefined) {
+    updateData.status = data.status;
+  }
+
+  if (data.priority !== undefined) {
+    updateData.priority = data.priority;
+  }
+
+  if (data.assigneeId !== undefined) {
+    updateData.assigneeId = data.assigneeId;
+  }
+
+  if (data.dueDate !== undefined) {
+    updateData.dueDate = data.dueDate;
+  }
+
+  if (data.status === "DONE" && oldStatus !== "DONE") {
+    updateData.completedAt = new Date();
+  }
+
+  if (
+    oldStatus === "DONE" &&
+    data.status !== undefined &&
+    data.status !== "DONE"
+  ) {
+    updateData.completedAt = null;
+  }
+
+  const updatedTask = await prisma.task.update({
+    where: {
+      id: task.id,
+    },
+
+    data: updateData,
+  });
+
+  if (data.status !== undefined && oldStatus !== updatedTask.status) {
+    await createActivity({
+      workspaceId: task.workspaceId,
+      actorId,
+
+      type: ActivityType.TASK_STATUS_CHANGED,
+
+      entityType: ActivityEntityType.TASK,
+      entityId: updatedTask.id,
+
+      metadata: {
+        oldStatus,
+        newStatus: updatedTask.status,
+      },
+    });
+  }
+
+  if (
+    data.status !== undefined &&
+    oldStatus !== "DONE" &&
+    updatedTask.status === "DONE"
+  ) {
+    await createActivity({
+      workspaceId: task.workspaceId,
+      actorId,
+
+      type: ActivityType.TASK_COMPLETED,
+
+      entityType: ActivityEntityType.TASK,
+      entityId: updatedTask.id,
+
+      metadata: {
+        taskTitle: updatedTask.title,
+      },
+    });
+  }
+
+  return {
+    id: updatedTask.id,
+
+    workspaceId: updatedTask.workspaceId,
+    projectId: updatedTask.projectId,
+
+    title: updatedTask.title,
+    description: updatedTask.description,
+
+    status: updatedTask.status,
+    priority: updatedTask.priority,
+
+    dueDate: updatedTask.dueDate,
+
+    createdById: updatedTask.createdById,
+    assigneeId: updatedTask.assigneeId,
+
+    completedAt: updatedTask.completedAt,
+
+    createdAt: updatedTask.createdAt,
+    updatedAt: updatedTask.updatedAt,
+  };
 }

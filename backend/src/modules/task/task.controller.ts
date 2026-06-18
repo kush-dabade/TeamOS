@@ -203,15 +203,24 @@ export async function updateTaskHandler(req: Request, res: Response) {
       });
     }
 
-    if (
-      error instanceof Error &&
-      (error.message.includes("Task not found") ||
-        error.message.includes("Assignee must be a workspace member"))
-    ) {
+    if (error instanceof Error && error.message.includes("Task not found")) {
       return res.status(404).json({
         success: false,
         error: {
           code: "TASK_NOT_FOUND",
+          message: error.message,
+        },
+      });
+    }
+
+    if (
+      error instanceof Error &&
+      error.message.includes("Assignee must be a workspace member")
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
           message: error.message,
         },
       });

@@ -57,6 +57,7 @@ export async function createComment(
   const task = await prisma.task.findUnique({
     where: {
       id: data.taskId,
+      deletedAt: null,
     },
   });
 
@@ -116,6 +117,7 @@ export async function listComments(
   const task = await prisma.task.findUnique({
     where: {
       id: options.taskId,
+      deletedAt: null,
     },
   });
 

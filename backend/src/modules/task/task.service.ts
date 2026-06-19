@@ -141,6 +141,7 @@ export async function listTasks(actorId: string, options: ListTasksOptions) {
   const tasks = await prisma.task.findMany({
     where: {
       projectId: options.projectId,
+      deletedAt: null,
     },
 
     orderBy: {
@@ -172,14 +173,103 @@ export async function listTasks(actorId: string, options: ListTasksOptions) {
   }));
 }
 
+export async function getTaskById(actorId: string, taskId: string) {
+  const task = await prisma.task.findFirst({
+    where: {
+      id: taskId,
+      deletedAt: null,
+    },
+  });
+
+  if (!task) {
+    throw new Error("Task not found");
+  }
+
+  const membership = await getWorkspaceMembership(task.workspaceId, actorId);
+
+  if (!membership) {
+    throw new Error("You are not a member of this workspace");
+  }
+
+  return {
+    id: task.id,
+
+    workspaceId: task.workspaceId,
+    projectId: task.projectId,
+
+    title: task.title,
+    description: task.description,
+
+    status: task.status,
+    priority: task.priority,
+
+    dueDate: task.dueDate,
+
+    createdById: task.createdById,
+    assigneeId: task.assigneeId,
+
+    completedAt: task.completedAt,
+
+    createdAt: task.createdAt,
+    updatedAt: task.updatedAt,
+  };
+}
+
+export async function deleteTask(actorId: string, taskId: string) {
+  const task = await prisma.task.findFirst({
+    where: {
+      id: taskId,
+      deletedAt: null,
+    },
+  });
+
+  if (!task) {
+    throw new Error("Task not found");
+  }
+
+  const membership = await getWorkspaceMembership(task.workspaceId, actorId);
+
+  if (!membership) {
+    throw new Error("You are not a member of this workspace");
+  }
+
+  if (membership.role === "GUEST") {
+    throw new Error("Guests cannot delete tasks");
+  }
+
+  await prisma.task.update({
+    where: {
+      id: task.id,
+    },
+    data: {
+      deletedAt: new Date(),
+    },
+  });
+
+  await createActivity({
+    workspaceId: task.workspaceId,
+    actorId,
+
+    type: ActivityType.TASK_DELETED,
+
+    entityType: ActivityEntityType.TASK,
+    entityId: task.id,
+
+    metadata: {
+      taskTitle: task.title,
+    },
+  });
+}
+
 export async function updateTask(
   actorId: string,
   taskId: string,
   data: UpdateTaskData,
 ) {
-  const task = await prisma.task.findUnique({
+  const task = await prisma.task.findFirst({
     where: {
       id: taskId,
+      deletedAt: null,
     },
   });
 

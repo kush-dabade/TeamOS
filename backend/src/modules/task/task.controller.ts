@@ -7,7 +7,13 @@ import {
   updateTaskSchema,
 } from "./task.schema.js";
 
-import { createTask, listTasks, updateTask } from "./task.service.js";
+import {
+  createTask,
+  deleteTask,
+  getTaskById,
+  listTasks,
+  updateTask,
+} from "./task.service.js";
 
 export async function createTaskHandler(req: Request, res: Response) {
   try {
@@ -127,6 +133,95 @@ export async function listTasksHandler(req: Request, res: Response) {
     }
 
     console.error("List tasks error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "An internal error occurred",
+      },
+    });
+  }
+}
+
+export async function getTaskByIdHandler(req: Request, res: Response) {
+  try {
+    const task = await getTaskById(req.user!.id, req.params.taskId as string);
+
+    return res.status(200).json({
+      success: true,
+      data: task,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("Task not found")) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: "TASK_NOT_FOUND",
+          message: error.message,
+        },
+      });
+    }
+
+    if (
+      error instanceof Error &&
+      error.message.includes("You are not a member of this workspace")
+    ) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: error.message,
+        },
+      });
+    }
+
+    console.error("Get task error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "An internal error occurred",
+      },
+    });
+  }
+}
+
+export async function deleteTaskHandler(req: Request, res: Response) {
+  try {
+    await deleteTask(req.user!.id, req.params.taskId as string);
+
+    return res.status(200).json({
+      success: true,
+      data: null,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("Task not found")) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: "TASK_NOT_FOUND",
+          message: error.message,
+        },
+      });
+    }
+
+    if (
+      error instanceof Error &&
+      (error.message.includes("You are not a member of this workspace") ||
+        error.message.includes("Guests cannot delete tasks"))
+    ) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: error.message,
+        },
+      });
+    }
+
+    console.error("Task delete error:", error);
 
     return res.status(500).json({
       success: false,

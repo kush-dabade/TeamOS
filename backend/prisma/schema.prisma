@@ -42,6 +42,7 @@ enum ActivityType {
   TASK_CREATED
   TASK_STATUS_CHANGED
   TASK_COMPLETED
+  TASK_DELETED
 
   COMMENT_CREATED
 }
@@ -226,6 +227,7 @@ model Task {
   assigneeId  String?
 
   completedAt DateTime?
+  deletedAt   DateTime?
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
@@ -245,6 +247,7 @@ model Task {
   @@index([workspaceId, status])
   @@index([workspaceId, assigneeId])
   @@index([workspaceId, projectId])
+  @@index([deletedAt])
 }
 
 model Comment {

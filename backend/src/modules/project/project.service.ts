@@ -90,6 +90,10 @@ export async function updateProject(
     throw new Error("Project not found");
   }
 
+  if (project.status === "ARCHIVED") {
+    throw new Error("Archived projects cannot be updated");
+  }
+
   const membership = await getWorkspaceMembership(project.workspaceId, actorId);
 
   if (!membership) {
@@ -163,6 +167,56 @@ export async function updateProject(
 
     createdAt: updatedProject.createdAt,
     updatedAt: updatedProject.updatedAt,
+  };
+}
+
+export async function archiveProject(actorId: string, projectId: string) {
+  const project = await findProjectById(projectId);
+
+  if (!project) {
+    throw new Error("Project not found");
+  }
+
+  const membership = await getWorkspaceMembership(project.workspaceId, actorId);
+
+  if (!membership) {
+    throw new Error("You are not a member of this workspace");
+  }
+
+  if (membership.role !== "OWNER" && membership.role !== "ADMIN") {
+    throw new Error("Only workspace owners and admins can archive projects");
+  }
+
+  if (project.status === "ARCHIVED") {
+    throw new Error("Project is already archived");
+  }
+
+  const archivedProject = await prisma.project.update({
+    where: {
+      id: project.id,
+    },
+    data: {
+      status: "ARCHIVED",
+    },
+  });
+
+  await createActivity({
+    workspaceId: archivedProject.workspaceId,
+    actorId,
+
+    type: ActivityType.PROJECT_ARCHIVED,
+
+    entityType: ActivityEntityType.PROJECT,
+    entityId: archivedProject.id,
+
+    metadata: {
+      projectName: archivedProject.name,
+    },
+  });
+
+  return {
+    id: archivedProject.id,
+    status: archivedProject.status,
   };
 }
 

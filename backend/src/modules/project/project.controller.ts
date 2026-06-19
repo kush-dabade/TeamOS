@@ -8,6 +8,7 @@ import {
 } from "./project.schema.js";
 
 import {
+  archiveProject,
   createProject,
   listProjects,
   getProject,
@@ -252,7 +253,95 @@ export async function updateProjectHandler(req: Request, res: Response) {
       });
     }
 
+    if (
+      error instanceof Error &&
+      error.message === "Archived projects cannot be updated"
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: error.message,
+        },
+      });
+    }
+
     console.error("Update project error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "An internal error occurred",
+      },
+    });
+  }
+}
+
+export async function archiveProjectHandler(req: Request, res: Response) {
+  try {
+    const project = await archiveProject(
+      req.user!.id,
+      req.params.projectId as string,
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: project,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "Project not found") {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: "PROJECT_NOT_FOUND",
+          message: error.message,
+        },
+      });
+    }
+
+    if (
+      error instanceof Error &&
+      error.message.includes(
+        "Only workspace owners and admins can archive projects",
+      )
+    ) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: error.message,
+        },
+      });
+    }
+
+    if (
+      error instanceof Error &&
+      error.message.includes("You are not a member of this workspace")
+    ) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: error.message,
+        },
+      });
+    }
+
+    if (
+      error instanceof Error &&
+      error.message === "Project is already archived"
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: error.message,
+        },
+      });
+    }
+
+    console.error("Archive project error:", error);
 
     return res.status(500).json({
       success: false,

@@ -3,10 +3,7 @@ import { ZodError } from "zod";
 
 import { createCommentSchema } from "./comments.validation.js";
 
-import {
-  createComment,
-  listComments,
-} from "./comments.service.js";
+import { createComment, listComments } from "./comments.service.js";
 
 export async function createCommentHandler(req: Request, res: Response) {
   try {
@@ -53,6 +50,19 @@ export async function createCommentHandler(req: Request, res: Response) {
         success: false,
         error: {
           code: "FORBIDDEN",
+          message: error.message,
+        },
+      });
+    }
+
+    if (
+      error instanceof Error &&
+      error.message === "Archived projects cannot be modified"
+    ) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
           message: error.message,
         },
       });

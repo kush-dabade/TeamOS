@@ -90,10 +90,6 @@ export async function updateProject(
     throw new Error("Project not found");
   }
 
-  if (project.status === "ARCHIVED") {
-    throw new Error("Archived projects cannot be updated");
-  }
-
   const membership = await getWorkspaceMembership(project.workspaceId, actorId);
 
   if (!membership) {
@@ -102,6 +98,10 @@ export async function updateProject(
 
   if (membership.role !== "OWNER" && membership.role !== "ADMIN") {
     throw new Error("Only workspace owners and admins can update projects");
+  }
+
+  if (project.status === "ARCHIVED") {
+    throw new Error("Archived projects cannot be updated");
   }
 
   const oldName = project.name;

@@ -54,7 +54,7 @@ export async function createComment(
   actorId: string,
   data: CreateCommentData,
 ): Promise<CommentResponse> {
-  const task = await prisma.task.findUnique({
+  const task = await prisma.task.findFirst({
     where: {
       id: data.taskId,
       deletedAt: null,
@@ -73,6 +73,16 @@ export async function createComment(
 
   if (membership.role === "GUEST") {
     throw new Error("Guests cannot create comments");
+  }
+
+  const project = await prisma.project.findUnique({
+    where: {
+      id: task.projectId,
+    },
+  });
+
+  if (project?.status === "ARCHIVED") {
+    throw new Error("Archived projects cannot be modified");
   }
 
   const comment = await prisma.comment.create({
@@ -114,7 +124,7 @@ export async function listComments(
   actorId: string,
   options: ListCommentsOptions,
 ): Promise<CommentResponse[]> {
-  const task = await prisma.task.findUnique({
+  const task = await prisma.task.findFirst({
     where: {
       id: options.taskId,
       deletedAt: null,

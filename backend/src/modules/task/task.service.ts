@@ -35,6 +35,10 @@ export async function createTask(actorId: string, data: CreateTaskData) {
     throw new Error("Project not found");
   }
 
+  if (project.status === "ARCHIVED") {
+    throw new Error("Archived projects cannot be modified");
+  }
+
   const membership = await getWorkspaceMembership(project.workspaceId, actorId);
 
   if (!membership) {
@@ -237,6 +241,16 @@ export async function deleteTask(actorId: string, taskId: string) {
     throw new Error("Guests cannot delete tasks");
   }
 
+  const project = await prisma.project.findUnique({
+    where: {
+      id: task.projectId,
+    },
+  });
+
+  if (project?.status === "ARCHIVED") {
+    throw new Error("Archived projects cannot be modified");
+  }
+
   await prisma.task.update({
     where: {
       id: task.id,
@@ -285,6 +299,16 @@ export async function updateTask(
 
   if (membership.role === "GUEST") {
     throw new Error("Guests cannot update tasks");
+  }
+
+  const project = await prisma.project.findUnique({
+    where: {
+      id: task.projectId,
+    },
+  });
+
+  if (project?.status === "ARCHIVED") {
+    throw new Error("Archived projects cannot be modified");
   }
 
   if (data.assigneeId !== undefined && data.assigneeId !== null) {

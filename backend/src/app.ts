@@ -9,6 +9,8 @@ import commentRoutes from "./modules/comments/comments.routes.js";
 import activityRoutes from "./modules/activity/activity.routes.js";
 import taskItemRoutes from "./modules/task/task-item.routes.js";
 import projectItemRoutes from "./modules/project/project-item.routes.js";
+import sprintRoutes from "./modules/sprint/sprint.routes.js";
+import sprintItemRoutes from "./modules/sprint/sprint-item.routes.js";
 
 const app = express();
 
@@ -16,14 +18,19 @@ app.all("/api/auth/*splat", toNodeHandler(auth));
 
 app.use(express.json());
 
+// workspace resources
 app.use("/api/v1/workspaces", workspaceRoutes);
 app.use("/api/v1/workspaces", projectRoutes);
 app.use("/api/v1/workspaces", activityRoutes);
 
+// project resources
 app.use("/api/v1/projects", taskRoutes);
+app.use("/api/v1/projects", sprintRoutes);
+
+// item resources
 app.use("/api/v1/projects", projectItemRoutes);
 app.use("/api/v1/tasks", taskItemRoutes);
-app.use("/api/v1/tasks", commentRoutes);
+app.use("/api/v1/sprints", sprintItemRoutes);
 
 app.get("/health", (_req, res) => {
   res.status(200).json({

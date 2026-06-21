@@ -42,11 +42,25 @@ async function findSprintById(sprintId: string) {
   });
 }
 
-async function findSprintByProjectAndName(projectId: string, name: string) {
+async function findSprintByProjectAndName(
+  projectId: string,
+  name: string,
+  excludeSprintId?: string,
+) {
   return prisma.sprint.findFirst({
     where: {
       projectId,
-      name,
+
+      name: {
+        equals: name,
+        mode: "insensitive",
+      },
+
+      ...(excludeSprintId && {
+        id: {
+          not: excludeSprintId,
+        },
+      }),
     },
   });
 }
@@ -246,6 +260,20 @@ export async function updateSprint(
     throw new ValidationError("Archived projects cannot be modified");
   }
 
+  const effectiveStartDate =
+    data.startDate !== undefined ? new Date(data.startDate) : sprint.startDate;
+
+  const effectiveEndDate =
+    data.endDate !== undefined ? new Date(data.endDate) : sprint.endDate;
+
+  if (
+    effectiveStartDate &&
+    effectiveEndDate &&
+    effectiveEndDate < effectiveStartDate
+  ) {
+    throw new ValidationError("End date must be after start date");
+  }
+
   if (
     data.name !== undefined &&
     data.name.toLowerCase() !== sprint.name.toLowerCase()
@@ -253,6 +281,7 @@ export async function updateSprint(
     const existingSprint = await findSprintByProjectAndName(
       sprint.projectId,
       data.name,
+      sprint.id,
     );
 
     if (existingSprint) {
@@ -295,6 +324,14 @@ export async function updateSprint(
   if (data.goal !== undefined && data.goal !== sprint.goal) {
     metadata.oldGoal = sprint.goal ?? "";
     metadata.newGoal = data.goal ?? "";
+  }
+
+  if (data.startDate !== undefined) {
+    metadata.startDateUpdated = "true";
+  }
+
+  if (data.endDate !== undefined) {
+    metadata.endDateUpdated = "true";
   }
 
   if (Object.keys(metadata).length > 0) {

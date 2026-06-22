@@ -11,6 +11,7 @@ import taskItemRoutes from "./modules/task/task-item.routes.js";
 import projectItemRoutes from "./modules/project/project-item.routes.js";
 import sprintRoutes from "./modules/sprint/sprint.routes.js";
 import sprintItemRoutes from "./modules/sprint/sprint-item.routes.js";
+import sprintTaskRoutes from "./modules/sprint-task/sprint-task.routes.js";
 
 const app = express();
 
@@ -30,7 +31,9 @@ app.use("/api/v1/projects", sprintRoutes);
 // item resources
 app.use("/api/v1/projects", projectItemRoutes);
 app.use("/api/v1/tasks", taskItemRoutes);
+app.use("/api/v1/tasks", commentRoutes);
 app.use("/api/v1/sprints", sprintItemRoutes);
+app.use("/api/v1/sprints", sprintTaskRoutes);
 
 app.get("/health", (_req, res) => {
   res.status(200).json({

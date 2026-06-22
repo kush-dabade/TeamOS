@@ -65,6 +65,15 @@ async function findSprintByProjectAndName(
   });
 }
 
+async function findActiveSprintByProject(projectId: string) {
+  return prisma.sprint.findFirst({
+    where: {
+      projectId,
+      status: "ACTIVE",
+    },
+  });
+}
+
 export async function createSprint(actorId: string, data: CreateSprintData) {
   const project = await findProjectById(data.projectId);
 
@@ -347,6 +356,164 @@ export async function updateSprint(
       metadata,
     });
   }
+
+  return {
+    id: updatedSprint.id,
+
+    workspaceId: updatedSprint.workspaceId,
+    projectId: updatedSprint.projectId,
+
+    name: updatedSprint.name,
+    goal: updatedSprint.goal,
+
+    status: updatedSprint.status,
+
+    startDate: updatedSprint.startDate,
+    endDate: updatedSprint.endDate,
+
+    createdAt: updatedSprint.createdAt,
+    updatedAt: updatedSprint.updatedAt,
+  };
+}
+
+export async function startSprint(actorId: string, sprintId: string) {
+  const sprint = await findSprintById(sprintId);
+
+  if (!sprint) {
+    throw new NotFoundError("Sprint not found");
+  }
+
+  const membership = await getWorkspaceMembership(sprint.workspaceId, actorId);
+
+  if (!membership) {
+    throw new ForbiddenError("You are not a member of this workspace");
+  }
+
+  if (membership.role !== "OWNER" && membership.role !== "ADMIN") {
+    throw new ForbiddenError(
+      "Only workspace owners and admins can start sprints",
+    );
+  }
+
+  const project = await findProjectById(sprint.projectId);
+
+  if (!project) {
+    throw new NotFoundError("Project not found");
+  }
+
+  if (project.status === "ARCHIVED") {
+    throw new ValidationError("Archived projects cannot be modified");
+  }
+
+  if (sprint.status !== "PLANNED") {
+    throw new ValidationError("Only planned sprints can be started");
+  }
+
+  const activeSprint = await findActiveSprintByProject(sprint.projectId);
+
+  if (activeSprint && activeSprint.id !== sprint.id) {
+    throw new ValidationError(
+      "Another active sprint already exists for this project",
+    );
+  }
+
+  const updatedSprint = await prisma.sprint.update({
+    where: {
+      id: sprint.id,
+    },
+    data: {
+      status: "ACTIVE",
+    },
+  });
+
+  await createActivity({
+    workspaceId: updatedSprint.workspaceId,
+    actorId,
+
+    type: ActivityType.SPRINT_STARTED,
+
+    entityType: ActivityEntityType.SPRINT,
+    entityId: updatedSprint.id,
+
+    metadata: {
+      sprintName: updatedSprint.name,
+    },
+  });
+
+  return {
+    id: updatedSprint.id,
+
+    workspaceId: updatedSprint.workspaceId,
+    projectId: updatedSprint.projectId,
+
+    name: updatedSprint.name,
+    goal: updatedSprint.goal,
+
+    status: updatedSprint.status,
+
+    startDate: updatedSprint.startDate,
+    endDate: updatedSprint.endDate,
+
+    createdAt: updatedSprint.createdAt,
+    updatedAt: updatedSprint.updatedAt,
+  };
+}
+
+export async function completeSprint(actorId: string, sprintId: string) {
+  const sprint = await findSprintById(sprintId);
+
+  if (!sprint) {
+    throw new NotFoundError("Sprint not found");
+  }
+
+  const membership = await getWorkspaceMembership(sprint.workspaceId, actorId);
+
+  if (!membership) {
+    throw new ForbiddenError("You are not a member of this workspace");
+  }
+
+  if (membership.role !== "OWNER" && membership.role !== "ADMIN") {
+    throw new ForbiddenError(
+      "Only workspace owners and admins can complete sprints",
+    );
+  }
+
+  const project = await findProjectById(sprint.projectId);
+
+  if (!project) {
+    throw new NotFoundError("Project not found");
+  }
+
+  if (project.status === "ARCHIVED") {
+    throw new ValidationError("Archived projects cannot be modified");
+  }
+
+  if (sprint.status !== "ACTIVE") {
+    throw new ValidationError("Only active sprints can be completed");
+  }
+
+  const updatedSprint = await prisma.sprint.update({
+    where: {
+      id: sprint.id,
+    },
+    data: {
+      status: "COMPLETED",
+    },
+  });
+
+  await createActivity({
+    workspaceId: updatedSprint.workspaceId,
+    actorId,
+
+    type: ActivityType.SPRINT_COMPLETED,
+
+    entityType: ActivityEntityType.SPRINT,
+    entityId: updatedSprint.id,
+
+    metadata: {
+      sprintName: updatedSprint.name,
+    },
+  });
 
   return {
     id: updatedSprint.id,

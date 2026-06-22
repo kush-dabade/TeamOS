@@ -70,6 +70,18 @@ export async function assignTaskToSprint(
     throw new NotFoundError("Sprint not found");
   }
 
+  const membership = await getWorkspaceMembership(sprint.workspaceId, userId);
+
+  if (!membership) {
+    throw new ForbiddenError("You are not a member of this workspace");
+  }
+
+  if (membership.role !== "OWNER" && membership.role !== "ADMIN") {
+    throw new ForbiddenError(
+      "Only workspace owners and admins can assign tasks to sprints",
+    );
+  }
+
   const task = await findTaskById(taskId);
 
   if (!task) {
@@ -93,22 +105,6 @@ export async function assignTaskToSprint(
   }
 
   await validateProjectCanBeModified(sprint.projectId);
-
-  const membership = await getWorkspaceMembership(sprint.workspaceId, userId);
-
-  if (!membership) {
-    throw new ForbiddenError("You are not a member of this workspace");
-  }
-
-  if (membership.role !== "OWNER" && membership.role !== "ADMIN") {
-    throw new ForbiddenError(
-      "Only workspace owners and admins can assign tasks to sprints",
-    );
-  }
-
-  if (task.sprintId === sprint.id) {
-    throw new ValidationError("Task is already assigned to this sprint");
-  }
 
   const previousSprint =
     task.sprintId && task.sprintId !== sprint.id
@@ -159,6 +155,18 @@ export async function removeTaskFromSprint(
     throw new NotFoundError("Sprint not found");
   }
 
+  const membership = await getWorkspaceMembership(sprint.workspaceId, userId);
+
+  if (!membership) {
+    throw new ForbiddenError("You are not a member of this workspace");
+  }
+
+  if (membership.role !== "OWNER" && membership.role !== "ADMIN") {
+    throw new ForbiddenError(
+      "Only workspace owners and admins can remove tasks from sprints",
+    );
+  }
+
   const task = await findTaskById(taskId);
 
   if (!task) {
@@ -174,18 +182,6 @@ export async function removeTaskFromSprint(
   }
 
   await validateProjectCanBeModified(sprint.projectId);
-
-  const membership = await getWorkspaceMembership(sprint.workspaceId, userId);
-
-  if (!membership) {
-    throw new ForbiddenError("You are not a member of this workspace");
-  }
-
-  if (membership.role !== "OWNER" && membership.role !== "ADMIN") {
-    throw new ForbiddenError(
-      "Only workspace owners and admins can remove tasks from sprints",
-    );
-  }
 
   const updatedTask = await prisma.task.update({
     where: {

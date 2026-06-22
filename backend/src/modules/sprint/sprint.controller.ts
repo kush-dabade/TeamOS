@@ -7,6 +7,8 @@ import {
   listSprints,
   getSprint,
   updateSprint,
+  startSprint,
+  completeSprint,
 } from "./sprint.service.js";
 
 import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
@@ -226,6 +228,114 @@ export async function updateSprintHandler(req: Request, res: Response) {
     }
 
     console.error("Update sprint error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "An internal error occurred",
+      },
+    });
+  }
+}
+
+export async function startSprintHandler(req: Request, res: Response) {
+  try {
+    const sprint = await startSprint(
+      req.user!.id,
+      req.params.sprintId as string,
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: sprint,
+    });
+  } catch (error) {
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: "SPRINT_NOT_FOUND",
+          message: error.message,
+        },
+      });
+    }
+
+    if (error instanceof ForbiddenError) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: error.message,
+        },
+      });
+    }
+
+    if (error instanceof ValidationError) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: error.message,
+        },
+      });
+    }
+
+    console.error("Start sprint error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "An internal error occurred",
+      },
+    });
+  }
+}
+
+export async function completeSprintHandler(req: Request, res: Response) {
+  try {
+    const sprint = await completeSprint(
+      req.user!.id,
+      req.params.sprintId as string,
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: sprint,
+    });
+  } catch (error) {
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: "SPRINT_NOT_FOUND",
+          message: error.message,
+        },
+      });
+    }
+
+    if (error instanceof ForbiddenError) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: error.message,
+        },
+      });
+    }
+
+    if (error instanceof ValidationError) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: error.message,
+        },
+      });
+    }
+
+    console.error("Complete sprint error:", error);
 
     return res.status(500).json({
       success: false,

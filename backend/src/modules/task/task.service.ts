@@ -104,18 +104,22 @@ export async function createTask(actorId: string, data: CreateTaskData) {
   });
 
   if (task.assigneeId && task.assigneeId !== actorId) {
-    await createNotification({
-      workspaceId: task.workspaceId,
+    try {
+      await createNotification({
+        workspaceId: task.workspaceId,
 
-      recipientId: task.assigneeId,
+        recipientId: task.assigneeId,
 
-      type: NotificationType.TASK_ASSIGNED,
+        type: NotificationType.TASK_ASSIGNED,
 
-      metadata: {
-        taskId: task.id,
-        taskTitle: task.title,
-      },
-    });
+        metadata: {
+          taskId: task.id,
+          taskTitle: task.title,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to create notification:", error);
+    }
   }
 
   return {
@@ -401,18 +405,22 @@ export async function updateTask(
     updatedTask.assigneeId !== task.assigneeId &&
     updatedTask.assigneeId !== actorId
   ) {
-    await createNotification({
-      workspaceId: updatedTask.workspaceId,
+    try {
+      await createNotification({
+        workspaceId: updatedTask.workspaceId,
 
-      recipientId: updatedTask.assigneeId,
+        recipientId: updatedTask.assigneeId,
 
-      type: NotificationType.TASK_ASSIGNED,
+        type: NotificationType.TASK_ASSIGNED,
 
-      metadata: {
-        taskId: updatedTask.id,
-        taskTitle: updatedTask.title,
-      },
-    });
+        metadata: {
+          taskId: updatedTask.id,
+          taskTitle: updatedTask.title,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to create notification:", error);
+    }
   }
 
   if (data.status !== undefined && oldStatus !== updatedTask.status) {

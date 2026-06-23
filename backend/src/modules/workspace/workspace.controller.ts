@@ -2,15 +2,9 @@ import type { Request, Response } from "express";
 import { ZodError } from "zod";
 
 import { createWorkspaceSchema } from "./workspace.schema.js";
-import {
-  createWorkspace,
-  getUserWorkspaces,
-} from "./workspace.service.js";
+import { createWorkspace, getUserWorkspaces } from "./workspace.service.js";
 
-export async function createWorkspaceHandler(
-  req: Request,
-  res: Response
-) {
+export async function createWorkspaceHandler(req: Request, res: Response) {
   try {
     const body = createWorkspaceSchema.parse(req.body);
 
@@ -66,13 +60,8 @@ export async function createWorkspaceHandler(
   }
 }
 
-export async function getUserWorkspacesHandler(
-  req: Request,
-  res: Response
-) {
-  const workspaces = await getUserWorkspaces(
-    req.user!.id
-  );
+export async function getUserWorkspacesHandler(req: Request, res: Response) {
+  const workspaces = await getUserWorkspaces(req.user!.id);
 
   return res.status(200).json({
     success: true,

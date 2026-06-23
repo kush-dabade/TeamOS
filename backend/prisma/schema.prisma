@@ -69,6 +69,11 @@ enum SprintStatus {
   COMPLETED
 }
 
+enum NotificationType {
+  TASK_ASSIGNED
+  COMMENT_ON_ASSIGNED_TASK
+}
+
 model User {
   id            String   @id
   name          String
@@ -89,6 +94,7 @@ model User {
   comments      Comment[]
   memberships   WorkspaceMember[]
   activities    Activity[]
+  notifications Notification[]    @relation("NotificationRecipient")
 
   @@unique([email])
   @@map("user")
@@ -158,12 +164,13 @@ model Workspace {
 
   owner User @relation("OwnedWorkspaces", fields: [ownerId], references: [id])
 
-  members    WorkspaceMember[]
-  projects   Project[]
-  tasks      Task[]
-  comments   Comment[]
-  activities Activity[]
-  sprints    Sprint[]
+  members       WorkspaceMember[]
+  projects      Project[]
+  tasks         Task[]
+  comments      Comment[]
+  activities    Activity[]
+  sprints       Sprint[]
+  notifications Notification[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -352,4 +359,29 @@ model Sprint {
   @@index([projectId])
   @@index([workspaceId, projectId])
   @@index([workspaceId, status])
+}
+
+model Notification {
+  id String @id @default(cuid())
+
+  workspaceId String
+  recipientId String
+
+  type NotificationType
+
+  metadata Json?
+
+  isRead Boolean @default(false)
+
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  recipient User @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId, isRead])
+  @@index([recipientId, createdAt(sort: Desc)])
+  @@index([workspaceId])
+  @@index([deletedAt])
 }

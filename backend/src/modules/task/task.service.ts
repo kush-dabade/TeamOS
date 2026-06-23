@@ -7,10 +7,12 @@ import type {
 } from "./task.types.js";
 
 import { createActivity } from "../activity/activity.service.js";
+import { createNotification } from "../notification/notification.service.js";
 
 import {
   ActivityEntityType,
   ActivityType,
+  NotificationType,
 } from "../../generated/prisma/enums.js";
 
 async function getWorkspaceMembership(workspaceId: string, userId: string) {
@@ -100,6 +102,25 @@ export async function createTask(actorId: string, data: CreateTaskData) {
       taskTitle: task.title,
     },
   });
+
+  if (task.assigneeId && task.assigneeId !== actorId) {
+    try {
+      await createNotification({
+        workspaceId: task.workspaceId,
+
+        recipientId: task.assigneeId,
+
+        type: NotificationType.TASK_ASSIGNED,
+
+        metadata: {
+          taskId: task.id,
+          taskTitle: task.title,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to create notification:", error);
+    }
+  }
 
   return {
     id: task.id,
@@ -377,6 +398,30 @@ export async function updateTask(
 
     data: updateData,
   });
+
+  if (
+    data.assigneeId !== undefined &&
+    updatedTask.assigneeId !== null &&
+    updatedTask.assigneeId !== task.assigneeId &&
+    updatedTask.assigneeId !== actorId
+  ) {
+    try {
+      await createNotification({
+        workspaceId: updatedTask.workspaceId,
+
+        recipientId: updatedTask.assigneeId,
+
+        type: NotificationType.TASK_ASSIGNED,
+
+        metadata: {
+          taskId: updatedTask.id,
+          taskTitle: updatedTask.title,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to create notification:", error);
+    }
+  }
 
   if (data.status !== undefined && oldStatus !== updatedTask.status) {
     await createActivity({

@@ -1,8 +1,20 @@
 import type { Request, Response } from "express";
 import { ZodError } from "zod";
 
-import { createWorkspaceSchema } from "./workspace.schema.js";
-import { createWorkspace, getUserWorkspaces } from "./workspace.service.js";
+import {
+  createWorkspaceSchema,
+  updateWorkspaceMemberRoleSchema,
+} from "./workspace.schema.js";
+import {
+  createWorkspace,
+  getUserWorkspaces,
+  listWorkspaceMembers,
+  updateWorkspaceMemberRole,
+  removeWorkspaceMember,
+} from "./workspace.service.js";
+import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
+import { NotFoundError } from "../../shared/errors/not-found-error.js";
+import { ValidationError } from "../../shared/errors/validation-error.js";
 
 export async function createWorkspaceHandler(req: Request, res: Response) {
   try {
@@ -67,4 +79,142 @@ export async function getUserWorkspacesHandler(req: Request, res: Response) {
     success: true,
     data: workspaces,
   });
+}
+
+export async function listWorkspaceMembersHandler(req: Request, res: Response) {
+  const members = await listWorkspaceMembers(
+    req.params.workspaceId as string,
+    req.user!.id,
+  );
+
+  return res.status(200).json({
+    success: true,
+    data: members,
+  });
+}
+
+export async function updateWorkspaceMemberRoleHandler(
+  req: Request,
+  res: Response,
+) {
+  try {
+    const body = updateWorkspaceMemberRoleSchema.parse(req.body);
+
+    const member = await updateWorkspaceMemberRole(
+      req.user!.id,
+      req.params.workspaceId as string,
+      req.params.memberId as string,
+      body.role,
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: member,
+    });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: error.issues[0]?.message ?? "Invalid request",
+        },
+      });
+    }
+
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: "MEMBER_NOT_FOUND",
+          message: error.message,
+        },
+      });
+    }
+
+    if (error instanceof ForbiddenError) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: error.message,
+        },
+      });
+    }
+
+    if (error instanceof ValidationError) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: error.message,
+        },
+      });
+    }
+
+    console.error("Update workspace member role error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "An internal error occurred",
+      },
+    });
+  }
+}
+
+export async function removeWorkspaceMemberHandler(
+  req: Request,
+  res: Response,
+) {
+  try {
+    const result = await removeWorkspaceMember(
+      req.user!.id,
+      req.params.workspaceId as string,
+      req.params.memberId as string,
+    );
+
+    return res.status(200).json(result);
+  } catch (error) {
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: "MEMBER_NOT_FOUND",
+          message: error.message,
+        },
+      });
+    }
+
+    if (error instanceof ForbiddenError) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: error.message,
+        },
+      });
+    }
+
+    if (error instanceof ValidationError) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: error.message,
+        },
+      });
+    }
+
+    console.error("Remove workspace member error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "An internal error occurred",
+      },
+    });
+  }
 }

@@ -82,15 +82,47 @@ export async function getUserWorkspacesHandler(req: Request, res: Response) {
 }
 
 export async function listWorkspaceMembersHandler(req: Request, res: Response) {
-  const members = await listWorkspaceMembers(
-    req.params.workspaceId as string,
-    req.user!.id,
-  );
+  try {
+    const members = await listWorkspaceMembers(
+      req.params.workspaceId as string,
+      req.user!.id,
+    );
 
-  return res.status(200).json({
-    success: true,
-    data: members,
-  });
+    return res.status(200).json({
+      success: true,
+      data: members,
+    });
+  } catch (error) {
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: "MEMBER_NOT_FOUND",
+          message: error.message,
+        },
+      });
+    }
+
+    if (error instanceof ForbiddenError) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: error.message,
+        },
+      });
+    }
+
+    console.error("List workspace members error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "An internal error occurred",
+      },
+    });
+  }
 }
 
 export async function updateWorkspaceMemberRoleHandler(

@@ -97,6 +97,22 @@ function canManageMember(actorRole: WorkspaceRole, targetRole: WorkspaceRole) {
   return false;
 }
 
+function canAssignRole(actorRole: WorkspaceRole, role: WorkspaceRole) {
+  if (actorRole === WorkspaceRole.OWNER) {
+    return (
+      role === WorkspaceRole.ADMIN ||
+      role === WorkspaceRole.MEMBER ||
+      role === WorkspaceRole.GUEST
+    );
+  }
+
+  if (actorRole === WorkspaceRole.ADMIN) {
+    return role === WorkspaceRole.MEMBER || role === WorkspaceRole.GUEST;
+  }
+
+  return false;
+}
+
 export async function createWorkspace(data: CreateWorkspaceData) {
   const slug = await generateUniqueSlug(data.name);
 
@@ -208,6 +224,10 @@ export async function updateWorkspaceMemberRole(
     throw new ForbiddenError(
       "You do not have permission to manage this member",
     );
+  }
+
+  if (!canAssignRole(actorMembership.role, role)) {
+    throw new ForbiddenError("You do not have permission to assign this role");
   }
 
   if (targetMember.role === role) {

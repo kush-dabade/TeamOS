@@ -13,6 +13,8 @@ import { prisma } from "../../lib/prisma.js";
 
 import { createActivity } from "../activity/activity.service.js";
 
+import { sendWorkspaceInvitation } from "../email/index.js";
+
 import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
 import { NotFoundError } from "../../shared/errors/not-found-error.js";
 import { ValidationError } from "../../shared/errors/validation-error.js";
@@ -142,12 +144,25 @@ function toInvitationResponse(
 export async function createInvitation(
   data: CreateInvitationData,
 ): Promise<InvitationResponse> {
-  await getWorkspaceById(data.workspaceId);
+  const workspace = await getWorkspaceById(data.workspaceId);
 
   const actorMembership = await getWorkspaceMembership(
     data.workspaceId,
     data.invitedById,
   );
+
+  const actor = await prisma.user.findUnique({
+    where: {
+      id: data.invitedById,
+    },
+    select: {
+      name: true,
+    },
+  });
+
+  if (!actor) {
+    throw new NotFoundError("User not found");
+  }
 
   if (!canAssignRole(actorMembership.role, data.role)) {
     throw new ForbiddenError("You do not have permission to assign this role");
@@ -211,6 +226,18 @@ export async function createInvitation(
       role: invitation.role,
     },
   });
+
+  try {
+    await sendWorkspaceInvitation({
+      recipientEmail: invitation.email,
+      workspaceName: workspace.name,
+      invitedByName: actor.name,
+      role: invitation.role,
+      invitationToken: invitation.token,
+    });
+  } catch (error) {
+    console.error("Failed to send workspace invitation email:", error);
+  }
 
   return toInvitationResponse(invitation);
 }

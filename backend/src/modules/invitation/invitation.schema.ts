@@ -2,7 +2,7 @@ import { z } from "zod";
 import { WorkspaceRole } from "../../generated/prisma/enums.js";
 
 export const createInvitationSchema = z.object({
-  email: z.email().trim().toLowerCase(),
+  email: z.string().trim().toLowerCase().pipe(z.email()),
 
   role: z
     .nativeEnum(WorkspaceRole)

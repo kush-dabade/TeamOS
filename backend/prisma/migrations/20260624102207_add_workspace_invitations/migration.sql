@@ -48,7 +48,9 @@ CREATE INDEX "WorkspaceInvitation_status_idx" ON "WorkspaceInvitation"("status")
 CREATE INDEX "WorkspaceInvitation_workspaceId_status_idx" ON "WorkspaceInvitation"("workspaceId", "status");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "WorkspaceInvitation_workspaceId_email_status_key" ON "WorkspaceInvitation"("workspaceId", "email", "status");
+CREATE UNIQUE INDEX "WorkspaceInvitation_workspaceId_email_pending_key"
+ON "WorkspaceInvitation"("workspaceId", "email")
+WHERE "status" = 'PENDING';
 
 -- AddForeignKey
 ALTER TABLE "WorkspaceInvitation" ADD CONSTRAINT "WorkspaceInvitation_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace"("id") ON DELETE CASCADE ON UPDATE CASCADE;

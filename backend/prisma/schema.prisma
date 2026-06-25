@@ -424,7 +424,6 @@ model WorkspaceInvitation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([workspaceId, email, status])
   @@index([workspaceId])
   @@index([email])
   @@index([status])

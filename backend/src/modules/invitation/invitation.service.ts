@@ -142,17 +142,17 @@ function toInvitationResponse(
 export async function createInvitation(
   data: CreateInvitationData,
 ): Promise<InvitationResponse> {
+  await getWorkspaceById(data.workspaceId);
+
   const actorMembership = await getWorkspaceMembership(
     data.workspaceId,
     data.invitedById,
   );
 
-  await getWorkspaceById(data.workspaceId);
-
   if (!canAssignRole(actorMembership.role, data.role)) {
     throw new ForbiddenError("You do not have permission to assign this role");
   }
-  
+
   const email = data.email.toLowerCase();
   const existingUser = await findUserByEmail(email);
 
@@ -232,8 +232,10 @@ export async function listWorkspaceInvitations(
     where: {
       workspaceId,
       status: InvitationStatus.PENDING,
+      expiresAt: {
+        gt: new Date(),
+      },
     },
-
     orderBy: {
       createdAt: "desc",
     },

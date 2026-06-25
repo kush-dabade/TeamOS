@@ -4,4 +4,19 @@ export interface SendWorkspaceInvitationEmailData {
   invitedByName: string;
   role: string;
   invitationToken: string;
+  expiresAt: Date;
+}
+
+export interface EmailTemplate {
+  subject: string;
+  html: string;
+  text: string;
+}
+
+export interface WorkspaceInvitationTemplateData {
+  workspaceName: string;
+  invitedByName: string;
+  role: string;
+  invitationUrl: string;
+  expiresText: string;
 }

@@ -10,6 +10,21 @@ export function workspaceInvitationTemplate(
   const heading = "You've been invited to TeamOS";
   const buttonText = "Accept Invitation";
 
+  function escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  const workspaceName = escapeHtml(data.workspaceName);
+  const invitedByName = escapeHtml(data.invitedByName);
+  const role = escapeHtml(data.role);
+  const invitationUrl = escapeHtml(data.invitationUrl);
+  const expiresText = escapeHtml(data.expiresText);
+
   const text = `
 ${heading}
 
@@ -117,11 +132,11 @@ TeamOS
                               color:#3f3f46;
                               "
                               >
-                              <strong>${data.invitedByName}</strong>
+                              <strong>${invitedByName}</strong>
                               has invited you to collaborate in the workspace
-                              <strong>${data.workspaceName}</strong>
+                              <strong>${workspaceName}</strong>
                               as a
-                              <strong>${data.role}</strong>.
+                              <strong>${role}</strong>.
                             </p>
                             <p
                               style="
@@ -168,7 +183,7 @@ TeamOS
                                         color:#18181b;
                                         "
                                         >
-                                        ${data.workspaceName}
+                                        ${workspaceName}
                                     </p>
                                     <p
                                         style="
@@ -199,7 +214,7 @@ TeamOS
                                               font-weight:600;
                                               "
                                               >
-                                              ${data.role}
+                                              ${role}
                                           </td>
                                         </tr>
                                     </table>
@@ -221,7 +236,7 @@ TeamOS
                                     "
                                     >
                                     <a
-                                        href="${data.invitationUrl}"
+                                        href="${invitationUrl}"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         role="button"
@@ -259,7 +274,7 @@ TeamOS
                               line-height:22px;
                               "
                               >
-                              ${data.invitationUrl}
+                              ${invitationUrl}
                             </p>
                             <table
                               role="presentation"
@@ -285,7 +300,7 @@ TeamOS
                               color:#52525b;
                               "
                               >
-                              <strong>${data.expiresText}</strong>
+                              <strong>${expiresText}</strong>
                             </p>
                             <p
                               style="

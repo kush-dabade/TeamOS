@@ -13,6 +13,8 @@ import sprintRoutes from "./modules/sprint/sprint.routes.js";
 import sprintItemRoutes from "./modules/sprint/sprint-item.routes.js";
 import sprintTaskRoutes from "./modules/sprint-task/sprint-task.routes.js";
 import notificationRoutes from "./modules/notification/notification.routes.js";
+import invitationRoutes from "./modules/invitation/invitation.routes.js";
+import workspaceInvitationRoutes from "./modules/invitation/workspace-invitation.routes.js";
 
 const app = express();
 
@@ -24,6 +26,7 @@ app.use(express.json());
 app.use("/api/v1/workspaces", workspaceRoutes);
 app.use("/api/v1/workspaces", projectRoutes);
 app.use("/api/v1/workspaces", activityRoutes);
+app.use("/api/v1/workspaces", workspaceInvitationRoutes);
 
 // project resources
 app.use("/api/v1/projects", taskRoutes);
@@ -35,6 +38,9 @@ app.use("/api/v1/tasks", taskItemRoutes);
 app.use("/api/v1/tasks", commentRoutes);
 app.use("/api/v1/sprints", sprintItemRoutes);
 app.use("/api/v1/sprints", sprintTaskRoutes);
+
+// invitation resources
+app.use("/api/v1/invitations", invitationRoutes);
 
 // notification resources
 app.use("/api/v1/notifications", notificationRoutes);

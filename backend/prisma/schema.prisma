@@ -50,6 +50,12 @@ enum ActivityType {
 
   COMMENT_CREATED
 
+  USER_INVITED
+
+  INVITATION_ACCEPTED
+
+  INVITATION_DECLINED
+
   SPRINT_CREATED
   SPRINT_UPDATED
   SPRINT_STARTED
@@ -61,6 +67,7 @@ enum ActivityEntityType {
   TASK
   COMMENT
   SPRINT
+  INVITATION
 }
 
 enum SprintStatus {
@@ -72,6 +79,13 @@ enum SprintStatus {
 enum NotificationType {
   TASK_ASSIGNED
   COMMENT_ON_ASSIGNED_TASK
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
 }
 
 model User {
@@ -86,8 +100,9 @@ model User {
   sessions Session[]
   accounts Account[]
 
-  ownedWorkspaces Workspace[] @relation("OwnedWorkspaces")
-  ownedProjects   Project[]   @relation("ProjectOwner")
+  ownedWorkspaces Workspace[]           @relation("OwnedWorkspaces")
+  ownedProjects   Project[]             @relation("ProjectOwner")
+  sentInvitations WorkspaceInvitation[] @relation("WorkspaceInvitationInviter")
 
   createdTasks  Task[]            @relation("TaskCreator")
   assignedTasks Task[]            @relation("TaskAssignee")
@@ -171,6 +186,7 @@ model Workspace {
   activities    Activity[]
   sprints       Sprint[]
   notifications Notification[]
+  invitations   WorkspaceInvitation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -384,4 +400,33 @@ model Notification {
   @@index([recipientId, createdAt(sort: Desc)])
   @@index([workspaceId])
   @@index([deletedAt])
+}
+
+model WorkspaceInvitation {
+  id String @id @default(cuid())
+
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  email String
+
+  role WorkspaceRole
+
+  invitedById String
+  invitedBy   User   @relation("WorkspaceInvitationInviter", fields: [invitedById], references: [id])
+
+  token String @unique
+
+  status InvitationStatus @default(PENDING)
+
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([workspaceId, email, status])
+  @@index([workspaceId])
+  @@index([email])
+  @@index([status])
+  @@index([workspaceId, status])
 }

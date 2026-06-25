@@ -1,23 +1,54 @@
-import type { SendWorkspaceInvitationEmailData } from "./email.types.js";
-const FRONTEND_URL = process.env.FRONTEND_URL ?? "http://localhost:5173";
+import { resend } from "./email.client.js";
+import { emailConfig } from "./email.config.js";
+import { workspaceInvitationTemplate } from "./templates/workspace-invitation.js";
+import type {
+  EmailTemplate,
+  SendWorkspaceInvitationEmailData,
+} from "./email.types.js";
+
+async function sendEmail(
+  recipientEmail: string,
+  email: EmailTemplate,
+): Promise<void> {
+  const { error } = await resend.emails.send({
+    from: emailConfig.from,
+    to: recipientEmail,
+    subject: email.subject,
+    html: email.html,
+    text: email.text,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
 
 export async function sendWorkspaceInvitation(
   data: SendWorkspaceInvitationEmailData,
 ): Promise<void> {
-  const invitationUrl = `${FRONTEND_URL}/invitations/${data.invitationToken}`;
-  console.log(`
-========================================
-📧 TeamOS Workspace Invitation
+  const invitationUrl = `${emailConfig.frontendUrl}/invitations/${data.invitationToken}`;
 
-To: ${data.recipientEmail}
+  const expiresText = `Expires on ${new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(data.expiresAt)}`;
 
-Subject: You've been invited to join ${data.workspaceName}
+  const email = workspaceInvitationTemplate({
+    workspaceName: data.workspaceName,
+    invitedByName: data.invitedByName,
+    role: data.role,
+    invitationUrl,
+    expiresText,
+  });
 
-${data.invitedByName} has invited you to join the workspace "${data.workspaceName}" as a ${data.role}.
-
-Accept your invitation:
-${invitationUrl}
-
-========================================
-`);
+  try {
+    await sendEmail(data.recipientEmail, email);
+  } catch (error) {
+    console.error("Failed to send workspace invitation email", {
+      recipient: data.recipientEmail,
+      workspace: data.workspaceName,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
 }

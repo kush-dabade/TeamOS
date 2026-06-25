@@ -227,17 +227,14 @@ export async function createInvitation(
     },
   });
 
-  try {
-    await sendWorkspaceInvitation({
-      recipientEmail: invitation.email,
-      workspaceName: workspace.name,
-      invitedByName: actor.name,
-      role: invitation.role,
-      invitationToken: invitation.token,
-    });
-  } catch (error) {
-    console.error("Failed to send workspace invitation email:", error);
-  }
+  await sendWorkspaceInvitation({
+    recipientEmail: invitation.email,
+    workspaceName: workspace.name,
+    invitedByName: actor.name,
+    role: invitation.role,
+    invitationToken: invitation.token,
+    expiresAt: invitation.expiresAt,
+  });
 
   return toInvitationResponse(invitation);
 }

@@ -1,5 +1,5 @@
 import type { SendWorkspaceInvitationEmailData } from "./email.types.js";
-const FRONTEND_URL = "http://localhost:5173";
+const FRONTEND_URL = process.env.FRONTEND_URL ?? "http://localhost:5173";
 
 export async function sendWorkspaceInvitation(
   data: SendWorkspaceInvitationEmailData,

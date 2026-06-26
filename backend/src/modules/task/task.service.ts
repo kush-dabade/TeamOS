@@ -7,7 +7,7 @@ import type {
 } from "./task.types.js";
 
 import { createActivity } from "../activity/activity.service.js";
-import { createNotification } from "../notification/notification.service.js";
+import { enqueueNotification } from "../../queues/notification/index.js";
 
 import {
   ActivityEntityType,
@@ -105,12 +105,16 @@ export async function createTask(actorId: string, data: CreateTaskData) {
 
   if (task.assigneeId && task.assigneeId !== actorId) {
     try {
-      await createNotification({
+      await enqueueNotification({
         workspaceId: task.workspaceId,
 
         recipientId: task.assigneeId,
 
         type: NotificationType.TASK_ASSIGNED,
+
+        title: "Task Assigned",
+
+        message: `You were assigned "${task.title}".`,
 
         metadata: {
           taskId: task.id,
@@ -406,12 +410,16 @@ export async function updateTask(
     updatedTask.assigneeId !== actorId
   ) {
     try {
-      await createNotification({
+      await enqueueNotification({
         workspaceId: updatedTask.workspaceId,
 
         recipientId: updatedTask.assigneeId,
 
         type: NotificationType.TASK_ASSIGNED,
+
+        title: "Task Assigned",
+
+        message: `You were assigned "${task.title}".`,
 
         metadata: {
           taskId: updatedTask.id,

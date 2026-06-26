@@ -8,7 +8,7 @@ import type {
 
 import { createActivity } from "../activity/activity.service.js";
 
-import { createNotification } from "../notification/notification.service.js";
+import { enqueueNotification } from "../../queues/notification/index.js";
 
 import { NotificationType } from "../../generated/prisma/enums.js";
 
@@ -123,10 +123,12 @@ export async function createComment(
 
   if (task.assigneeId && task.assigneeId !== actorId) {
     try {
-      await createNotification({
+      await enqueueNotification({
         workspaceId: task.workspaceId,
         recipientId: task.assigneeId,
         type: NotificationType.COMMENT_ON_ASSIGNED_TASK,
+        title: "New Comment",
+        message: `A new comment was added to "${task.title}".`,
         metadata: {
           taskId: task.id,
           taskTitle: task.title,

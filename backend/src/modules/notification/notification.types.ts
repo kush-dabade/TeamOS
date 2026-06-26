@@ -8,9 +8,13 @@ export type NotificationResponse = {
 
   type: NotificationType;
 
+  title: string;
+  message: string;
+
   metadata: Record<string, unknown> | null;
 
   isRead: boolean;
+  readAt: Date | null;
 
   createdAt: Date;
 };
@@ -22,5 +26,15 @@ export interface CreateNotificationData {
 
   type: NotificationType;
 
+  title: string;
+  message: string;
+
   metadata?: Record<string, unknown>;
+}
+
+export interface ListNotificationsOptions {
+  recipientId: string;
+
+  page: number;
+  limit: number;
 }

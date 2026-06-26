@@ -13,7 +13,7 @@ import { prisma } from "../../lib/prisma.js";
 
 import { createActivity } from "../activity/activity.service.js";
 
-import { sendWorkspaceInvitation } from "../email/index.js";
+import { enqueueWorkspaceInvitationEmail } from "../../queues/email/index.js";
 
 import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
 import { NotFoundError } from "../../shared/errors/not-found-error.js";
@@ -227,13 +227,14 @@ export async function createInvitation(
     },
   });
 
-  await sendWorkspaceInvitation({
-    recipientEmail: invitation.email,
+  await enqueueWorkspaceInvitationEmail({
+    invitationId: invitation.id,
+    email: invitation.email,
     workspaceName: workspace.name,
-    invitedByName: actor.name,
     role: invitation.role,
-    invitationToken: invitation.token,
-    expiresAt: invitation.expiresAt,
+    invitedByName: actor.name,
+    token: invitation.token,
+    expiresAt: invitation.expiresAt.toISOString(),
   });
 
   return toInvitationResponse(invitation);

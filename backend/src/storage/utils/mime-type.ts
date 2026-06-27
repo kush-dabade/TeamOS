@@ -5,7 +5,9 @@ export function getFileExtension(fileName: string): string {
 }
 
 export function normalizeMimeType(mimeType: string): string {
-  return mimeType.trim().toLowerCase();
+  const [mediaType = ""] = mimeType.split(";");
+
+  return mediaType.trim().toLowerCase();
 }
 
 export function getMimeTypeExtension(mimeType: string): string | null {

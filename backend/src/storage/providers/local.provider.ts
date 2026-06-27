@@ -15,7 +15,17 @@ import { generateStorageKey } from "../utils/storage-key.js";
 
 export class LocalStorageProvider implements StorageProvider {
   private resolveAbsolutePath(storageKey: string): string {
-    return path.join(storageConfig.rootDirectory, storageKey);
+    const absoluteRoot = path.resolve(storageConfig.rootDirectory);
+    const absolutePath = path.resolve(absoluteRoot, storageKey);
+
+    if (
+      absolutePath !== absoluteRoot &&
+      !absolutePath.startsWith(`${absoluteRoot}${path.sep}`)
+    ) {
+      throw new StorageOperationError("Invalid storage path.");
+    }
+
+    return absolutePath;
   }
 
   async upload(request: UploadRequest): Promise<StorageObject> {
@@ -87,8 +97,14 @@ export class LocalStorageProvider implements StorageProvider {
     try {
       await fs.access(this.resolveAbsolutePath(storageKey));
       return true;
-    } catch {
-      return false;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        return false;
+      }
+
+      throw new StorageOperationError("Failed to check file existence.", {
+        cause: error,
+      });
     }
   }
 }

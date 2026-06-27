@@ -419,7 +419,7 @@ export async function updateTask(
 
         title: "Task Assigned",
 
-        message: `You were assigned "${task.title}".`,
+        message: `You were assigned "${updatedTask.title}".`,
 
         metadata: {
           taskId: updatedTask.id,

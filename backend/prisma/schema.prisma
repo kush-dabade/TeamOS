@@ -77,8 +77,12 @@ enum SprintStatus {
 }
 
 enum NotificationType {
+  INVITATION_RECEIVED
+
   TASK_ASSIGNED
   COMMENT_ON_ASSIGNED_TASK
+
+  COMMENT_MENTIONED
 }
 
 enum InvitationStatus {
@@ -385,9 +389,13 @@ model Notification {
 
   type NotificationType
 
+  title   String
+  message String
+
   metadata Json?
 
-  isRead Boolean @default(false)
+  isRead Boolean   @default(false)
+  readAt DateTime?
 
   createdAt DateTime  @default(now())
   deletedAt DateTime?

@@ -1,4 +1,4 @@
-import { Prisma } from "../../generated/prisma/client.js";
+import { Prisma, type Notification } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
 
 import type {
@@ -10,31 +10,15 @@ import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
 import { NotFoundError } from "../../shared/errors/not-found-error.js";
 
 async function findNotificationById(notificationId: string) {
-  return prisma.notification.findFirst({
+  return prisma.notification.findUnique({
     where: {
       id: notificationId,
-      deletedAt: null,
     },
   });
 }
 
-type NotificationEntity = {
-  id: string;
-
-  workspaceId: string;
-  recipientId: string;
-
-  type: NotificationResponse["type"];
-
-  metadata: unknown;
-
-  isRead: boolean;
-
-  createdAt: Date;
-};
-
 function toNotificationResponse(
-  notification: NotificationEntity,
+  notification: Notification,
 ): NotificationResponse {
   return {
     id: notification.id,
@@ -44,9 +28,13 @@ function toNotificationResponse(
 
     type: notification.type,
 
+    title: notification.title,
+    message: notification.message,
+
     metadata: (notification.metadata as Record<string, unknown> | null) ?? null,
 
     isRead: notification.isRead,
+    readAt: notification.readAt,
 
     createdAt: notification.createdAt,
   };
@@ -54,9 +42,13 @@ function toNotificationResponse(
 
 export async function createNotification(
   data: CreateNotificationData,
-): Promise<void> {
-  await prisma.notification.create({
+): Promise<NotificationResponse> {
+  const notification = await prisma.notification.create({
     data: {
+      title: data.title,
+
+      message: data.message,
+
       workspaceId: data.workspaceId,
 
       recipientId: data.recipientId,
@@ -68,6 +60,8 @@ export async function createNotification(
       }),
     },
   });
+
+  return toNotificationResponse(notification);
 }
 
 export async function listNotifications(
@@ -87,13 +81,13 @@ export async function listNotifications(
   return notifications.map(toNotificationResponse);
 }
 
-export async function markNotificationRead(
+export async function markNotificationAsRead(
   actorId: string,
   notificationId: string,
 ): Promise<NotificationResponse> {
   const notification = await findNotificationById(notificationId);
 
-  if (!notification) {
+  if (!notification || notification.deletedAt) {
     throw new NotFoundError("Notification not found");
   }
 
@@ -109,13 +103,14 @@ export async function markNotificationRead(
         },
         data: {
           isRead: true,
+          readAt: new Date(),
         },
       });
 
   return toNotificationResponse(updatedNotification);
 }
 
-export async function markAllNotificationsRead(
+export async function markAllNotificationsAsRead(
   actorId: string,
 ): Promise<number> {
   const result = await prisma.notification.updateMany({
@@ -129,10 +124,23 @@ export async function markAllNotificationsRead(
 
     data: {
       isRead: true,
+      readAt: new Date(),
     },
   });
 
   return result.count;
+}
+
+export async function getUnreadNotificationCount(
+  actorId: string,
+): Promise<number> {
+  return prisma.notification.count({
+    where: {
+      recipientId: actorId,
+      isRead: false,
+      deletedAt: null,
+    },
+  });
 }
 
 export { findNotificationById };

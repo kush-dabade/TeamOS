@@ -2,8 +2,8 @@ import type { Request, Response } from "express";
 
 import {
   listNotifications,
-  markNotificationRead,
-  markAllNotificationsRead,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
 } from "./notification.service.js";
 
 import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
@@ -42,7 +42,7 @@ export async function listNotificationsHandler(req: Request, res: Response) {
 
 export async function markNotificationReadHandler(req: Request, res: Response) {
   try {
-    const notification = await markNotificationRead(
+    const notification = await markNotificationAsRead(
       req.user!.id,
       req.params.notificationId as string,
     );
@@ -89,7 +89,7 @@ export async function markAllNotificationsReadHandler(
   res: Response,
 ) {
   try {
-    const updated = await markAllNotificationsRead(req.user!.id);
+    const updated = await markAllNotificationsAsRead(req.user!.id);
 
     return res.status(200).json({
       success: true,

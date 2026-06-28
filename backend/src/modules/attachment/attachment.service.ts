@@ -101,6 +101,7 @@ async function findAttachmentById(attachmentId: string) {
           id: true,
           title: true,
           workspaceId: true,
+          deletedAt: true,
         },
       },
 
@@ -114,7 +115,7 @@ async function findAttachmentById(attachmentId: string) {
     },
   });
 
-  if (!attachment) {
+  if (!attachment || attachment.task.deletedAt) {
     throw new NotFoundError("Attachment not found.");
   }
 
@@ -186,9 +187,9 @@ export async function uploadAttachment(
     mimeType: mimetype,
     size,
   });
-
+  let attachment;
   try {
-    const attachment = await prisma.attachment.create({
+    attachment = await prisma.attachment.create({
       data: {
         workspaceId: task.workspaceId,
         taskId: task.id,
@@ -235,6 +236,18 @@ export async function uploadAttachment(
 
     return toAttachmentResponse(attachment);
   } catch (error) {
+    if (attachment) {
+      try {
+        await prisma.attachment.delete({
+          where: {
+            id: attachment.id,
+          },
+        });
+      } catch {
+        // Best-effort rollback.
+      }
+    }
+
     try {
       await storageService.delete(storageObject.storageKey);
     } catch {

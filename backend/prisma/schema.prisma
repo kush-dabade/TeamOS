@@ -50,6 +50,9 @@ enum ActivityType {
 
   COMMENT_CREATED
 
+  ATTACHMENT_UPLOADED
+  ATTACHMENT_DELETED
+
   USER_INVITED
 
   INVITATION_ACCEPTED
@@ -66,6 +69,7 @@ enum ActivityEntityType {
   PROJECT
   TASK
   COMMENT
+  ATTACHMENT
   SPRINT
   INVITATION
 }
@@ -108,12 +112,13 @@ model User {
   ownedProjects   Project[]             @relation("ProjectOwner")
   sentInvitations WorkspaceInvitation[] @relation("WorkspaceInvitationInviter")
 
-  createdTasks  Task[]            @relation("TaskCreator")
-  assignedTasks Task[]            @relation("TaskAssignee")
-  comments      Comment[]
-  memberships   WorkspaceMember[]
-  activities    Activity[]
-  notifications Notification[]    @relation("NotificationRecipient")
+  createdTasks        Task[]            @relation("TaskCreator")
+  assignedTasks       Task[]            @relation("TaskAssignee")
+  comments            Comment[]
+  uploadedAttachments Attachment[]
+  memberships         WorkspaceMember[]
+  activities          Activity[]
+  notifications       Notification[]    @relation("NotificationRecipient")
 
   @@unique([email])
   @@map("user")
@@ -187,6 +192,7 @@ model Workspace {
   projects      Project[]
   tasks         Task[]
   comments      Comment[]
+  attachments   Attachment[]
   activities    Activity[]
   sprints       Sprint[]
   notifications Notification[]
@@ -286,7 +292,8 @@ model Task {
 
   sprint Sprint? @relation(fields: [sprintId], references: [id], onDelete: SetNull)
 
-  comments Comment[]
+  comments    Comment[]
+  attachments Attachment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -325,6 +332,35 @@ model Comment {
   @@index([taskId])
   @@index([authorId])
   @@index([deletedAt])
+}
+
+model Attachment {
+  id String @id @default(cuid())
+
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  uploadedById String
+  uploadedBy   User   @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  originalName String
+
+  storageKey String @unique
+
+  storageFileName String
+
+  mimeType String
+
+  size Int
+
+  createdAt DateTime @default(now())
+
+  @@index([workspaceId])
+  @@index([taskId, createdAt])
+  @@index([uploadedById])
 }
 
 model Activity {

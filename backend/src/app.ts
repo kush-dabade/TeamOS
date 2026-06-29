@@ -17,6 +17,7 @@ import invitationRoutes from "./modules/invitation/invitation.routes.js";
 import taskAttachmentRoutes from "./modules/task/task-attachment.routes.js";
 import workspaceInvitationRoutes from "./modules/invitation/workspace-invitation.routes.js";
 import attachmentItemRoutes from "./modules/attachment/attachment-item.routes.js";
+import searchRoutes from "./modules/search/search.routes.js";
 
 const app = express();
 
@@ -29,6 +30,9 @@ app.use("/api/v1/workspaces", workspaceRoutes);
 app.use("/api/v1/workspaces", projectRoutes);
 app.use("/api/v1/workspaces", activityRoutes);
 app.use("/api/v1/workspaces", workspaceInvitationRoutes);
+
+//search resources
+app.use("/api/v1/search", searchRoutes);
 
 // project resources
 app.use("/api/v1/projects", taskRoutes);

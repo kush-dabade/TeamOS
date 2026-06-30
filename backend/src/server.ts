@@ -1,6 +1,9 @@
 import "dotenv/config";
+import { createServer } from "node:http";
+
 import app from "./app.js";
 import { prisma } from "./lib/prisma.js";
+import { initializeRealtime } from "./realtime/index.js";
 
 const PORT = process.env.PORT || 3000;
 
@@ -10,7 +13,11 @@ async function start() {
 
     console.log("Database connected");
 
-    app.listen(PORT, () => {
+    const server = createServer(app);
+
+    initializeRealtime(server);
+
+    server.listen(PORT, () => {
       console.log(`TeamOS API running on port ${PORT}`);
     });
   } catch (error) {

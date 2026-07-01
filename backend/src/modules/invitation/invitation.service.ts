@@ -144,6 +144,17 @@ function toInvitationResponse(
   };
 }
 
+function toInvitationRealtimeResponse(invitation: InvitationEntity) {
+  return {
+    id: invitation.id,
+    workspaceId: invitation.workspaceId,
+    role: invitation.role,
+    status: invitation.status,
+    expiresAt: invitation.expiresAt,
+    createdAt: invitation.createdAt,
+  };
+}
+
 export async function createInvitation(
   data: CreateInvitationData,
 ): Promise<InvitationResponse> {
@@ -244,7 +255,7 @@ export async function createInvitation(
 
   emitToWorkspace(invitation.workspaceId, REALTIME_EVENTS.INVITATION_CREATED, {
     workspaceId: invitation.workspaceId,
-    invitation: response,
+    invitation: toInvitationRealtimeResponse(invitation),
   });
 
   return response;
@@ -385,7 +396,7 @@ export async function acceptInvitation(
     REALTIME_EVENTS.INVITATION_ACCEPTED,
     {
       workspaceId: updatedInvitation.workspaceId,
-      invitation: response,
+      invitation: toInvitationRealtimeResponse(updatedInvitation),
     },
   );
 
@@ -453,7 +464,7 @@ export async function declineInvitation(
     REALTIME_EVENTS.INVITATION_DECLINED,
     {
       workspaceId: updatedInvitation.workspaceId,
-      invitation: response,
+      invitation: toInvitationRealtimeResponse(updatedInvitation),
     },
   );
 

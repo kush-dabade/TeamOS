@@ -230,10 +230,7 @@ export async function archiveProject(actorId: string, projectId: string) {
     },
   });
 
-  const response = {
-    id: archivedProject.id,
-    status: archivedProject.status,
-  };
+  const response = toProjectResponse(archivedProject);
 
   emitToWorkspace(
     archivedProject.workspaceId,

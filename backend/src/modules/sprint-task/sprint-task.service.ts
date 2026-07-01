@@ -154,6 +154,9 @@ export async function assignTaskToSprint(
       task: {
         id: updatedTask.id,
         sprintId: updatedTask.sprintId,
+        ...(previousSprint && {
+          previousSprintId: previousSprint.id,
+        }),
       },
     },
   );

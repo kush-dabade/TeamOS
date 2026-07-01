@@ -8,7 +8,14 @@ export function emitToRoom(
   event: RealtimeEvent,
   payload: unknown,
 ): void {
-  getIO().to(room).emit(event, payload);
+  try {
+    getIO().to(room).emit(event, payload);
+  } catch (error) {
+    console.error(
+      `Failed to emit realtime event "${event}" to room "${room}":`,
+      error,
+    );
+  }
 }
 
 export function emitToWorkspace(

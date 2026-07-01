@@ -5,6 +5,9 @@ import type {
   ListProjectsOptions,
 } from "./project.types.js";
 
+import { emitToWorkspace } from "../../realtime/realtime.emitter.js";
+import { REALTIME_EVENTS } from "../../realtime/realtime.constants.js";
+
 import type { UpdateProjectInput } from "./project.schema.js";
 
 import { createActivity } from "../activity/activity.service.js";
@@ -13,6 +16,27 @@ import {
   ActivityEntityType,
   ActivityType,
 } from "../../generated/prisma/enums.js";
+
+import type { Project } from "../../generated/prisma/client.js";
+
+function toProjectResponse(project: Project) {
+  return {
+    id: project.id,
+    workspaceId: project.workspaceId,
+    ownerId: project.ownerId,
+
+    name: project.name,
+    slug: project.slug,
+    description: project.description,
+    status: project.status,
+
+    startDate: project.startDate,
+    endDate: project.endDate,
+
+    createdAt: project.createdAt,
+    updatedAt: project.updatedAt,
+  };
+}
 
 async function getWorkspaceMembership(workspaceId: string, userId: string) {
   return prisma.workspaceMember.findUnique({
@@ -152,22 +176,14 @@ export async function updateProject(
     });
   }
 
-  return {
-    id: updatedProject.id,
+  const response = toProjectResponse(updatedProject);
+
+  emitToWorkspace(updatedProject.workspaceId, REALTIME_EVENTS.PROJECT_UPDATED, {
     workspaceId: updatedProject.workspaceId,
-    ownerId: updatedProject.ownerId,
+    project: response,
+  });
 
-    name: updatedProject.name,
-    slug: updatedProject.slug,
-    description: updatedProject.description,
-    status: updatedProject.status,
-
-    startDate: updatedProject.startDate,
-    endDate: updatedProject.endDate,
-
-    createdAt: updatedProject.createdAt,
-    updatedAt: updatedProject.updatedAt,
-  };
+  return response;
 }
 
 export async function archiveProject(actorId: string, projectId: string) {
@@ -214,10 +230,18 @@ export async function archiveProject(actorId: string, projectId: string) {
     },
   });
 
-  return {
-    id: archivedProject.id,
-    status: archivedProject.status,
-  };
+  const response = toProjectResponse(archivedProject);
+
+  emitToWorkspace(
+    archivedProject.workspaceId,
+    REALTIME_EVENTS.PROJECT_ARCHIVED,
+    {
+      workspaceId: archivedProject.workspaceId,
+      project: response,
+    },
+  );
+
+  return response;
 }
 
 async function generateUniqueProjectSlug(
@@ -305,19 +329,14 @@ export async function createProject(actorId: string, data: CreateProjectData) {
     },
   });
 
-  return {
-    id: project.id,
+  const response = toProjectResponse(project);
+
+  emitToWorkspace(project.workspaceId, REALTIME_EVENTS.PROJECT_CREATED, {
     workspaceId: project.workspaceId,
-    ownerId: project.ownerId,
-    name: project.name,
-    slug: project.slug,
-    description: project.description,
-    status: project.status,
-    startDate: project.startDate,
-    endDate: project.endDate,
-    createdAt: project.createdAt,
-    updatedAt: project.updatedAt,
-  };
+    project: response,
+  });
+
+  return response;
 }
 
 export async function listProjects(
@@ -350,17 +369,5 @@ export async function listProjects(
     },
   });
 
-  return projects.map((project) => ({
-    id: project.id,
-    workspaceId: project.workspaceId,
-    ownerId: project.ownerId,
-    name: project.name,
-    slug: project.slug,
-    description: project.description,
-    status: project.status,
-    startDate: project.startDate,
-    endDate: project.endDate,
-    createdAt: project.createdAt,
-    updatedAt: project.updatedAt,
-  }));
+  return projects.map(toProjectResponse);
 }

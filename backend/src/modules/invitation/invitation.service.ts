@@ -9,6 +9,9 @@ import {
   WorkspaceRole,
 } from "../../generated/prisma/enums.js";
 
+import { emitToWorkspace } from "../../realtime/realtime.emitter.js";
+import { REALTIME_EVENTS } from "../../realtime/realtime.constants.js";
+
 import { prisma } from "../../lib/prisma.js";
 
 import { createActivity } from "../activity/activity.service.js";
@@ -141,6 +144,17 @@ function toInvitationResponse(
   };
 }
 
+function toInvitationRealtimeResponse(invitation: InvitationEntity) {
+  return {
+    id: invitation.id,
+    workspaceId: invitation.workspaceId,
+    role: invitation.role,
+    status: invitation.status,
+    expiresAt: invitation.expiresAt,
+    createdAt: invitation.createdAt,
+  };
+}
+
 export async function createInvitation(
   data: CreateInvitationData,
 ): Promise<InvitationResponse> {
@@ -237,7 +251,14 @@ export async function createInvitation(
     expiresAt: invitation.expiresAt.toISOString(),
   });
 
-  return toInvitationResponse(invitation);
+  const response = toInvitationResponse(invitation);
+
+  emitToWorkspace(invitation.workspaceId, REALTIME_EVENTS.INVITATION_CREATED, {
+    workspaceId: invitation.workspaceId,
+    invitation: toInvitationRealtimeResponse(invitation),
+  });
+
+  return response;
 }
 
 export async function listWorkspaceInvitations(
@@ -368,7 +389,18 @@ export async function acceptInvitation(
     },
   });
 
-  return toInvitationResponse(updatedInvitation);
+  const response = toInvitationResponse(updatedInvitation);
+
+  emitToWorkspace(
+    updatedInvitation.workspaceId,
+    REALTIME_EVENTS.INVITATION_ACCEPTED,
+    {
+      workspaceId: updatedInvitation.workspaceId,
+      invitation: toInvitationRealtimeResponse(updatedInvitation),
+    },
+  );
+
+  return response;
 }
 
 export async function declineInvitation(
@@ -425,7 +457,18 @@ export async function declineInvitation(
     });
   }
 
-  return toInvitationResponse(updatedInvitation);
+  const response = toInvitationResponse(updatedInvitation);
+
+  emitToWorkspace(
+    updatedInvitation.workspaceId,
+    REALTIME_EVENTS.INVITATION_DECLINED,
+    {
+      workspaceId: updatedInvitation.workspaceId,
+      invitation: toInvitationRealtimeResponse(updatedInvitation),
+    },
+  );
+
+  return response;
 }
 
 export { findInvitationById };

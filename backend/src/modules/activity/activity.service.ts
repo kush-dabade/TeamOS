@@ -9,6 +9,9 @@ import type {
   ListActivitiesResult,
 } from "./activity.types.js";
 
+import { emitToWorkspace } from "../../realtime/realtime.emitter.js";
+import { REALTIME_EVENTS } from "../../realtime/realtime.constants.js";
+
 async function getWorkspaceMembership(workspaceId: string, userId: string) {
   return prisma.workspaceMember.findUnique({
     where: {
@@ -75,8 +78,24 @@ export async function createActivity(data: CreateActivityData): Promise<void> {
     }),
   };
 
-  await prisma.activity.create({
+  const activity = await prisma.activity.create({
     data: activityData,
+    include: {
+      actor: {
+        select: {
+          id: true,
+          name: true,
+          image: true,
+        },
+      },
+    },
+  });
+
+  const response = toActivityResponse(activity as ActivityWithActor);
+
+  emitToWorkspace(activity.workspaceId, REALTIME_EVENTS.ACTIVITY_CREATED, {
+    workspaceId: activity.workspaceId,
+    activity: response,
   });
 }
 

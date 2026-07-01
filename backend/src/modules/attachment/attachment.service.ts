@@ -8,6 +8,9 @@ import {
   WorkspaceRole,
 } from "../../generated/prisma/enums.js";
 
+import { emitToWorkspace } from "../../realtime/realtime.emitter.js";
+import { REALTIME_EVENTS } from "../../realtime/realtime.constants.js";
+
 import { createActivity } from "../activity/activity.service.js";
 
 import { ALLOWED_ATTACHMENT_MIME_TYPES } from "./attachment.config.js";
@@ -187,7 +190,7 @@ export async function uploadAttachment(
     mimeType: mimetype,
     size,
   });
-  let attachment;
+  let attachment: AttachmentWithUploader | undefined;
   try {
     attachment = await prisma.attachment.create({
       data: {
@@ -234,7 +237,15 @@ export async function uploadAttachment(
       },
     });
 
-    return toAttachmentResponse(attachment);
+    const response = toAttachmentResponse(attachment);
+
+    emitToWorkspace(task.workspaceId, REALTIME_EVENTS.ATTACHMENT_UPLOADED, {
+      workspaceId: task.workspaceId,
+      taskId: task.id,
+      attachment: response,
+    });
+
+    return response;
   } catch (error) {
     if (attachment) {
       try {
@@ -343,4 +354,16 @@ export async function deleteAttachment(
       taskTitle: attachment.task.title,
     },
   });
+
+  emitToWorkspace(
+    attachment.task.workspaceId,
+    REALTIME_EVENTS.ATTACHMENT_DELETED,
+    {
+      workspaceId: attachment.task.workspaceId,
+      taskId: attachment.task.id,
+      attachment: {
+        id: attachment.id,
+      },
+    },
+  );
 }

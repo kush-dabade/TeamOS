@@ -5,6 +5,8 @@ export const ROOM_PREFIXES = {
 
 export const REALTIME_EVENTS = {
   NOTIFICATION_CREATED: "notification.created",
+  NOTIFICATION_READ: "notification.read",
+  NOTIFICATION_READ_ALL: "notification.read_all",
 
   ACTIVITY_CREATED: "activity.created",
 
@@ -15,7 +17,11 @@ export const REALTIME_EVENTS = {
 
   TASK_CREATED: "task.created",
   TASK_UPDATED: "task.updated",
+  TASK_COMPLETED: "task.completed",
   TASK_DELETED: "task.deleted",
+
+  TASK_ASSIGNED_TO_SPRINT: "task.assigned_to_sprint",
+  TASK_REMOVED_FROM_SPRINT: "task.removed_from_sprint",
 
   COMMENT_CREATED: "comment.created",
   COMMENT_UPDATED: "comment.updated",

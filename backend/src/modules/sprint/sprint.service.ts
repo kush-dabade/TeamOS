@@ -11,9 +11,14 @@ import {
   ActivityType,
 } from "../../generated/prisma/enums.js";
 
+import { emitToWorkspace } from "../../realtime/realtime.emitter.js";
+import { REALTIME_EVENTS } from "../../realtime/realtime.constants.js";
+
 import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
 import { NotFoundError } from "../../shared/errors/not-found-error.js";
 import { ValidationError } from "../../shared/errors/validation-error.js";
+
+import type { Sprint } from "../../generated/prisma/client.js";
 
 async function getWorkspaceMembership(workspaceId: string, userId: string) {
   return prisma.workspaceMember.findUnique({
@@ -72,6 +77,26 @@ async function findActiveSprintByProject(projectId: string) {
       status: "ACTIVE",
     },
   });
+}
+
+function toSprintResponse(sprint: Sprint) {
+  return {
+    id: sprint.id,
+
+    workspaceId: sprint.workspaceId,
+    projectId: sprint.projectId,
+
+    name: sprint.name,
+    goal: sprint.goal,
+
+    status: sprint.status,
+
+    startDate: sprint.startDate,
+    endDate: sprint.endDate,
+
+    createdAt: sprint.createdAt,
+    updatedAt: sprint.updatedAt,
+  };
 }
 
 export async function createSprint(actorId: string, data: CreateSprintData) {
@@ -143,23 +168,15 @@ export async function createSprint(actorId: string, data: CreateSprintData) {
     },
   });
 
-  return {
-    id: sprint.id,
+  const response = toSprintResponse(sprint);
 
+  emitToWorkspace(sprint.workspaceId, REALTIME_EVENTS.SPRINT_CREATED, {
     workspaceId: sprint.workspaceId,
     projectId: sprint.projectId,
+    sprint: response,
+  });
 
-    name: sprint.name,
-    goal: sprint.goal,
-
-    status: sprint.status,
-
-    startDate: sprint.startDate,
-    endDate: sprint.endDate,
-
-    createdAt: sprint.createdAt,
-    updatedAt: sprint.updatedAt,
-  };
+  return response;
 }
 
 export async function listSprints(actorId: string, projectId: string) {
@@ -185,23 +202,7 @@ export async function listSprints(actorId: string, projectId: string) {
     },
   });
 
-  return sprints.map((sprint) => ({
-    id: sprint.id,
-
-    workspaceId: sprint.workspaceId,
-    projectId: sprint.projectId,
-
-    name: sprint.name,
-    goal: sprint.goal,
-
-    status: sprint.status,
-
-    startDate: sprint.startDate,
-    endDate: sprint.endDate,
-
-    createdAt: sprint.createdAt,
-    updatedAt: sprint.updatedAt,
-  }));
+  return sprints.map(toSprintResponse);
 }
 
 export async function getSprint(actorId: string, sprintId: string) {
@@ -217,23 +218,7 @@ export async function getSprint(actorId: string, sprintId: string) {
     throw new ForbiddenError("You are not a member of this workspace");
   }
 
-  return {
-    id: sprint.id,
-
-    workspaceId: sprint.workspaceId,
-    projectId: sprint.projectId,
-
-    name: sprint.name,
-    goal: sprint.goal,
-
-    status: sprint.status,
-
-    startDate: sprint.startDate,
-    endDate: sprint.endDate,
-
-    createdAt: sprint.createdAt,
-    updatedAt: sprint.updatedAt,
-  };
+  return toSprintResponse(sprint);
 }
 
 export async function updateSprint(
@@ -357,23 +342,15 @@ export async function updateSprint(
     });
   }
 
-  return {
-    id: updatedSprint.id,
+  const response = toSprintResponse(updatedSprint);
 
+  emitToWorkspace(updatedSprint.workspaceId, REALTIME_EVENTS.SPRINT_UPDATED, {
     workspaceId: updatedSprint.workspaceId,
     projectId: updatedSprint.projectId,
+    sprint: response,
+  });
 
-    name: updatedSprint.name,
-    goal: updatedSprint.goal,
-
-    status: updatedSprint.status,
-
-    startDate: updatedSprint.startDate,
-    endDate: updatedSprint.endDate,
-
-    createdAt: updatedSprint.createdAt,
-    updatedAt: updatedSprint.updatedAt,
-  };
+  return response;
 }
 
 export async function startSprint(actorId: string, sprintId: string) {
@@ -440,23 +417,15 @@ export async function startSprint(actorId: string, sprintId: string) {
     },
   });
 
-  return {
-    id: updatedSprint.id,
+  const response = toSprintResponse(updatedSprint);
 
+  emitToWorkspace(updatedSprint.workspaceId, REALTIME_EVENTS.SPRINT_STARTED, {
     workspaceId: updatedSprint.workspaceId,
     projectId: updatedSprint.projectId,
+    sprint: response,
+  });
 
-    name: updatedSprint.name,
-    goal: updatedSprint.goal,
-
-    status: updatedSprint.status,
-
-    startDate: updatedSprint.startDate,
-    endDate: updatedSprint.endDate,
-
-    createdAt: updatedSprint.createdAt,
-    updatedAt: updatedSprint.updatedAt,
-  };
+  return response;
 }
 
 export async function completeSprint(actorId: string, sprintId: string) {
@@ -515,23 +484,15 @@ export async function completeSprint(actorId: string, sprintId: string) {
     },
   });
 
-  return {
-    id: updatedSprint.id,
+  const response = toSprintResponse(updatedSprint);
 
+  emitToWorkspace(updatedSprint.workspaceId, REALTIME_EVENTS.SPRINT_COMPLETED, {
     workspaceId: updatedSprint.workspaceId,
     projectId: updatedSprint.projectId,
+    sprint: response,
+  });
 
-    name: updatedSprint.name,
-    goal: updatedSprint.goal,
-
-    status: updatedSprint.status,
-
-    startDate: updatedSprint.startDate,
-    endDate: updatedSprint.endDate,
-
-    createdAt: updatedSprint.createdAt,
-    updatedAt: updatedSprint.updatedAt,
-  };
+  return response;
 }
 
 export { findSprintById };

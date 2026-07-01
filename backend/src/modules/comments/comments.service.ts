@@ -6,15 +6,17 @@ import type {
   ListCommentsOptions,
 } from "./comments.types.js";
 
+import { emitToWorkspace } from "../../realtime/realtime.emitter.js";
+import { REALTIME_EVENTS } from "../../realtime/realtime.constants.js";
+
 import { createActivity } from "../activity/activity.service.js";
 
 import { enqueueNotification } from "../../queues/notification/index.js";
 
-import { NotificationType } from "../../generated/prisma/enums.js";
-
 import {
   ActivityEntityType,
   ActivityType,
+  NotificationType,
 } from "../../generated/prisma/enums.js";
 
 async function getWorkspaceMembership(workspaceId: string, userId: string) {
@@ -141,7 +143,15 @@ export async function createComment(
     }
   }
 
-  return toCommentResponse(comment);
+  const response = toCommentResponse(comment);
+
+  emitToWorkspace(task.workspaceId, REALTIME_EVENTS.COMMENT_CREATED, {
+    workspaceId: task.workspaceId,
+    taskId: task.id,
+    comment: response,
+  });
+
+  return response;
 }
 
 export async function listComments(

@@ -6,6 +6,9 @@ import {
   ActivityType,
 } from "../../generated/prisma/enums.js";
 
+import { emitToWorkspace } from "../../realtime/realtime.emitter.js";
+import { REALTIME_EVENTS } from "../../realtime/realtime.constants.js";
+
 import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
 import { NotFoundError } from "../../shared/errors/not-found-error.js";
 import { ValidationError } from "../../shared/errors/validation-error.js";
@@ -141,6 +144,20 @@ export async function assignTaskToSprint(
         },
   });
 
+  emitToWorkspace(
+    updatedTask.workspaceId,
+    REALTIME_EVENTS.TASK_ASSIGNED_TO_SPRINT,
+    {
+      workspaceId: updatedTask.workspaceId,
+      projectId: updatedTask.projectId,
+      sprintId: sprint.id,
+      task: {
+        id: updatedTask.id,
+        sprintId: updatedTask.sprintId,
+      },
+    },
+  );
+
   return updatedTask;
 }
 
@@ -206,6 +223,20 @@ export async function removeTaskFromSprint(
       sprintName: sprint.name,
     },
   });
+
+  emitToWorkspace(
+    updatedTask.workspaceId,
+    REALTIME_EVENTS.TASK_REMOVED_FROM_SPRINT,
+    {
+      workspaceId: updatedTask.workspaceId,
+      projectId: updatedTask.projectId,
+      sprintId: sprint.id,
+      task: {
+        id: updatedTask.id,
+        sprintId: null,
+      },
+    },
+  );
 
   return updatedTask;
 }

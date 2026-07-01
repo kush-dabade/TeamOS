@@ -1,10 +1,14 @@
 import { prisma } from "../../lib/prisma.js";
+import type { Task } from "../../generated/prisma/client.js";
 
 import type {
   CreateTaskData,
   ListTasksOptions,
   UpdateTaskData,
 } from "./task.types.js";
+
+import { emitToWorkspace } from "../../realtime/realtime.emitter.js";
+import { REALTIME_EVENTS } from "../../realtime/realtime.constants.js";
 
 import { createActivity } from "../activity/activity.service.js";
 import { enqueueNotification } from "../../queues/notification/index.js";
@@ -24,6 +28,31 @@ async function getWorkspaceMembership(workspaceId: string, userId: string) {
       },
     },
   });
+}
+
+function toTaskResponse(task: Task) {
+  return {
+    id: task.id,
+
+    workspaceId: task.workspaceId,
+    projectId: task.projectId,
+
+    title: task.title,
+    description: task.description,
+
+    status: task.status,
+    priority: task.priority,
+
+    dueDate: task.dueDate,
+
+    createdById: task.createdById,
+    assigneeId: task.assigneeId,
+
+    completedAt: task.completedAt,
+
+    createdAt: task.createdAt,
+    updatedAt: task.updatedAt,
+  };
 }
 
 export async function createTask(actorId: string, data: CreateTaskData) {
@@ -126,28 +155,14 @@ export async function createTask(actorId: string, data: CreateTaskData) {
     }
   }
 
-  return {
-    id: task.id,
+  const response = toTaskResponse(task);
 
+  emitToWorkspace(task.workspaceId, REALTIME_EVENTS.TASK_CREATED, {
     workspaceId: task.workspaceId,
-    projectId: task.projectId,
+    task: response,
+  });
 
-    title: task.title,
-    description: task.description,
-
-    status: task.status,
-    priority: task.priority,
-
-    dueDate: task.dueDate,
-
-    createdById: task.createdById,
-    assigneeId: task.assigneeId,
-
-    completedAt: task.completedAt,
-
-    createdAt: task.createdAt,
-    updatedAt: task.updatedAt,
-  };
+  return response;
 }
 
 export async function listTasks(actorId: string, options: ListTasksOptions) {
@@ -178,28 +193,7 @@ export async function listTasks(actorId: string, options: ListTasksOptions) {
     },
   });
 
-  return tasks.map((task) => ({
-    id: task.id,
-
-    workspaceId: task.workspaceId,
-    projectId: task.projectId,
-
-    title: task.title,
-    description: task.description,
-
-    status: task.status,
-    priority: task.priority,
-
-    dueDate: task.dueDate,
-
-    createdById: task.createdById,
-    assigneeId: task.assigneeId,
-
-    completedAt: task.completedAt,
-
-    createdAt: task.createdAt,
-    updatedAt: task.updatedAt,
-  }));
+  return tasks.map(toTaskResponse);
 }
 
 export async function getTaskById(actorId: string, taskId: string) {
@@ -220,28 +214,7 @@ export async function getTaskById(actorId: string, taskId: string) {
     throw new Error("You are not a member of this workspace");
   }
 
-  return {
-    id: task.id,
-
-    workspaceId: task.workspaceId,
-    projectId: task.projectId,
-
-    title: task.title,
-    description: task.description,
-
-    status: task.status,
-    priority: task.priority,
-
-    dueDate: task.dueDate,
-
-    createdById: task.createdById,
-    assigneeId: task.assigneeId,
-
-    completedAt: task.completedAt,
-
-    createdAt: task.createdAt,
-    updatedAt: task.updatedAt,
-  };
+  return toTaskResponse(task);
 }
 
 export async function deleteTask(actorId: string, taskId: string) {
@@ -297,6 +270,11 @@ export async function deleteTask(actorId: string, taskId: string) {
     metadata: {
       taskTitle: task.title,
     },
+  });
+
+  emitToWorkspace(task.workspaceId, REALTIME_EVENTS.TASK_DELETED, {
+    workspaceId: task.workspaceId,
+    task: toTaskResponse(task),
   });
 }
 
@@ -468,26 +446,30 @@ export async function updateTask(
     });
   }
 
-  return {
-    id: updatedTask.id,
+  const response = toTaskResponse(updatedTask);
 
+  const payload = {
     workspaceId: updatedTask.workspaceId,
-    projectId: updatedTask.projectId,
-
-    title: updatedTask.title,
-    description: updatedTask.description,
-
-    status: updatedTask.status,
-    priority: updatedTask.priority,
-
-    dueDate: updatedTask.dueDate,
-
-    createdById: updatedTask.createdById,
-    assigneeId: updatedTask.assigneeId,
-
-    completedAt: updatedTask.completedAt,
-
-    createdAt: updatedTask.createdAt,
-    updatedAt: updatedTask.updatedAt,
+    task: response,
   };
+
+  if (
+    data.status !== undefined &&
+    oldStatus !== "DONE" &&
+    updatedTask.status === "DONE"
+  ) {
+    emitToWorkspace(
+      updatedTask.workspaceId,
+      REALTIME_EVENTS.TASK_COMPLETED,
+      payload,
+    );
+  } else {
+    emitToWorkspace(
+      updatedTask.workspaceId,
+      REALTIME_EVENTS.TASK_UPDATED,
+      payload,
+    );
+  }
+
+  return response;
 }

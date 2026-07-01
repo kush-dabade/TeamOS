@@ -6,6 +6,9 @@ import type {
   NotificationResponse,
 } from "./notification.types.js";
 
+import { emitToUser } from "../../realtime/realtime.emitter.js";
+import { REALTIME_EVENTS } from "../../realtime/realtime.constants.js";
+
 import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
 import { NotFoundError } from "../../shared/errors/not-found-error.js";
 
@@ -61,7 +64,13 @@ export async function createNotification(
     },
   });
 
-  return toNotificationResponse(notification);
+  const response = toNotificationResponse(notification);
+
+  emitToUser(notification.recipientId, REALTIME_EVENTS.NOTIFICATION_CREATED, {
+    notification: response,
+  });
+
+  return response;
 }
 
 export async function listNotifications(
@@ -107,7 +116,17 @@ export async function markNotificationAsRead(
         },
       });
 
-  return toNotificationResponse(updatedNotification);
+  const response = toNotificationResponse(updatedNotification);
+
+  emitToUser(
+    updatedNotification.recipientId,
+    REALTIME_EVENTS.NOTIFICATION_READ,
+    {
+      notification: response,
+    },
+  );
+
+  return response;
 }
 
 export async function markAllNotificationsAsRead(
@@ -126,6 +145,10 @@ export async function markAllNotificationsAsRead(
       isRead: true,
       readAt: new Date(),
     },
+  });
+
+  emitToUser(actorId, REALTIME_EVENTS.NOTIFICATION_READ_ALL, {
+    recipientId: actorId,
   });
 
   return result.count;

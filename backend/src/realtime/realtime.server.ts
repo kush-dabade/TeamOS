@@ -39,6 +39,16 @@ export function getIO(): Server {
   return io;
 }
 
+export async function closeRealtime(): Promise<void> {
+  if (!io) {
+    return;
+  }
+
+  await io.close();
+
+  io = null;
+}
+
 function registerMiddleware(io: Server): void {
   io.use(authenticateSocket);
 }

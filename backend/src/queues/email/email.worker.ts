@@ -31,6 +31,7 @@ export const emailWorker = new Worker(
   },
   {
     connection: redisConfig,
+    concurrency: 1,
   },
 );
 
@@ -52,3 +53,11 @@ emailWorker.on("failed", (job, error) => {
 emailWorker.on("error", (error) => {
   console.error("Email worker error:", error);
 });
+
+export async function closeEmailWorker(): Promise<void> {
+  console.log("Closing email worker...");
+
+  await emailWorker.close();
+
+  console.log("Email worker closed.");
+}

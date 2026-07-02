@@ -1,4 +1,4 @@
-export { initializeRealtime, getIO } from "./realtime.server.js";
+export { initializeRealtime, getIO, closeRealtime } from "./realtime.server.js";
 
 export { emitToRoom, emitToUser, emitToWorkspace } from "./realtime.emitter.js";
 

@@ -1,7 +1,6 @@
 import { Worker } from "bullmq";
 
 import { redisConfig } from "../../config/redis.config.js";
-
 import { createNotification } from "../../modules/notification/notification.service.js";
 
 import { QUEUE_NAMES } from "../queue.constants.js";
@@ -61,3 +60,11 @@ notificationWorker.on("failed", (job, error) => {
 notificationWorker.on("error", (error) => {
   console.error("Notification worker error:", error);
 });
+
+export async function closeNotificationWorker(): Promise<void> {
+  console.log("Closing notification worker...");
+
+  await notificationWorker.close();
+
+  console.log("Notification worker closed.");
+}

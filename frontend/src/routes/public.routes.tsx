@@ -9,15 +9,19 @@ import RegisterPage from "@/pages/RegisterPage";
 
 export const publicRoutes: RouteObject[] = [
   {
+    path: "/",
+    element: <HomePage />,
+  },
+  {
+    path: "*",
+    element: <NotFoundPage />,
+  },
+  {
     element: <GuestRoute />,
     children: [
       {
         element: <PublicLayout />,
         children: [
-          {
-            path: "/",
-            element: <HomePage />,
-          },
           {
             path: "/login",
             element: <LoginPage />,
@@ -25,10 +29,6 @@ export const publicRoutes: RouteObject[] = [
           {
             path: "/register",
             element: <RegisterPage />,
-          },
-          {
-            path: "*",
-            element: <NotFoundPage />,
           },
         ],
       },

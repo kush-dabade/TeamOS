@@ -1,4 +1,5 @@
 import express from "express";
+import cors from "cors";
 import { toNodeHandler } from "better-auth/node";
 
 import { auth } from "./lib/auth.js";
@@ -20,6 +21,19 @@ import attachmentItemRoutes from "./modules/attachment/attachment-item.routes.js
 import searchRoutes from "./modules/search/search.routes.js";
 
 const app = express();
+
+const frontendUrl = process.env.FRONTEND_URL;
+
+if (!frontendUrl) {
+  throw new Error("FRONTEND_URL environment variable is required.");
+}
+
+app.use(
+  cors({
+    origin: frontendUrl,
+    credentials: true,
+  }),
+);
 
 app.all("/api/auth/*splat", toNodeHandler(auth));
 

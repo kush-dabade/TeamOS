@@ -1,15 +1,11 @@
+import type { LoginFormData } from "../validation/login";
+import type { RegisterFormData } from "../validation/register";
+
 import { authClient } from "@/lib/auth-client";
 
-interface LoginCredentials {
-  email: string;
-  password: string;
-}
+type LoginCredentials = LoginFormData;
 
-interface RegisterCredentials {
-  name: string;
-  email: string;
-  password: string;
-}
+type RegisterCredentials = Pick<RegisterFormData, "name" | "email" | "password">;
 
 export async function login(data: LoginCredentials): Promise<void> {
   const { error } = await authClient.signIn.email({
@@ -43,6 +39,15 @@ function throwIfAuthError(error: unknown): void {
 
   if (error instanceof Error) {
     throw error;
+  }
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    throw new Error(error.message);
   }
 
   throw new Error("Something went wrong. Please try again.");

@@ -12,14 +12,16 @@ export function SidebarBrand() {
   const isCollapsed = state === "collapsed";
 
   return (
-    <div className="flex items-center justify-between">
-      <Link to="/dashboard" className="flex min-w-0 items-center gap-3">
+    <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center gap-3">
         <SidebarBrandButton />
 
         {!isCollapsed && (
-          <span className="truncate text-base font-semibold tracking-tight">TeamOS</span>
+          <Link to="/dashboard" className="truncate text-base font-semibold tracking-tight">
+            TeamOS
+          </Link>
         )}
-      </Link>
+      </div>
 
       {!isCollapsed && (
         <Button

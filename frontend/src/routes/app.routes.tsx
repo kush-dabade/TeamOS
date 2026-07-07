@@ -1,7 +1,7 @@
 import type { RouteObject } from "react-router-dom";
 
 import { AuthenticatedRoute } from "@/features/auth";
-import AppLayout from "@/layouts/AppLayout";
+import AppShell from "@/layouts/AppShell";
 import DashboardPage from "@/pages/DashboardPage";
 
 export const appRoutes: RouteObject[] = [
@@ -9,7 +9,7 @@ export const appRoutes: RouteObject[] = [
     element: <AuthenticatedRoute />,
     children: [
       {
-        element: <AppLayout />,
+        element: <AppShell />,
         children: [
           {
             path: "/dashboard",

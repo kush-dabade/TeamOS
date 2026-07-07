@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 
-import { appNavigation } from "@/config/navigation";
+import { appRoutesConfig } from "@/config/routes";
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -12,22 +12,24 @@ import {
 export function SidebarNavigation() {
   const location = useLocation();
 
+  const navigationItems = appRoutesConfig.filter((route) => route.showInSidebar);
+
   return (
     <SidebarGroup>
       <SidebarGroupContent>
         <SidebarMenu>
-          {appNavigation.map((item) => {
-            const Icon = item.icon;
+          {navigationItems.map((route) => {
+            const Icon = route.icon!;
 
             const isActive =
-              location.pathname === item.to || location.pathname.startsWith(`${item.to}/`);
+              location.pathname === route.path || location.pathname.startsWith(`${route.path}/`);
 
             return (
-              <SidebarMenuItem key={item.to}>
+              <SidebarMenuItem key={route.path}>
                 <SidebarMenuButton asChild isActive={isActive}>
-                  <Link to={item.to}>
+                  <Link to={route.path}>
                     <Icon className="size-4 shrink-0" />
-                    <span className="truncate">{item.label}</span>
+                    <span className="truncate">{route.navigationLabel}</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

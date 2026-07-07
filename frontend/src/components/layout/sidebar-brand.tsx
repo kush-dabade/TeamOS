@@ -1,23 +1,38 @@
-import { Layers3 } from "lucide-react";
+import { PanelLeftIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
+import { useSidebar } from "@/components/ui/sidebar";
+
+import { SidebarBrandButton } from "./sidebar-brand-button";
 
 export function SidebarBrand() {
+  const { state, toggleSidebar } = useSidebar();
+
+  const isCollapsed = state === "collapsed";
+
   return (
     <div className="flex items-center justify-between">
-      <Link
-        to="/dashboard"
-        className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1 transition-colors hover:bg-accent"
-      >
-        <Layers3 className="size-5 shrink-0 text-primary" />
+      <Link to="/dashboard" className="flex min-w-0 items-center gap-3">
+        <SidebarBrandButton />
 
-        <span className="truncate text-base font-semibold group-data-[collapsible=icon]:hidden">
-          TeamOS
-        </span>
+        {!isCollapsed && (
+          <span className="truncate text-base font-semibold tracking-tight">TeamOS</span>
+        )}
       </Link>
 
-      <SidebarTrigger className="group-data-[collapsible=icon]:hidden opacity-60 transition-opacity hover:opacity-100" />
+      {!isCollapsed && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="Collapse sidebar"
+          onClick={toggleSidebar}
+          className="size-8 rounded-md"
+        >
+          <PanelLeftIcon className="size-5" />
+        </Button>
+      )}
     </div>
   );
 }

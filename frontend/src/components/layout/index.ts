@@ -5,6 +5,11 @@ export * from "./breadcrumbs";
 export * from "./header-actions";
 export * from "./header-navigation";
 export * from "./header-title";
+
+export * from "./PageHeader";
+export * from "./PageLayout";
+export * from "./PageSection";
+
 export * from "./sidebar-brand";
 export * from "./sidebar-brand-button";
 export * from "./sidebar-navigation";

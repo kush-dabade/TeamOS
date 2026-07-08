@@ -3,7 +3,7 @@ import { Layers3, PanelLeftIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useSidebar } from "@/components/ui/sidebar";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 
 export function SidebarBrandButton() {
   const { state, toggleSidebar } = useSidebar();

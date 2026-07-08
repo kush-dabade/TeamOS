@@ -1,5 +1,6 @@
 import type { LoginFormData } from "../validation/login";
 import type { RegisterFormData } from "../validation/register";
+import { getErrorMessage } from "@/utils";
 
 import { authClient } from "@/lib/auth-client";
 
@@ -37,18 +38,5 @@ function throwIfAuthError(error: unknown): void {
     return;
   }
 
-  if (error instanceof Error) {
-    throw error;
-  }
-
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "message" in error &&
-    typeof error.message === "string"
-  ) {
-    throw new Error(error.message);
-  }
-
-  throw new Error("Something went wrong. Please try again.");
+  throw new Error(getErrorMessage(error));
 }

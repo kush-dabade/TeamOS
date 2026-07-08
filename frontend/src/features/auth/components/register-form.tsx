@@ -3,7 +3,7 @@ import { Controller, useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
-import { register } from "../api/auth-api";
+import { register } from "../api/auth.api";
 import { registerSchema, type RegisterFormData } from "../validation/register";
 
 import { Button } from "@/components/ui/button";

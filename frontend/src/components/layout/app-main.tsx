@@ -20,7 +20,7 @@ export function AppMain({ children }: AppMainProps) {
       <div className="flex h-full flex-col overflow-hidden rounded-xl bg-background shadow-sm">
         <AppHeader />
 
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        <div className="flex-1 overflow-y-auto">{children}</div>
       </div>
     </SidebarInset>
   );

@@ -15,8 +15,8 @@ export function SidebarNavigation() {
   const navigationItems = appRoutesConfig.filter((route) => route.showInSidebar);
 
   return (
-    <SidebarGroup>
-      <SidebarGroupContent>
+    <SidebarGroup className="group-data-[collapsible=icon]:items-center">
+      <SidebarGroupContent className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center">
         <SidebarMenu>
           {navigationItems.map((route) => {
             const Icon = route.icon!;

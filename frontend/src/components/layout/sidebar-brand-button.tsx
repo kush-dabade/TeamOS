@@ -16,32 +16,38 @@ export function SidebarBrandButton() {
     <Button
       type="button"
       variant="ghost"
-      size="icon"
-      aria-label="TeamOS"
       onClick={() => {
         if (isCollapsed) {
           toggleSidebar();
         }
       }}
+      aria-label={isCollapsed ? "Expand sidebar" : "TeamOS"}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="size-8 rounded-md"
+      className={cn(
+        "h-10 flex-1 justify-start gap-3 rounded-lg px-2",
+        isCollapsed && "size-10 justify-center px-0",
+      )}
     >
-      <div className="relative size-5">
+      <div className="relative size-5 shrink-0">
         <Layers3
           className={cn(
-            "absolute inset-0 size-5 transition-all duration-150 ease-out",
+            "absolute inset-0 size-5 transition-all duration-200 ease-out",
             isCollapsed && hovered ? "scale-90 opacity-0" : "scale-100 opacity-100",
           )}
         />
 
         <PanelLeftIcon
           className={cn(
-            "absolute inset-0 size-5 transition-all duration-150 ease-out",
+            "absolute inset-0 size-5 transition-all duration-200 ease-out",
             isCollapsed && hovered ? "scale-100 opacity-100" : "scale-90 opacity-0",
           )}
         />
       </div>
+
+      {!isCollapsed && (
+        <span className="truncate text-base font-bold tracking-tight">TeamOS</span>
+      )}
     </Button>
   );
 }

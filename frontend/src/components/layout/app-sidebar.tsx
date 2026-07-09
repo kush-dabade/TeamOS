@@ -1,11 +1,4 @@
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarHeader,
-  SidebarRail,
-  SidebarSeparator,
-} from "@/components/ui/sidebar";
+import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader } from "@/components/ui/sidebar";
 
 import { SidebarBrand } from "./sidebar-brand";
 import { SidebarNavigation } from "./sidebar-navigation";
@@ -15,24 +8,18 @@ import { WorkspaceSwitcher } from "./workspace-switcher";
 export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader>
+      <SidebarHeader className="pb-3">
         <SidebarBrand />
         <WorkspaceSwitcher />
       </SidebarHeader>
-
-      <SidebarSeparator />
 
       <SidebarContent className="flex-1">
         <SidebarNavigation />
       </SidebarContent>
 
-      <SidebarSeparator />
-
-      <SidebarFooter>
+      <SidebarFooter className="pt-3">
         <SidebarUser />
       </SidebarFooter>
-
-      <SidebarRail />
     </Sidebar>
   );
 }

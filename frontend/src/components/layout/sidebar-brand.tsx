@@ -1,5 +1,4 @@
 import { PanelLeftIcon } from "lucide-react";
-import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { useSidebar } from "@/components/ui/sidebar";
@@ -12,16 +11,8 @@ export function SidebarBrand() {
   const isCollapsed = state === "collapsed";
 
   return (
-    <div className="flex items-center justify-between gap-2">
-      <div className="flex items-center gap-3">
-        <SidebarBrandButton />
-
-        {!isCollapsed && (
-          <Link to="/dashboard" className="truncate text-base font-semibold tracking-tight">
-            TeamOS
-          </Link>
-        )}
-      </div>
+    <div className="group flex items-center justify-between gap-2 group-data-[collapsible=icon]:justify-center">
+      <SidebarBrandButton />
 
       {!isCollapsed && (
         <Button
@@ -30,9 +21,9 @@ export function SidebarBrand() {
           size="icon"
           aria-label="Collapse sidebar"
           onClick={toggleSidebar}
-          className="size-8 rounded-md"
+          className="size-8 rounded-md text-muted-foreground opacity-40 transition-all duration-200 hover:text-foreground hover:opacity-100 group-hover:opacity-100"
         >
-          <PanelLeftIcon className="size-5" />
+          <PanelLeftIcon className="size-4" />
         </Button>
       )}
     </div>

@@ -2,8 +2,8 @@ import { PageHeader, PageLayout } from "@/components/layout";
 
 import {
   ActiveProjectsPanel,
-  MyTasksPanel,
   RecentActivityPanel,
+  TodaysFocusPanel,
   WorkspaceSnapshotPanel,
 } from "../components";
 
@@ -17,7 +17,7 @@ export function DashboardPage() {
 
       <div className="grid gap-6 lg:grid-cols-12">
         <div className="lg:col-span-8">
-          <MyTasksPanel />
+          <TodaysFocusPanel />
         </div>
 
         <div className="lg:col-span-4">

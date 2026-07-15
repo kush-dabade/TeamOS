@@ -1,9 +1,19 @@
 import type {
-  DashboardActivity,
+  DashboardEvent,
   DashboardProject,
   DashboardTask,
-  WorkspaceSnapshot,
+  WorkspaceHealthItem,
 } from "../types";
+
+import {
+  Archive,
+  CircleCheckBig,
+  CircleAlert,
+  FolderKanban,
+  MessageSquare,
+  Rocket,
+  Users,
+} from "lucide-react";
 
 export const mockTasks: DashboardTask[] = [
   {
@@ -36,33 +46,69 @@ export const mockTasks: DashboardTask[] = [
   },
 ];
 
-export const mockWorkspaceSnapshot: WorkspaceSnapshot = {
-  projectCount: 12,
-  taskCount: 84,
-  memberCount: 8,
-  activeSprint: true,
-};
+export const mockWorkspaceHealth: WorkspaceHealthItem[] = [
+  {
+    id: "projects",
+    label: "Projects",
+    state: "12 Active",
+    tone: "healthy",
+    icon: FolderKanban,
+  },
+  {
+    id: "tasks",
+    label: "Tasks",
+    state: "2 Overdue",
+    tone: "warning",
+    icon: CircleAlert,
+  },
+  {
+    id: "sprint",
+    label: "Sprint",
+    state: "On Track",
+    tone: "healthy",
+    icon: Rocket,
+  },
+  {
+    id: "members",
+    label: "Members",
+    state: "8 Active",
+    tone: "neutral",
+    icon: Users,
+  },
+];
 
-export const mockActivities: DashboardActivity[] = [
+export const mockEvents: DashboardEvent[] = [
   {
     id: "1",
-    message: "You completed Authentication module",
-    timestamp: "2 minutes ago",
+    title: "Authentication module completed",
+    context: "Backend API",
+    timestamp: "Just now",
+    tone: "success",
+    icon: CircleCheckBig,
   },
   {
     id: "2",
-    message: "Sarah created Sprint 14",
-    timestamp: "18 minutes ago",
+    title: "Sprint 14 started",
+    context: "Website Redesign",
+    timestamp: "18 min",
+    tone: "default",
+    icon: Rocket,
   },
   {
     id: "3",
-    message: "Alex commented on API Specification",
-    timestamp: "1 hour ago",
+    title: "API specification updated",
+    context: "Backend API",
+    timestamp: "1 hr",
+    tone: "default",
+    icon: MessageSquare,
   },
   {
     id: "4",
-    message: "Website Redesign project was updated",
+    title: "Website redesign archived",
+    context: "Marketing Site",
     timestamp: "Yesterday",
+    tone: "warning",
+    icon: Archive,
   },
 ];
 
@@ -72,17 +118,20 @@ export const mockProjects: DashboardProject[] = [
     name: "Website Redesign",
     completedTasks: 12,
     totalTasks: 18,
+    status: "Waiting for review",
   },
   {
     id: "2",
     name: "Authentication",
     completedTasks: 21,
     totalTasks: 23,
+    status: "2 tasks remaining",
   },
   {
     id: "3",
     name: "Marketing Site",
     completedTasks: 5,
     totalTasks: 15,
+    status: "Design phase",
   },
 ];

@@ -1,22 +1,37 @@
-import { DashboardPanel } from "./layout";
-import { SnapshotStat } from "./workspace-snapshot";
+import { ArrowRight } from "lucide-react";
 
-import { mockWorkspaceSnapshot } from "../data/dashboard.mock";
+import { Button } from "@/components/ui";
+
+import { DashboardPanel } from "./layout";
+import { HealthItem } from "./workspace-snapshot";
+
+import { mockWorkspaceHealth } from "../data/dashboard.mock";
 
 export function WorkspaceSnapshotPanel() {
   return (
-    <DashboardPanel title="Workspace Snapshot" description="Current workspace overview.">
-      <div className="divide-border divide-y">
-        <SnapshotStat label="Projects" value={mockWorkspaceSnapshot.projectCount} />
-
-        <SnapshotStat label="Open Tasks" value={mockWorkspaceSnapshot.taskCount} />
-
-        <SnapshotStat label="Members" value={mockWorkspaceSnapshot.memberCount} />
-
-        <SnapshotStat
-          label="Current Sprint"
-          value={<span className="text-emerald-600 font-medium">Active</span>}
-        />
+    <DashboardPanel
+      title="Workspace Health"
+      action={
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="
+            h-6
+            px-1.5
+            text-xs
+            font-medium
+          "
+        >
+          View details
+          <ArrowRight className="ml-1 h-3 w-3" />
+        </Button>
+      }
+    >
+      <div className="divide-y divide-border">
+        {mockWorkspaceHealth.map((item) => (
+          <HealthItem key={item.id} item={item} />
+        ))}
       </div>
     </DashboardPanel>
   );

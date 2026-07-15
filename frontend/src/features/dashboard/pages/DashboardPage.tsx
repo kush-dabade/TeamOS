@@ -1,8 +1,8 @@
-import { PageHeader, PageLayout } from "@/components/layout";
+import { PageLayout } from "@/components/layout";
 
 import {
   ActiveProjectsPanel,
-  RecentActivityPanel,
+  SinceLastVisitPanel,
   TodaysFocusPanel,
   WorkspaceSnapshotPanel,
 } from "../components";
@@ -10,28 +10,23 @@ import {
 export function DashboardPage() {
   return (
     <PageLayout>
-      <PageHeader
-        title="Good morning, Kush 👋"
-        description="Here's what's happening across your workspace today."
-      />
-
-      <div className="grid gap-6 lg:grid-cols-12">
-        <div className="lg:col-span-8">
+      <main className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-12">
+        <section className="flex lg:col-span-7">
           <TodaysFocusPanel />
-        </div>
+        </section>
 
-        <div className="lg:col-span-4">
+        <aside className="flex lg:col-span-5">
           <WorkspaceSnapshotPanel />
-        </div>
+        </aside>
 
-        <div className="lg:col-span-5">
-          <RecentActivityPanel />
-        </div>
+        <aside className="flex lg:col-span-5">
+          <SinceLastVisitPanel />
+        </aside>
 
-        <div className="lg:col-span-7">
+        <section className="flex lg:col-span-7">
           <ActiveProjectsPanel />
-        </div>
-      </div>
+        </section>
+      </main>
     </PageLayout>
   );
 }

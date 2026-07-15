@@ -1,3 +1,7 @@
+import { ArrowRight } from "lucide-react";
+
+import { Button } from "@/components/ui";
+
 import { DashboardPanel } from "./layout";
 import { FocusItem } from "./focus-item";
 
@@ -7,17 +11,23 @@ export function TodaysFocusPanel() {
   return (
     <DashboardPanel
       title="Today's Focus"
-      description="The highest-priority work that needs your attention today."
       action={
-        <button
-          type="button"
-          className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
+        <Button
+          variant="ghost"
+          size="sm"
+          className="
+            h-6
+            px-1.5
+            text-xs
+            font-medium
+          "
         >
           View all
-        </button>
+          <ArrowRight className="ml-1 h-3 w-3" />
+        </Button>
       }
     >
-      <div className="divide-border divide-y">
+      <div className="divide-y divide-border">
         {mockTasks.map((task) => (
           <FocusItem key={task.id} task={task} />
         ))}

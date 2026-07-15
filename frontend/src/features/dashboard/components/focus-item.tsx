@@ -16,72 +16,47 @@ export function FocusItem({ task, onClick }: FocusItemProps) {
       onClick={onClick}
       className="
         group w-full
-        rounded-lg
-        px-4 py-3
+        rounded-md
+        px-3 py-2.5
         text-left
-        transition-colors
-        hover:bg-muted/40
+        transition-colors duration-150
+        hover:bg-muted/50
+        focus-visible:ring-ring focus-visible:ring-2
+        focus-visible:outline-none
       "
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start gap-4">
         <div className="min-w-0 flex-1">
-          <h3
-            className="
-              truncate
-              text-sm
-              font-medium
-              transition-colors
-              group-hover:text-foreground
-            "
-          >
-            {task.title}
-          </h3>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="truncate text-sm font-medium leading-none">{task.title}</h3>
 
-          <div
-            className="
-              text-muted-foreground
-              mt-1.5
-              flex
-              flex-wrap
-              items-center
-              gap-x-2
-              gap-y-1
-              text-xs
-            "
-          >
-            <span>{task.projectName}</span>
-
-            {task.dueDate && (
-              <>
-                <span>•</span>
-                <span>{task.dueDate}</span>
-              </>
-            )}
-
-            {/* Future:
-                • Waiting for review
-                • In Progress
-                • Sprint 12
-                • Updated 2h ago
-            */}
+            <TaskPriorityBadge priority={task.priority} />
           </div>
-        </div>
 
-        <div className="flex items-center gap-3">
-          <TaskPriorityBadge priority={task.priority} />
+          <div className="text-muted-foreground mt-1 flex items-center justify-between text-xs">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="truncate">{task.projectName}</span>
 
-          <ChevronRight
-            className="
-              text-muted-foreground
-              h-4
-              w-4
-              opacity-0
-              transition-all
-              duration-150
-              group-hover:translate-x-0.5
-              group-hover:opacity-100
-            "
-          />
+              {task.dueDate ? (
+                <>
+                  <span>•</span>
+                  <span className="shrink-0">{task.dueDate}</span>
+                </>
+              ) : null}
+            </div>
+
+            <ChevronRight
+              className="
+                h-3.5
+                w-3.5
+                shrink-0
+                opacity-0
+                transition-all duration-150
+                group-hover:translate-x-0.5
+                group-hover:opacity-100
+              "
+            />
+          </div>
         </div>
       </div>
     </button>

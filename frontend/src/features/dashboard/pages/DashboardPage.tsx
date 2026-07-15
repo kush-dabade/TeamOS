@@ -10,7 +10,7 @@ import {
 export function DashboardPage() {
   return (
     <PageLayout>
-      <main className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-12">
+      <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-12">
         <section className="flex lg:col-span-7">
           <TodaysFocusPanel />
         </section>
@@ -26,7 +26,7 @@ export function DashboardPage() {
         <section className="flex lg:col-span-7">
           <ActiveProjectsPanel />
         </section>
-      </main>
+      </div>
     </PageLayout>
   );
 }

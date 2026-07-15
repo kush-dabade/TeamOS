@@ -12,7 +12,10 @@ export function DashboardPanel({ title, description, action, children }: Dashboa
   return (
     <Card className="flex h-full flex-col overflow-hidden">
       <header
-        className={["border-border border-b px-4", description ? "py-3" : "py-2.5"].join(" ")}
+        className={`
+        border-border border-b px-4
+        ${description ? "py-3" : "py-2.5"}
+      `}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">

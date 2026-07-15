@@ -22,7 +22,7 @@ export function FocusItem({ task, onClick }: FocusItemProps) {
         transition-colors duration-150
         hover:bg-muted/50
         focus-visible:ring-ring focus-visible:ring-2
-        focus-visible:outline-none
+        focus-visible:outline-hidden
       "
     >
       <div className="flex items-start gap-4">

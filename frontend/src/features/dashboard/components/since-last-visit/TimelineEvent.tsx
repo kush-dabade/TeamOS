@@ -41,7 +41,7 @@ export function TimelineEvent({ event, onClick }: TimelineEventProps) {
         text-left
         transition-colors duration-150
         hover:bg-muted/50
-        focus-visible:outline-none
+        focus-visible:outline-hidden
         focus-visible:ring-2
         focus-visible:ring-ring
       "

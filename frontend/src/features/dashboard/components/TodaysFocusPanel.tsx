@@ -3,17 +3,16 @@ import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui";
 
 import { DashboardPanel } from "./layout";
-import { HealthItem } from "./workspace-snapshot";
+import { FocusItem } from "./focus-item";
 
-import { mockWorkspaceHealth } from "../data/dashboard.mock";
+import { mockTasks } from "../data/dashboard.mock";
 
-export function WorkspaceSnapshotPanel() {
+export function TodaysFocusPanel() {
   return (
     <DashboardPanel
-      title="Workspace Health"
+      title="Today's Focus"
       action={
         <Button
-          type="button"
           variant="ghost"
           size="sm"
           className="
@@ -23,14 +22,14 @@ export function WorkspaceSnapshotPanel() {
             font-medium
           "
         >
-          View details
+          View all
           <ArrowRight className="ml-1 h-3 w-3" />
         </Button>
       }
     >
       <div className="divide-y divide-border">
-        {mockWorkspaceHealth.map((item) => (
-          <HealthItem key={item.id} item={item} />
+        {mockTasks.map((task) => (
+          <FocusItem key={task.id} task={task} />
         ))}
       </div>
     </DashboardPanel>

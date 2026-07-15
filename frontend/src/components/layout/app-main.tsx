@@ -1,7 +1,7 @@
 import type { PropsWithChildren } from "react";
 
-import { cn } from "@/utils";
 import { SidebarInset, useSidebar } from "@/components/ui/sidebar";
+import { cn } from "@/utils";
 
 import { AppHeader } from "./app-header";
 
@@ -13,14 +13,14 @@ export function AppMain({ children }: AppMainProps) {
   return (
     <SidebarInset
       className={cn(
-        "h-screen bg-muted/20 py-5 pr-5 transition-all duration-200 md:py-6 md:pr-6",
-        state === "collapsed" ? "pl-2 md:pl-2" : "pl-3 md:pl-4",
+        "h-screen bg-muted/20 py-4 pr-4 transition-[padding] duration-200 md:py-5 md:pr-5",
+        state === "collapsed" ? "pl-2" : "pl-3 md:pl-4",
       )}
     >
-      <div className="flex h-full flex-col overflow-hidden rounded-xl bg-background shadow-sm">
+      <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg bg-background shadow-sm">
         <AppHeader />
 
-        <div className="flex-1 overflow-y-auto">{children}</div>
+        <main className="min-h-0 flex-1 overflow-y-auto pb-4">{children}</main>
       </div>
     </SidebarInset>
   );

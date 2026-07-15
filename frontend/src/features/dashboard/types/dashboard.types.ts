@@ -1,3 +1,5 @@
+import type { LucideIcon } from "lucide-react";
+
 export type DashboardTaskPriority = "low" | "medium" | "high" | "urgent";
 
 export interface DashboardTask {
@@ -8,22 +10,29 @@ export interface DashboardTask {
   dueDate: string | null;
 }
 
-export interface DashboardActivity {
+export interface WorkspaceHealthItem {
   id: string;
-  message: string;
+  label: string;
+  state: string;
+  tone: "healthy" | "warning" | "neutral";
+  icon: LucideIcon;
+}
+
+export interface DashboardEvent {
+  id: string;
+  title: string;
+  context: string;
   timestamp: string;
+  tone: "default" | "success" | "warning";
+  icon: LucideIcon;
 }
 
 export interface DashboardProject {
   id: string;
   name: string;
+
   completedTasks: number;
   totalTasks: number;
-}
 
-export interface WorkspaceSnapshot {
-  projectCount: number;
-  taskCount: number;
-  memberCount: number;
-  activeSprint: boolean;
+  status: string;
 }

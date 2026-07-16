@@ -34,7 +34,7 @@ export function ProjectRow({ project, isSelected, onSelect }: ProjectRowProps) {
             selectProject();
           }}
           ref={projectNameButtonRef}
-          className="rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="rounded-sm text-left outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
         >
           {projectDetails.name}
         </button>

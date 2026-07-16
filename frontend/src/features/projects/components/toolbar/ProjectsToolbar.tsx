@@ -43,7 +43,7 @@ export function ProjectsToolbar({
           value={statusFilter}
           onChange={(event) => onStatusFilterChange(event.target.value as ProjectStatusFilter)}
           aria-label="Filter projects by status"
-          className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+          className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-hidden transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
         >
           <option value="ALL">All</option>
           <option value="PLANNED">Planned</option>
@@ -56,7 +56,7 @@ export function ProjectsToolbar({
           value={sortOption}
           onChange={(event) => onSortOptionChange(event.target.value as ProjectSortOption)}
           aria-label="Sort projects"
-          className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+          className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-hidden transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
         >
           <option value="RECENTLY_UPDATED">Recently Updated</option>
           <option value="NAME_ASC">Name (A–Z)</option>

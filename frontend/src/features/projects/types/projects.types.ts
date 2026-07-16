@@ -19,3 +19,9 @@ export interface ProjectListItem {
   completedTaskCount: number;
   totalTaskCount: number;
 }
+
+export interface ProjectPreviewData {
+  ownerName: string;
+  startDate: string | null;
+  targetDate: string | null;
+}

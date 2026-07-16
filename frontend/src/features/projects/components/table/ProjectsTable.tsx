@@ -10,7 +10,7 @@ interface ProjectsTableProps {
   selectedProjectId: string | null;
   isLoading: boolean;
   error: string | null;
-  onProjectSelect: (projectId: string) => void;
+  onProjectSelect: (projectId: string, trigger: HTMLButtonElement | null) => void;
   onRetry: () => void;
 }
 

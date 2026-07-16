@@ -1,3 +1,5 @@
+import { useRef } from "react";
+
 import { formatRelativeDate } from "@/utils";
 
 import type { ProjectListItem, ProjectStatus } from "../../types";
@@ -5,7 +7,7 @@ import type { ProjectListItem, ProjectStatus } from "../../types";
 interface ProjectRowProps {
   project: ProjectListItem;
   isSelected: boolean;
-  onSelect: (projectId: string) => void;
+  onSelect: (projectId: string, trigger: HTMLButtonElement | null) => void;
 }
 
 const statusStyles: Record<ProjectStatus, string> = {
@@ -24,10 +26,11 @@ const statusLabels: Record<ProjectStatus, string> = {
 
 export function ProjectRow({ project, isSelected, onSelect }: ProjectRowProps) {
   const { completedTaskCount, project: projectDetails, totalTaskCount } = project;
+  const projectNameButtonRef = useRef<HTMLButtonElement>(null);
   const progress =
     totalTaskCount === 0 ? 0 : Math.round((completedTaskCount / totalTaskCount) * 100);
 
-  const selectProject = () => onSelect(projectDetails.id);
+  const selectProject = () => onSelect(projectDetails.id, projectNameButtonRef.current);
 
   return (
     <tr
@@ -39,6 +42,7 @@ export function ProjectRow({ project, isSelected, onSelect }: ProjectRowProps) {
         <button
           type="button"
           onClick={selectProject}
+          ref={projectNameButtonRef}
           className="rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           {projectDetails.name}

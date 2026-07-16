@@ -1,4 +1,4 @@
-import type { ProjectListItem } from "../types";
+import type { ProjectListItem, ProjectPreviewData } from "../types";
 
 export const mockProjects: ProjectListItem[] = [
   {
@@ -67,3 +67,31 @@ export const mockProjects: ProjectListItem[] = [
     totalTaskCount: 10,
   },
 ];
+
+export const mockProjectPreviewData: Record<string, ProjectPreviewData> = {
+  "project-website-redesign": {
+    ownerName: "Sarah Johnson",
+    startDate: "2026-06-10T00:00:00.000Z",
+    targetDate: "2026-08-15T00:00:00.000Z",
+  },
+  "project-authentication": {
+    ownerName: "Marcus Chen",
+    startDate: "2026-05-20T00:00:00.000Z",
+    targetDate: "2026-07-30T00:00:00.000Z",
+  },
+  "project-mobile-launch": {
+    ownerName: "Priya Patel",
+    startDate: "2026-07-20T00:00:00.000Z",
+    targetDate: "2026-09-30T00:00:00.000Z",
+  },
+  "project-design-system": {
+    ownerName: "Jordan Lee",
+    startDate: "2026-03-15T00:00:00.000Z",
+    targetDate: "2026-06-20T00:00:00.000Z",
+  },
+  "project-legacy-api": {
+    ownerName: "Alex Morgan",
+    startDate: "2026-01-22T00:00:00.000Z",
+    targetDate: "2026-04-01T00:00:00.000Z",
+  },
+};

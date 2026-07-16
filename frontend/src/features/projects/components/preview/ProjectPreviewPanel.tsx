@@ -18,6 +18,7 @@ interface ProjectPreviewPanelProps {
   onClose: () => void;
   onCloseAutoFocus: () => void;
   onOpenProject: (slug: string) => void;
+  onEdit: (trigger: HTMLButtonElement) => void;
 }
 
 const statusStyles: Record<ProjectStatus, string> = {
@@ -41,6 +42,7 @@ export function ProjectPreviewPanel({
   onClose,
   onCloseAutoFocus,
   onOpenProject,
+  onEdit,
 }: ProjectPreviewPanelProps) {
   if (!project || !previewData) {
     return null;
@@ -116,10 +118,13 @@ export function ProjectPreviewPanel({
         <Separator />
 
         <SheetFooter className="flex-row items-center justify-between p-4">
-          <Button type="button" variant="ghost">Archive</Button>
-          <Button type="button" onClick={() => onOpenProject(projectDetails.slug)}>
-            Open Project
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button type="button" variant="ghost" onClick={(event) => onEdit(event.currentTarget)}>
+              Edit
+            </Button>
+            <Button type="button" variant="ghost">Archive</Button>
+          </div>
+          <Button type="button" onClick={() => onOpenProject(projectDetails.slug)}>Open Project</Button>
         </SheetFooter>
       </SheetContent>
     </Sheet>

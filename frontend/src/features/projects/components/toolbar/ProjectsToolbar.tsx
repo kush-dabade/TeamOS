@@ -9,6 +9,7 @@ interface ProjectsToolbarProps {
   onSearchQueryChange: (value: string) => void;
   onStatusFilterChange: (value: ProjectStatusFilter) => void;
   onSortOptionChange: (value: ProjectSortOption) => void;
+  onNewProject: (trigger: HTMLButtonElement) => void;
 }
 
 export function ProjectsToolbar({
@@ -18,11 +19,14 @@ export function ProjectsToolbar({
   onSearchQueryChange,
   onStatusFilterChange,
   onSortOptionChange,
+  onNewProject,
 }: ProjectsToolbarProps) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex justify-end">
-        <Button type="button">New Project</Button>
+        <Button type="button" onClick={(event) => onNewProject(event.currentTarget)}>
+          New Project
+        </Button>
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">

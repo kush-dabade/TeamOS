@@ -67,6 +67,11 @@ export function ProjectsPage() {
 
   const handleRetry = () => setError(null);
 
+  const handleClearFilters = () => {
+    setSearchQuery("");
+    setStatusFilter("ALL");
+  };
+
   const selectedProject = projectItems.find(
     ({ project }) => project.id === selectedProjectId,
   );
@@ -186,8 +191,11 @@ export function ProjectsPage() {
             selectedProjectId={selectedProjectId}
             isLoading={false}
             error={error}
+            hasActiveFilters={Boolean(searchQuery.trim()) || statusFilter !== "ALL"}
             onProjectSelect={handleProjectSelect}
             onRetry={handleRetry}
+            onNewProject={handleNewProject}
+            onClearFilters={handleClearFilters}
           />
         </div>
       </div>

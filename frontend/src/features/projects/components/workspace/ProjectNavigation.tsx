@@ -26,7 +26,7 @@ export function ProjectNavigation({ activeTab, onTabChange }: ProjectNavigationP
               <button
                 key={tab.id}
                 type="button"
-                aria-current={isActive ? "page" : undefined}
+                aria-pressed={isActive}
                 onClick={() => onTabChange(tab.id)}
                 className={`border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   isActive

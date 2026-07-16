@@ -9,7 +9,9 @@ import {
 } from "@/components/ui";
 import { formatDate, formatRelativeDate } from "@/utils";
 
-import type { ProjectListItem, ProjectPreviewData, ProjectStatus } from "../../types";
+import { ProjectStatusBadge } from "../ProjectStatusBadge";
+
+import type { ProjectListItem, ProjectPreviewData } from "../../types";
 
 interface ProjectPreviewPanelProps {
   project: ProjectListItem | null;
@@ -20,20 +22,6 @@ interface ProjectPreviewPanelProps {
   onOpenProject: (slug: string) => void;
   onEdit: (trigger: HTMLButtonElement) => void;
 }
-
-const statusStyles: Record<ProjectStatus, string> = {
-  PLANNED: "bg-muted text-muted-foreground",
-  ACTIVE: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
-  COMPLETED: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
-  ARCHIVED: "bg-secondary text-secondary-foreground",
-};
-
-const statusLabels: Record<ProjectStatus, string> = {
-  PLANNED: "Planned",
-  ACTIVE: "Active",
-  COMPLETED: "Completed",
-  ARCHIVED: "Archived",
-};
 
 export function ProjectPreviewPanel({
   project,
@@ -64,11 +52,7 @@ export function ProjectPreviewPanel({
       >
         <SheetHeader className="border-b p-4 pr-12">
           <SheetTitle>{projectDetails.name}</SheetTitle>
-          <span
-            className={`inline-flex w-fit rounded-full px-2 py-0.5 text-[11px] font-medium ${statusStyles[projectDetails.status]}`}
-          >
-            {statusLabels[projectDetails.status]}
-          </span>
+          <ProjectStatusBadge status={projectDetails.status} className="w-fit" />
         </SheetHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4">

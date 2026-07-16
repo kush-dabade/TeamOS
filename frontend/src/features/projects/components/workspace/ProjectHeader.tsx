@@ -1,19 +1,14 @@
 import { Button } from "@/components/ui";
 
-import type { ProjectListItem, ProjectPreviewData, ProjectStatus } from "../../types";
+import { ProjectStatusBadge } from "../ProjectStatusBadge";
+
+import type { ProjectListItem, ProjectPreviewData } from "../../types";
 
 interface ProjectHeaderProps {
   project: ProjectListItem;
   previewData: ProjectPreviewData | null;
   onEdit: (trigger: HTMLButtonElement) => void;
 }
-
-const statusLabels: Record<ProjectStatus, string> = {
-  PLANNED: "Planned",
-  ACTIVE: "Active",
-  COMPLETED: "Completed",
-  ARCHIVED: "Archived",
-};
 
 export function ProjectHeader({ project, previewData, onEdit }: ProjectHeaderProps) {
   const { completedTaskCount, project: projectDetails, totalTaskCount } = project;
@@ -31,7 +26,7 @@ export function ProjectHeader({ project, previewData, onEdit }: ProjectHeaderPro
 
         <div className="mt-3 overflow-x-auto">
           <div className="flex w-max items-center gap-2 whitespace-nowrap text-xs text-muted-foreground">
-            <span>{statusLabels[projectDetails.status]}</span>
+            <ProjectStatusBadge status={projectDetails.status} />
             <span aria-hidden="true">•</span>
             <span>{previewData?.ownerName ?? "TeamOS User"}</span>
             <span aria-hidden="true">•</span>

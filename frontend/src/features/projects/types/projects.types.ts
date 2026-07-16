@@ -1,5 +1,9 @@
 export type ProjectStatus = "PLANNED" | "ACTIVE" | "COMPLETED" | "ARCHIVED";
 
+export type ProjectStatusFilter = "ALL" | ProjectStatus;
+
+export type ProjectSortOption = "RECENTLY_UPDATED" | "NAME_ASC" | "NAME_DESC";
+
 export interface Project {
   id: string;
   slug: string;

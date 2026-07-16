@@ -1,6 +1,7 @@
 import type { RouteObject } from "react-router-dom";
 
 import { AuthenticatedRoute } from "@/features/auth";
+import { ProjectsPage, ProjectWorkspacePage } from "@/features/projects";
 import AppShell from "@/layouts/AppShell";
 import { DashboardPage } from "@/features/dashboard";
 
@@ -14,6 +15,14 @@ export const appRoutes: RouteObject[] = [
           {
             path: "/dashboard",
             element: <DashboardPage />,
+          },
+          {
+            path: "/projects",
+            element: <ProjectsPage />,
+          },
+          {
+            path: "/projects/:slug",
+            element: <ProjectWorkspacePage />,
           },
         ],
       },

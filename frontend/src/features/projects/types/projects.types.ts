@@ -4,6 +4,8 @@ export type ProjectStatusFilter = "ALL" | ProjectStatus;
 
 export type ProjectSortOption = "RECENTLY_UPDATED" | "NAME_ASC" | "NAME_DESC";
 
+export type ProjectWorkspaceTab = "tasks" | "sprints" | "activity";
+
 export interface Project {
   id: string;
   slug: string;

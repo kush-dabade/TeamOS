@@ -13,3 +13,9 @@ export interface Project {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface ProjectListItem {
+  project: Project;
+  completedTaskCount: number;
+  totalTaskCount: number;
+}

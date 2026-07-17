@@ -5,7 +5,7 @@ import { mockProjects } from "@/features/projects/data/projects.mock";
 
 import { TasksTable } from "../components/table";
 import { TasksToolbar } from "../components/toolbar";
-import { mockWorkspaceUsers } from "../data/tasks.mock";
+import { mockTasks, mockWorkspaceUsers } from "../data/tasks.mock";
 import type { TaskPriorityFilter, TaskStatusFilter } from "../types";
 
 export function TasksPage() {
@@ -14,8 +14,10 @@ export function TasksPage() {
   const [priorityFilter, setPriorityFilter] = useState<TaskPriorityFilter>("ALL");
   const [projectFilter, setProjectFilter] = useState("ALL");
   const [assigneeFilter, setAssigneeFilter] = useState("ALL");
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   const handleCreateTask = () => undefined;
+  const handleTaskSelect = (taskId: string) => setSelectedTaskId(taskId);
 
   return (
     <PageLayout>
@@ -38,7 +40,13 @@ export function TasksPage() {
           onCreateTask={handleCreateTask}
         />
         <div className="mt-4">
-          <TasksTable />
+          <TasksTable
+            tasks={mockTasks}
+            selectedTaskId={selectedTaskId}
+            isLoading={false}
+            onTaskSelect={handleTaskSelect}
+            onCreateTask={handleCreateTask}
+          />
         </div>
       </div>
     </PageLayout>

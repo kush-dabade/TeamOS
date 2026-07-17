@@ -1,4 +1,11 @@
-import type { TaskListItem } from "../types";
+import type { TaskAssignee, TaskListItem } from "../types";
+
+export const mockWorkspaceUsers: TaskAssignee[] = [
+  { id: "user-sarah-johnson", name: "Sarah Johnson" },
+  { id: "user-marcus-chen", name: "Marcus Chen" },
+  { id: "user-priya-patel", name: "Priya Patel" },
+  { id: "user-jordan-lee", name: "Jordan Lee" },
+];
 
 export const mockTasks: TaskListItem[] = [
   {

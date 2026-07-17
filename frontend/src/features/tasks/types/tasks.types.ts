@@ -2,6 +2,10 @@ export type TaskStatus = "TODO" | "IN_PROGRESS" | "REVIEW" | "DONE";
 
 export type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
+export type TaskStatusFilter = "ALL" | TaskStatus;
+
+export type TaskPriorityFilter = "ALL" | TaskPriority;
+
 export interface Task {
   id: string;
   workspaceId: string;

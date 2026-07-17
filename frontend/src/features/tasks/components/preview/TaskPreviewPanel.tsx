@@ -31,7 +31,7 @@ export function TaskPreviewPanel({
 }: TaskPreviewPanelProps) {
   if (isLoading) {
     return (
-      <Card>
+      <Card aria-busy="true" aria-label="Loading task preview">
         <CardContent>
           <TaskPreviewPanelSkeleton />
         </CardContent>
@@ -43,7 +43,9 @@ export function TaskPreviewPanel({
     return (
       <Card>
         <CardContent className="flex min-h-40 items-center justify-center text-center">
-          <p className="text-sm text-muted-foreground">Select a task to view its details.</p>
+          <p role="status" className="text-sm text-muted-foreground">
+            Select a task to view its details.
+          </p>
         </CardContent>
       </Card>
     );

@@ -52,12 +52,16 @@ export function TaskForm({
 
               return (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={field.name}>Title</FieldLabel>
+                  <FieldLabel htmlFor={field.name}>
+                    Title <span aria-hidden="true">*</span>
+                  </FieldLabel>
                   <Input
                     {...field}
                     ref={titleInputRef}
                     id={field.name}
                     placeholder="Review homepage conversion path"
+                    required
+                    aria-required="true"
                     aria-invalid={fieldState.invalid}
                     aria-describedby={fieldState.error ? errorId : undefined}
                   />
@@ -75,10 +79,14 @@ export function TaskForm({
 
               return (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={field.name}>Project</FieldLabel>
+                  <FieldLabel htmlFor={field.name}>
+                    Project <span aria-hidden="true">*</span>
+                  </FieldLabel>
                   <select
                     {...field}
                     id={field.name}
+                    required
+                    aria-required="true"
                     aria-invalid={fieldState.invalid}
                     aria-describedby={fieldState.error ? errorId : undefined}
                     className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-hidden transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:bg-input/30 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40"

@@ -62,7 +62,7 @@ export function TasksToolbar({
           value={statusFilter}
           onChange={(event) => onStatusFilterChange(event.target.value as TaskStatusFilter)}
           aria-label="Filter tasks by status"
-          className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-hidden transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+          className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-hidden transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:w-auto dark:bg-input/30"
         >
           <option value="ALL">All Statuses</option>
           <option value="TODO">Todo</option>
@@ -75,7 +75,7 @@ export function TasksToolbar({
           value={priorityFilter}
           onChange={(event) => onPriorityFilterChange(event.target.value as TaskPriorityFilter)}
           aria-label="Filter tasks by priority"
-          className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-hidden transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+          className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-hidden transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:w-auto dark:bg-input/30"
         >
           <option value="ALL">All Priorities</option>
           <option value="LOW">Low</option>
@@ -88,7 +88,7 @@ export function TasksToolbar({
           value={projectFilter}
           onChange={(event) => onProjectFilterChange(event.target.value)}
           aria-label="Filter tasks by project"
-          className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-hidden transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+          className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-hidden transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:w-auto dark:bg-input/30"
         >
           <option value="ALL">All Projects</option>
           {projects.map((project) => (
@@ -102,7 +102,7 @@ export function TasksToolbar({
           value={assigneeFilter}
           onChange={(event) => onAssigneeFilterChange(event.target.value)}
           aria-label="Filter tasks by assignee"
-          className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-hidden transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+          className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-hidden transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:w-auto dark:bg-input/30"
         >
           <option value="ALL">All Assignees</option>
           <option value="UNASSIGNED">Unassigned</option>
@@ -116,7 +116,7 @@ export function TasksToolbar({
 
       <Button
         type="button"
-        className="sm:ml-auto"
+        className="w-full sm:ml-auto sm:w-auto"
         onClick={(event) => onCreateTask(event.currentTarget)}
       >
         Create Task

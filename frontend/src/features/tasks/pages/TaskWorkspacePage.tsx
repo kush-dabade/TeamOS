@@ -23,7 +23,10 @@ export function TaskWorkspacePage() {
   if (!taskItem) {
     return (
       <PageLayout>
-        <p className="mt-3 text-sm text-muted-foreground">Task not found.</p>
+        <h1 className="mt-3 text-xl font-semibold tracking-tight">Task not found</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          The task may have been removed or you may not have access to it.
+        </p>
       </PageLayout>
     );
   }

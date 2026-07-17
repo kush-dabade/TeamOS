@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { PageHeader, PageLayout } from "@/components/layout";
@@ -22,6 +23,8 @@ export function TasksPage() {
   const [isFormPanelOpen, setIsFormPanelOpen] = useState(false);
   const [formPanelTrigger, setFormPanelTrigger] = useState<HTMLButtonElement | null>(null);
 
+  const navigate = useNavigate();
+
   const handleCreateTask = (trigger: HTMLButtonElement) => {
     setFormMode("create");
     setFormPanelTrigger(trigger);
@@ -30,9 +33,11 @@ export function TasksPage() {
   const handleTaskSelect = (taskId: string) => setSelectedTaskId(taskId);
   const selectedTask = mockTasks.find((taskItem) => taskItem.task.id === selectedTaskId) ?? null;
   const selectedTaskCreator = selectedTask
-    ? mockWorkspaceUsers.find((user) => user.id === selectedTask.task.createdById) ?? null
+    ? (mockWorkspaceUsers.find((user) => user.id === selectedTask.task.createdById) ?? null)
     : null;
-  const handleOpenTask = () => undefined;
+  const handleOpenTask = (taskId: string) => {
+    navigate(`/tasks/${taskId}`);
+  };
   const handleFormPanelClose = () => setIsFormPanelOpen(false);
   const handleFormPanelCloseAutoFocus = () => {
     formPanelTrigger?.focus();

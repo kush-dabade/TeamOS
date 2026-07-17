@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { PageHeader, PageLayout } from "@/components/layout";
 import { mockProjects } from "@/features/projects/data/projects.mock";
 
 import { TaskPreviewPanel } from "../components/preview";
+import { TaskFormPanel } from "../components/form";
 import { TasksTable } from "../components/table";
 import { TasksToolbar } from "../components/toolbar";
 import { mockTasks, mockWorkspaceUsers } from "../data/tasks.mock";
@@ -16,14 +18,31 @@ export function TasksPage() {
   const [projectFilter, setProjectFilter] = useState("ALL");
   const [assigneeFilter, setAssigneeFilter] = useState("ALL");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [formMode, setFormMode] = useState<"create" | "edit" | null>(null);
+  const [isFormPanelOpen, setIsFormPanelOpen] = useState(false);
+  const [formPanelTrigger, setFormPanelTrigger] = useState<HTMLButtonElement | null>(null);
 
-  const handleCreateTask = () => undefined;
+  const handleCreateTask = (trigger: HTMLButtonElement) => {
+    setFormMode("create");
+    setFormPanelTrigger(trigger);
+    setIsFormPanelOpen(true);
+  };
   const handleTaskSelect = (taskId: string) => setSelectedTaskId(taskId);
   const selectedTask = mockTasks.find((taskItem) => taskItem.task.id === selectedTaskId) ?? null;
   const selectedTaskCreator = selectedTask
     ? mockWorkspaceUsers.find((user) => user.id === selectedTask.task.createdById) ?? null
     : null;
   const handleOpenTask = () => undefined;
+  const handleFormPanelClose = () => setIsFormPanelOpen(false);
+  const handleFormPanelCloseAutoFocus = () => {
+    formPanelTrigger?.focus();
+    setFormMode(null);
+    setFormPanelTrigger(null);
+  };
+  const handleTaskFormSubmit = async () => {
+    toast.success(formMode === "create" ? "Task created" : "Task updated");
+    handleFormPanelClose();
+  };
 
   return (
     <PageLayout>
@@ -63,6 +82,17 @@ export function TasksPage() {
           />
         </div>
       </div>
+
+      <TaskFormPanel
+        mode={formMode}
+        taskItem={null}
+        projects={mockProjects.map(({ project }) => project)}
+        assignees={mockWorkspaceUsers}
+        open={isFormPanelOpen}
+        onClose={handleFormPanelClose}
+        onCloseAutoFocus={handleFormPanelCloseAutoFocus}
+        onSubmit={handleTaskFormSubmit}
+      />
     </PageLayout>
   );
 }

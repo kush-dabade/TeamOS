@@ -1,11 +1,4 @@
-import {
-  Button,
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  Separator,
-} from "@/components/ui";
+import { Button, Card, CardContent, CardFooter, CardHeader, Separator } from "@/components/ui";
 
 import { TaskPriorityBadge } from "../TaskPriorityBadge";
 import { TaskStatusBadge } from "../TaskStatusBadge";
@@ -32,7 +25,7 @@ export function TaskPreviewPanel({
   if (isLoading) {
     return (
       <Card aria-busy="true" aria-label="Loading task preview">
-        <CardContent>
+        <CardContent className="pt-6">
           <TaskPreviewPanelSkeleton />
         </CardContent>
       </Card>
@@ -42,7 +35,7 @@ export function TaskPreviewPanel({
   if (!taskItem) {
     return (
       <Card>
-        <CardContent className="flex min-h-40 items-center justify-center text-center">
+        <CardContent className="flex min-h-40 items-center justify-center pt-6 text-center">
           <p role="status" className="text-sm text-muted-foreground">
             Select a task to view its details.
           </p>
@@ -65,7 +58,9 @@ export function TaskPreviewPanel({
 
       <CardContent className="space-y-5">
         <section aria-labelledby="task-overview-heading">
-          <h3 id="task-overview-heading" className="text-sm font-medium">Overview</h3>
+          <h3 id="task-overview-heading" className="text-sm font-medium">
+            Overview
+          </h3>
           <div className="mt-2">
             <TaskOverview task={task} />
           </div>
@@ -74,7 +69,9 @@ export function TaskPreviewPanel({
         <Separator />
 
         <section aria-labelledby="task-properties-heading">
-          <h3 id="task-properties-heading" className="text-sm font-medium">Properties</h3>
+          <h3 id="task-properties-heading" className="text-sm font-medium">
+            Properties
+          </h3>
           <div className="mt-3">
             <TaskProperties taskItem={taskItem} createdBy={createdBy} />
           </div>
@@ -82,7 +79,9 @@ export function TaskPreviewPanel({
       </CardContent>
 
       <CardFooter className="justify-end">
-        <Button type="button" onClick={() => onOpenTask(task.id)}>Open Task</Button>
+        <Button type="button" onClick={() => onOpenTask(task.id)}>
+          Open Task
+        </Button>
       </CardFooter>
     </Card>
   );

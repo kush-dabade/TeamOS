@@ -41,7 +41,11 @@ export function TaskForm({
   }
 
   return (
-    <form onSubmit={form.handleSubmit(handleSubmit)} className="flex min-h-0 flex-1 flex-col" noValidate>
+    <form
+      onSubmit={form.handleSubmit(handleSubmit)}
+      className="flex min-h-0 flex-1 flex-col"
+      noValidate
+    >
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         <div className="flex flex-col gap-4">
           <Controller
@@ -57,7 +61,10 @@ export function TaskForm({
                   </FieldLabel>
                   <Input
                     {...field}
-                    ref={titleInputRef}
+                    ref={(element) => {
+                      field.ref(element);
+                      titleInputRef.current = element;
+                    }}
                     id={field.name}
                     placeholder="Review homepage conversion path"
                     required

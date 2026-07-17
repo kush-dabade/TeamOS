@@ -3,6 +3,7 @@ import { useState } from "react";
 import { PageHeader, PageLayout } from "@/components/layout";
 import { mockProjects } from "@/features/projects/data/projects.mock";
 
+import { TaskPreviewPanel } from "../components/preview";
 import { TasksTable } from "../components/table";
 import { TasksToolbar } from "../components/toolbar";
 import { mockTasks, mockWorkspaceUsers } from "../data/tasks.mock";
@@ -18,6 +19,11 @@ export function TasksPage() {
 
   const handleCreateTask = () => undefined;
   const handleTaskSelect = (taskId: string) => setSelectedTaskId(taskId);
+  const selectedTask = mockTasks.find((taskItem) => taskItem.task.id === selectedTaskId) ?? null;
+  const selectedTaskCreator = selectedTask
+    ? mockWorkspaceUsers.find((user) => user.id === selectedTask.task.createdById) ?? null
+    : null;
+  const handleOpenTask = () => undefined;
 
   return (
     <PageLayout>
@@ -46,6 +52,14 @@ export function TasksPage() {
             isLoading={false}
             onTaskSelect={handleTaskSelect}
             onCreateTask={handleCreateTask}
+          />
+        </div>
+        <div className="mt-4">
+          <TaskPreviewPanel
+            taskItem={selectedTask}
+            createdBy={selectedTaskCreator}
+            isLoading={false}
+            onOpenTask={handleOpenTask}
           />
         </div>
       </div>

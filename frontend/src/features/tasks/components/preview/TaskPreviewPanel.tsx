@@ -6,10 +6,11 @@ import {
   CardHeader,
   Separator,
 } from "@/components/ui";
-import { formatDate, formatRelativeDate } from "@/utils";
 
 import { TaskPriorityBadge } from "../TaskPriorityBadge";
 import { TaskStatusBadge } from "../TaskStatusBadge";
+import { TaskOverview } from "../TaskOverview";
+import { TaskProperties } from "../TaskProperties";
 
 import { TaskPreviewPanelSkeleton } from "./TaskPreviewPanelSkeleton";
 
@@ -48,7 +49,7 @@ export function TaskPreviewPanel({
     );
   }
 
-  const { assignee, project, task } = taskItem;
+  const { task } = taskItem;
 
   return (
     <Card>
@@ -63,59 +64,18 @@ export function TaskPreviewPanel({
       <CardContent className="space-y-5">
         <section aria-labelledby="task-overview-heading">
           <h3 id="task-overview-heading" className="text-sm font-medium">Overview</h3>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            {task.description ?? "No description provided."}
-          </p>
+          <div className="mt-2">
+            <TaskOverview task={task} />
+          </div>
         </section>
 
         <Separator />
 
         <section aria-labelledby="task-properties-heading">
           <h3 id="task-properties-heading" className="text-sm font-medium">Properties</h3>
-          <dl className="mt-3 space-y-3">
-            <div className="flex items-center justify-between gap-4">
-              <dt className="text-sm text-muted-foreground">Project</dt>
-              <dd className="text-right text-sm font-medium">{project.name}</dd>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <dt className="text-sm text-muted-foreground">Sprint</dt>
-              <dd className="text-right text-sm font-medium">
-                {task.sprintId ? task.sprintId : "Not assigned to a sprint"}
-              </dd>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <dt className="text-sm text-muted-foreground">Assignee</dt>
-              <dd className="text-right text-sm font-medium">{assignee?.name ?? "Unassigned"}</dd>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <dt className="text-sm text-muted-foreground">Due date</dt>
-              <dd className="text-right text-sm font-medium">
-                {task.dueDate ? formatDate(task.dueDate, "MMM d, yyyy") : "No due date"}
-              </dd>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <dt className="text-sm text-muted-foreground">Created by</dt>
-              <dd className="text-right text-sm font-medium">{createdBy?.name ?? "Unknown user"}</dd>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <dt className="text-sm text-muted-foreground">Created at</dt>
-              <dd className="text-right text-sm font-medium">
-                {formatDate(task.createdAt, "MMM d, yyyy 'at' h:mm a")}
-              </dd>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <dt className="text-sm text-muted-foreground">Updated at</dt>
-              <dd className="text-right text-sm font-medium">{formatRelativeDate(task.updatedAt)}</dd>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <dt className="text-sm text-muted-foreground">Completed at</dt>
-              <dd className="text-right text-sm font-medium">
-                {task.completedAt
-                  ? formatDate(task.completedAt, "MMM d, yyyy 'at' h:mm a")
-                  : "Not completed"}
-              </dd>
-            </div>
-          </dl>
+          <div className="mt-3">
+            <TaskProperties taskItem={taskItem} createdBy={createdBy} />
+          </div>
         </section>
       </CardContent>
 

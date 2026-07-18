@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
-import { PageHeader, PageLayout } from "@/components/layout";
+import { PageLayout } from "@/components/layout";
 import { mockProjects } from "@/features/projects/data/projects.mock";
 
 import { TaskPreviewPanel } from "../components/preview";
@@ -19,18 +19,26 @@ export function TasksPage() {
   const [projectFilter, setProjectFilter] = useState("ALL");
   const [assigneeFilter, setAssigneeFilter] = useState("ALL");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [selectedTaskTrigger, setSelectedTaskTrigger] = useState<HTMLButtonElement | null>(null);
   const [formMode, setFormMode] = useState<"create" | "edit" | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [isFormPanelOpen, setIsFormPanelOpen] = useState(false);
   const [formPanelTrigger, setFormPanelTrigger] = useState<HTMLButtonElement | null>(null);
 
   const navigate = useNavigate();
 
   const handleCreateTask = (trigger: HTMLButtonElement) => {
+    setEditingTaskId(null);
     setFormMode("create");
     setFormPanelTrigger(trigger);
     setIsFormPanelOpen(true);
   };
-  const handleTaskSelect = (taskId: string) => setSelectedTaskId(taskId);
+  const handleTaskSelect = (taskId: string, trigger: HTMLButtonElement | null) => {
+    setSelectedTaskId(taskId);
+    setSelectedTaskTrigger(trigger);
+    setIsPreviewOpen(true);
+  };
   const selectedTask = mockTasks.find((taskItem) => taskItem.task.id === selectedTaskId) ?? null;
   const selectedTaskCreator = selectedTask
     ? (mockWorkspaceUsers.find((user) => user.id === selectedTask.task.createdById) ?? null)
@@ -38,9 +46,23 @@ export function TasksPage() {
   const handleOpenTask = (taskId: string) => {
     navigate(`/tasks/${taskId}`);
   };
+  const handlePreviewClose = () => setIsPreviewOpen(false);
+  const handlePreviewCloseAutoFocus = () => {
+    selectedTaskTrigger?.focus();
+    setSelectedTaskId(null);
+    setSelectedTaskTrigger(null);
+  };
+  const handleEditTask = (trigger: HTMLButtonElement) => {
+    setEditingTaskId(selectedTaskId);
+    setFormMode("edit");
+    setFormPanelTrigger(trigger);
+    setIsPreviewOpen(false);
+    setIsFormPanelOpen(true);
+  };
   const handleFormPanelClose = () => setIsFormPanelOpen(false);
   const handleFormPanelCloseAutoFocus = () => {
     formPanelTrigger?.focus();
+    setEditingTaskId(null);
     setFormMode(null);
     setFormPanelTrigger(null);
   };
@@ -51,8 +73,6 @@ export function TasksPage() {
 
   return (
     <PageLayout>
-      <PageHeader title="Tasks" />
-
       <div className="mt-3">
         <TasksToolbar
           searchQuery={searchQuery}
@@ -78,19 +98,22 @@ export function TasksPage() {
             onCreateTask={handleCreateTask}
           />
         </div>
-        <div className="mt-4">
-          <TaskPreviewPanel
-            taskItem={selectedTask}
-            createdBy={selectedTaskCreator}
-            isLoading={false}
-            onOpenTask={handleOpenTask}
-          />
-        </div>
       </div>
+
+      <TaskPreviewPanel
+        taskItem={selectedTask}
+        createdBy={selectedTaskCreator}
+        open={isPreviewOpen}
+        onClose={handlePreviewClose}
+        onCloseAutoFocus={handlePreviewCloseAutoFocus}
+        onOpenTask={handleOpenTask}
+        onEdit={handleEditTask}
+        onDelete={() => undefined}
+      />
 
       <TaskFormPanel
         mode={formMode}
-        taskItem={null}
+        taskItem={mockTasks.find((taskItem) => taskItem.task.id === editingTaskId) ?? null}
         projects={mockProjects.map(({ project }) => project)}
         assignees={mockWorkspaceUsers}
         open={isFormPanelOpen}

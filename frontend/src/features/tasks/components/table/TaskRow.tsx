@@ -1,3 +1,5 @@
+import { useRef } from "react";
+
 import { formatDate, formatRelativeDate, getInitials } from "@/utils";
 
 import { TaskPriorityBadge } from "../TaskPriorityBadge";
@@ -8,34 +10,37 @@ import type { TaskListItem } from "../../types";
 interface TaskRowProps {
   taskItem: TaskListItem;
   isSelected: boolean;
-  onSelect: (taskId: string) => void;
+  onSelect: (taskId: string, trigger: HTMLButtonElement | null) => void;
 }
 
 export function TaskRow({ taskItem, isSelected, onSelect }: TaskRowProps) {
   const { assignee, project, task } = taskItem;
-  const selectTask = () => onSelect(task.id);
+  const taskTitleButtonRef = useRef<HTMLButtonElement>(null);
+  const selectTask = () => onSelect(task.id, taskTitleButtonRef.current);
 
   return (
     <tr
-      aria-label={`Select task ${task.title}`}
       aria-selected={isSelected}
-      tabIndex={0}
       onClick={selectTask}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          selectTask();
-        }
-      }}
-      className="cursor-pointer border-b transition-colors outline-hidden hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset aria-selected:bg-muted/70"
+      className="cursor-pointer border-b transition-colors hover:bg-muted/50 aria-selected:bg-muted/70"
     >
       <th scope="row" className="max-w-0 px-3 py-1.5 text-left font-medium">
-        <div className="min-w-0">
-          <p className="break-words leading-5">{task.title}</p>
+        <button
+          ref={taskTitleButtonRef}
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            selectTask();
+          }}
+          className="block w-full rounded-sm text-left outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <span className="block break-words leading-5">{task.title}</span>
           {task.description ? (
-            <p className="truncate text-xs leading-4 text-muted-foreground">{task.description}</p>
+            <span className="block truncate text-xs leading-4 text-muted-foreground">
+              {task.description}
+            </span>
           ) : null}
-        </div>
+        </button>
       </th>
       <td className="px-3 py-1.5">
         <TaskStatusBadge status={task.status} />

@@ -1,45 +1,39 @@
 import { Card, CardContent } from "@/components/ui";
-import { PageSection } from "@/components/layout";
 
 import { TaskOverview } from "../TaskOverview";
 import { TaskProperties } from "../TaskProperties";
 
 import { TaskFutureSections } from "./TaskFutureSections";
-import { TaskHeader } from "./TaskHeader";
 
 import type { TaskAssignee, TaskListItem } from "../../types";
 
 interface TaskWorkspaceProps {
   taskItem: TaskListItem;
   createdBy: TaskAssignee | null;
-  onEdit: (trigger: HTMLButtonElement) => void;
-  onDelete: () => void;
 }
 
-export function TaskWorkspace({ taskItem, createdBy, onEdit, onDelete }: TaskWorkspaceProps) {
+export function TaskWorkspace({ taskItem, createdBy }: TaskWorkspaceProps) {
   return (
-    <>
-      <TaskHeader taskItem={taskItem} onEdit={onEdit} onDelete={onDelete} />
-
-      <div className="space-y-6 py-5">
-        <PageSection title="Overview">
-          <Card>
+    <div className="space-y-5 py-5">
+        <section aria-labelledby="task-overview-heading">
+          <h2 id="task-overview-heading" className="text-sm font-medium">Overview</h2>
+          <Card size="sm" className="mt-3">
             <CardContent>
               <TaskOverview task={taskItem.task} />
             </CardContent>
           </Card>
-        </PageSection>
+        </section>
 
-        <PageSection title="Properties">
-          <Card>
+        <section aria-labelledby="task-properties-heading">
+          <h2 id="task-properties-heading" className="text-sm font-medium">Properties</h2>
+          <Card size="sm" className="mt-3">
             <CardContent>
               <TaskProperties taskItem={taskItem} createdBy={createdBy} />
             </CardContent>
           </Card>
-        </PageSection>
+        </section>
 
         <TaskFutureSections />
-      </div>
-    </>
+    </div>
   );
 }

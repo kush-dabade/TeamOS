@@ -6,7 +6,7 @@ import { PageLayout } from "@/components/layout";
 import { mockProjects } from "@/features/projects/data/projects.mock";
 
 import { TaskFormPanel } from "../components/form";
-import { TaskWorkspace } from "../components/workspace";
+import { TaskHeader, TaskWorkspace } from "../components/workspace";
 import { mockTasks, mockWorkspaceUsers } from "../data/tasks.mock";
 import type { TaskListItem } from "../types";
 import type { TaskFormData } from "../validation/task";
@@ -73,11 +73,14 @@ export function TaskWorkspacePage() {
 
   return (
     <PageLayout>
+      <TaskHeader
+        taskItem={taskItem}
+        onEdit={handleEdit}
+        onDelete={() => undefined}
+      />
       <TaskWorkspace
         taskItem={taskItem}
         createdBy={createdBy}
-        onEdit={handleEdit}
-        onDelete={() => undefined}
       />
 
       <TaskFormPanel

@@ -21,8 +21,8 @@ interface TaskPreviewPanelProps {
   onClose: () => void;
   onCloseAutoFocus: () => void;
   onOpenTask: (taskId: string) => void;
-  onEdit: (trigger: HTMLButtonElement) => void;
-  onDelete: () => void;
+  onEdit: () => void;
+  onDelete?: () => void;
 }
 
 export function TaskPreviewPanel({
@@ -73,12 +73,18 @@ export function TaskPreviewPanel({
 
         <SheetFooter className="flex-row items-center justify-between p-4">
           <div className="flex items-center gap-1">
-            <Button type="button" variant="ghost" onClick={(event) => onEdit(event.currentTarget)}>
+            <Button type="button" variant="ghost" onClick={onEdit}>
               Edit
             </Button>
-            <Button type="button" variant="ghost" onClick={onDelete}>Delete</Button>
+            {onDelete ? (
+              <Button type="button" variant="ghost" onClick={onDelete}>
+                Delete
+              </Button>
+            ) : null}
           </div>
-          <Button type="button" onClick={() => onOpenTask(task.id)}>Open Task</Button>
+          <Button type="button" onClick={() => onOpenTask(task.id)}>
+            Open Task
+          </Button>
         </SheetFooter>
       </SheetContent>
     </Sheet>

@@ -52,10 +52,10 @@ export function TasksPage() {
     setSelectedTaskId(null);
     setSelectedTaskTrigger(null);
   };
-  const handleEditTask = (trigger: HTMLButtonElement) => {
+  const handleEditTask = () => {
     setEditingTaskId(selectedTaskId);
     setFormMode("edit");
-    setFormPanelTrigger(trigger);
+    setFormPanelTrigger(selectedTaskTrigger);
     setIsPreviewOpen(false);
     setIsFormPanelOpen(true);
   };
@@ -108,8 +108,7 @@ export function TasksPage() {
         onCloseAutoFocus={handlePreviewCloseAutoFocus}
         onOpenTask={handleOpenTask}
         onEdit={handleEditTask}
-        onDelete={() => undefined}
-      />
+        />
 
       <TaskFormPanel
         mode={formMode}

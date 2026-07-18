@@ -9,7 +9,7 @@ interface TasksTableProps {
   tasks: TaskListItem[];
   selectedTaskId: string | null;
   isLoading: boolean;
-  onTaskSelect: (taskId: string) => void;
+  onTaskSelect: (taskId: string, trigger: HTMLButtonElement | null) => void;
   onCreateTask: (trigger: HTMLButtonElement) => void;
 }
 

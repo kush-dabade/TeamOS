@@ -1,88 +1,92 @@
-import { Button, Card, CardContent, CardFooter, CardHeader, Separator } from "@/components/ui";
+import {
+  Button,
+  Separator,
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui";
 
 import { TaskPriorityBadge } from "../TaskPriorityBadge";
 import { TaskStatusBadge } from "../TaskStatusBadge";
-import { TaskOverview } from "../TaskOverview";
 import { TaskProperties } from "../TaskProperties";
-
-import { TaskPreviewPanelSkeleton } from "./TaskPreviewPanelSkeleton";
 
 import type { TaskAssignee, TaskListItem } from "../../types";
 
 interface TaskPreviewPanelProps {
   taskItem: TaskListItem | null;
   createdBy: TaskAssignee | null;
-  isLoading: boolean;
+  open: boolean;
+  onClose: () => void;
+  onCloseAutoFocus: () => void;
   onOpenTask: (taskId: string) => void;
+  onEdit: () => void;
+  onDelete?: () => void;
 }
 
 export function TaskPreviewPanel({
   taskItem,
   createdBy,
-  isLoading,
+  open,
+  onClose,
+  onCloseAutoFocus,
   onOpenTask,
+  onEdit,
+  onDelete,
 }: TaskPreviewPanelProps) {
-  if (isLoading) {
-    return (
-      <Card aria-busy="true" aria-label="Loading task preview">
-        <CardContent className="pt-6">
-          <TaskPreviewPanelSkeleton />
-        </CardContent>
-      </Card>
-    );
-  }
-
   if (!taskItem) {
-    return (
-      <Card>
-        <CardContent className="flex min-h-40 items-center justify-center pt-6 text-center">
-          <p role="status" className="text-sm text-muted-foreground">
-            Select a task to view its details.
-          </p>
-        </CardContent>
-      </Card>
-    );
+    return null;
   }
 
   const { task } = taskItem;
 
   return (
-    <Card>
-      <CardHeader>
-        <h2 className="text-base leading-snug font-medium">{task.title}</h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <TaskStatusBadge status={task.status} />
-          <TaskPriorityBadge priority={task.priority} />
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-5">
-        <section aria-labelledby="task-overview-heading">
-          <h3 id="task-overview-heading" className="text-sm font-medium">
-            Overview
-          </h3>
-          <div className="mt-2">
-            <TaskOverview task={task} />
+    <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <SheetContent
+        side="right"
+        className="w-full max-w-[440px] gap-0 p-0 sm:max-w-[440px]"
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          onCloseAutoFocus();
+        }}
+      >
+        <SheetHeader className="border-b p-4 pr-12">
+          <SheetTitle>{task.title}</SheetTitle>
+          <div className="flex flex-wrap items-center gap-2">
+            <TaskStatusBadge status={task.status} />
+            <TaskPriorityBadge priority={task.priority} />
           </div>
-        </section>
+        </SheetHeader>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          {task.description ? (
+            <p className="text-sm leading-6 text-muted-foreground">{task.description}</p>
+          ) : null}
+
+          <div className={task.description ? "mt-5" : undefined}>
+            <TaskProperties taskItem={taskItem} createdBy={createdBy} showTimestamps={false} />
+          </div>
+        </div>
 
         <Separator />
 
-        <section aria-labelledby="task-properties-heading">
-          <h3 id="task-properties-heading" className="text-sm font-medium">
-            Properties
-          </h3>
-          <div className="mt-3">
-            <TaskProperties taskItem={taskItem} createdBy={createdBy} />
+        <SheetFooter className="flex-row items-center justify-between p-4">
+          <div className="flex items-center gap-1">
+            <Button type="button" variant="ghost" onClick={onEdit}>
+              Edit
+            </Button>
+            {onDelete ? (
+              <Button type="button" variant="ghost" onClick={onDelete}>
+                Delete
+              </Button>
+            ) : null}
           </div>
-        </section>
-      </CardContent>
-
-      <CardFooter className="justify-end">
-        <Button type="button" onClick={() => onOpenTask(task.id)}>
-          Open Task
-        </Button>
-      </CardFooter>
-    </Card>
+          <Button type="button" onClick={() => onOpenTask(task.id)}>
+            Open Task
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }

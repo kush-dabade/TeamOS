@@ -9,10 +9,8 @@ const futureSections = [
 export function TaskFutureSections() {
   return (
     <section aria-labelledby="task-collaboration-heading">
-      <h2 id="task-collaboration-heading" className="text-xl font-semibold tracking-tight">
-        Collaboration
-      </h2>
-      <div className="mt-4 grid gap-4 md:grid-cols-3">
+      <h2 id="task-collaboration-heading" className="text-sm font-medium">Collaboration</h2>
+      <div className="mt-3 grid gap-3 md:grid-cols-3">
         {futureSections.map((section) => (
           <Card key={section.title} size="sm">
             <CardHeader>

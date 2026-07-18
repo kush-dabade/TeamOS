@@ -5,9 +5,14 @@ import type { TaskAssignee, TaskListItem } from "../types";
 interface TaskPropertiesProps {
   taskItem: TaskListItem;
   createdBy: TaskAssignee | null;
+  showTimestamps?: boolean;
 }
 
-export function TaskProperties({ taskItem, createdBy }: TaskPropertiesProps) {
+export function TaskProperties({
+  taskItem,
+  createdBy,
+  showTimestamps = true,
+}: TaskPropertiesProps) {
   const { assignee, project, task } = taskItem;
 
   return (
@@ -40,26 +45,30 @@ export function TaskProperties({ taskItem, createdBy }: TaskPropertiesProps) {
           {createdBy?.name ?? "Unknown user"}
         </dd>
       </div>
-      <div className="flex items-center justify-between gap-4">
-        <dt className="shrink-0 text-sm text-muted-foreground">Created at</dt>
-        <dd className="min-w-0 break-words text-right text-sm font-medium">
-          {formatDate(task.createdAt, "MMM d, yyyy 'at' h:mm a")}
-        </dd>
-      </div>
-      <div className="flex items-center justify-between gap-4">
-        <dt className="shrink-0 text-sm text-muted-foreground">Updated at</dt>
-        <dd className="min-w-0 break-words text-right text-sm font-medium">
-          {formatRelativeDate(task.updatedAt)}
-        </dd>
-      </div>
-      <div className="flex items-center justify-between gap-4">
-        <dt className="shrink-0 text-sm text-muted-foreground">Completed at</dt>
-        <dd className="min-w-0 break-words text-right text-sm font-medium">
-          {task.completedAt
-            ? formatDate(task.completedAt, "MMM d, yyyy 'at' h:mm a")
-            : "Not completed"}
-        </dd>
-      </div>
+      {showTimestamps ? (
+        <>
+          <div className="flex items-center justify-between gap-4">
+            <dt className="shrink-0 text-sm text-muted-foreground">Created at</dt>
+            <dd className="min-w-0 break-words text-right text-sm font-medium">
+              {formatDate(task.createdAt, "MMM d, yyyy 'at' h:mm a")}
+            </dd>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <dt className="shrink-0 text-sm text-muted-foreground">Updated at</dt>
+            <dd className="min-w-0 break-words text-right text-sm font-medium">
+              {formatRelativeDate(task.updatedAt)}
+            </dd>
+          </div>
+          <div className="flex items-center justify-between gap-4">
+            <dt className="shrink-0 text-sm text-muted-foreground">Completed at</dt>
+            <dd className="min-w-0 break-words text-right text-sm font-medium">
+              {task.completedAt
+                ? formatDate(task.completedAt, "MMM d, yyyy 'at' h:mm a")
+                : "Not completed"}
+            </dd>
+          </div>
+        </>
+      ) : null}
     </dl>
   );
 }

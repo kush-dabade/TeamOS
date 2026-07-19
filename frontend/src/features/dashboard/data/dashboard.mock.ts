@@ -1,6 +1,6 @@
 import type { TaskListItem } from "@/features/tasks/types";
 
-import type { DashboardEvent, DashboardProject, WorkspaceAttentionItem } from "../types";
+import type { ContinueWorkingItem, DashboardEvent, WorkspaceAttentionItem } from "../types";
 
 import { Archive, CircleCheckBig, MessageSquare, Rocket } from "lucide-react";
 
@@ -100,27 +100,52 @@ export const mockEvents: DashboardEvent[] = [
   },
 ];
 
-export const mockProjects: DashboardProject[] = [
+// Projects the current user was recently working in, most-recent-first.
+// `lastActivityAt` (project `updatedAt`) is the MVP proxy for recency; the panel
+// slices to its cap without re-sorting, so ordering here is representative of
+// the eventual query.
+export const mockContinueWorking: ContinueWorkingItem[] = [
   {
-    id: "1",
+    id: "project-website-redesign",
+    slug: "website-redesign",
     name: "Website Redesign",
-    completedTasks: 12,
-    totalTasks: 18,
-    status: "Waiting for review",
+    status: "ACTIVE",
+    lastActivityAt: "2026-07-19T09:12:00.000Z",
   },
   {
-    id: "2",
+    id: "project-authentication",
+    slug: "authentication",
     name: "Authentication",
-    completedTasks: 21,
-    totalTasks: 23,
-    status: "2 tasks remaining",
+    status: "ACTIVE",
+    lastActivityAt: "2026-07-18T16:40:00.000Z",
   },
   {
-    id: "3",
+    id: "project-team-os",
+    slug: "team-os",
+    name: "TeamOS",
+    status: "ACTIVE",
+    lastActivityAt: "2026-07-18T11:05:00.000Z",
+  },
+  {
+    id: "project-mobile-launch",
+    slug: "mobile-launch",
+    name: "Mobile Launch",
+    status: "PLANNED",
+    lastActivityAt: "2026-07-17T14:30:00.000Z",
+  },
+  {
+    id: "project-marketing-site",
+    slug: "marketing-site",
     name: "Marketing Site",
-    completedTasks: 5,
-    totalTasks: 15,
-    status: "Design phase",
+    status: "ACTIVE",
+    lastActivityAt: "2026-07-16T10:20:00.000Z",
+  },
+  {
+    id: "project-billing",
+    slug: "billing",
+    name: "Billing & Payments",
+    status: "COMPLETED",
+    lastActivityAt: "2026-07-15T08:00:00.000Z",
   },
 ];
 

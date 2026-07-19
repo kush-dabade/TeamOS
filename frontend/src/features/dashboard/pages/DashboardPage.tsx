@@ -1,7 +1,7 @@
 import { PageLayout } from "@/components/layout";
 
 import {
-  ActiveProjectsPanel,
+  ContinueWorkingPanel,
   MyTasksPanel,
   SinceLastVisitPanel,
   WorkspaceAttentionPanel,
@@ -13,11 +13,11 @@ export function DashboardPage() {
       <div className="mt-3 flex flex-col gap-3">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <aside className="grid">
-            <WorkspaceAttentionPanel />
+            <ContinueWorkingPanel />
           </aside>
 
           <aside className="grid">
-            <ActiveProjectsPanel />
+            <WorkspaceAttentionPanel />
           </aside>
         </div>
 

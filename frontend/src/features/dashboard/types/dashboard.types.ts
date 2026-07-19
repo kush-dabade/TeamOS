@@ -1,5 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 
+import type { ProjectStatus } from "@/features/projects/types";
+
 export type AttentionItemKind = "OVERDUE_TASK" | "PENDING_REVIEW";
 
 export type AttentionEntityType = "TASK";
@@ -23,12 +25,10 @@ export interface DashboardEvent {
   icon: LucideIcon;
 }
 
-export interface DashboardProject {
+export interface ContinueWorkingItem {
   id: string;
+  slug: string;
   name: string;
-
-  completedTasks: number;
-  totalTasks: number;
-
-  status: string;
+  status: ProjectStatus;
+  lastActivityAt: string;
 }

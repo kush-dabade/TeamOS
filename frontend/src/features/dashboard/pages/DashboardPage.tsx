@@ -10,21 +10,23 @@ import {
 export function DashboardPage() {
   return (
     <PageLayout>
-      <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-12">
-        <section className="flex lg:col-span-7">
+      <div className="mt-3 flex flex-col gap-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <aside className="grid">
+            <WorkspaceSnapshotPanel />
+          </aside>
+
+          <aside className="grid">
+            <ActiveProjectsPanel />
+          </aside>
+        </div>
+
+        <section className="grid min-h-80">
           <TodaysFocusPanel />
         </section>
 
-        <aside className="flex lg:col-span-5">
-          <WorkspaceSnapshotPanel />
-        </aside>
-
-        <aside className="flex lg:col-span-5">
+        <section className="grid">
           <SinceLastVisitPanel />
-        </aside>
-
-        <section className="flex lg:col-span-7">
-          <ActiveProjectsPanel />
         </section>
       </div>
     </PageLayout>

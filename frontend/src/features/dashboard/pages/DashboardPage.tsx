@@ -4,7 +4,7 @@ import {
   ActiveProjectsPanel,
   MyTasksPanel,
   SinceLastVisitPanel,
-  WorkspaceSnapshotPanel,
+  WorkspaceAttentionPanel,
 } from "../components";
 
 export function DashboardPage() {
@@ -13,7 +13,7 @@ export function DashboardPage() {
       <div className="mt-3 flex flex-col gap-3">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <aside className="grid">
-            <WorkspaceSnapshotPanel />
+            <WorkspaceAttentionPanel />
           </aside>
 
           <aside className="grid">

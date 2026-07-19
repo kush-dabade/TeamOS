@@ -1,45 +1,67 @@
 import type { TaskListItem } from "@/features/tasks/types";
 
-import type { DashboardEvent, DashboardProject, WorkspaceHealthItem } from "../types";
+import type { DashboardEvent, DashboardProject, WorkspaceAttentionItem } from "../types";
 
-import {
-  Archive,
-  CircleCheckBig,
-  CircleAlert,
-  FolderKanban,
-  MessageSquare,
-  Rocket,
-  Users,
-} from "lucide-react";
+import { Archive, CircleCheckBig, MessageSquare, Rocket } from "lucide-react";
 
-export const mockWorkspaceHealth: WorkspaceHealthItem[] = [
+// Actionable items requiring attention. MVP is task-based only (overdue and
+// pending-review); sprint- and notification-sourced kinds arrive once those
+// modules ship. Ordered most-severe first — the panel slices to its cap without
+// re-sorting, so ordering here is representative of the eventual TM-08 query.
+export const mockWorkspaceAttention: WorkspaceAttentionItem[] = [
   {
-    id: "projects",
-    label: "Projects",
-    state: "12 Active",
-    tone: "healthy",
-    icon: FolderKanban,
+    id: "attention-auth-session-expiry",
+    kind: "OVERDUE_TASK",
+    title: "Handle expired session recovery",
+    context: "Authentication",
+    occurredAt: "2026-07-16T00:00:00.000Z",
+    entityType: "TASK",
+    entityId: "task-auth-session-expiry",
   },
   {
-    id: "tasks",
-    label: "Tasks",
-    state: "2 Overdue",
-    tone: "warning",
-    icon: CircleAlert,
+    id: "attention-api-rate-limiting",
+    kind: "OVERDUE_TASK",
+    title: "Finalize API rate limiting",
+    context: "Backend API",
+    occurredAt: "2026-07-17T00:00:00.000Z",
+    entityType: "TASK",
+    entityId: "task-api-rate-limiting",
   },
   {
-    id: "sprint",
-    label: "Sprint",
-    state: "On Track",
-    tone: "healthy",
-    icon: Rocket,
+    id: "attention-billing-webhooks",
+    kind: "OVERDUE_TASK",
+    title: "Verify billing webhook retries",
+    context: "Payments",
+    occurredAt: "2026-07-18T00:00:00.000Z",
+    entityType: "TASK",
+    entityId: "task-billing-webhooks",
   },
   {
-    id: "members",
-    label: "Members",
-    state: "8 Active",
-    tone: "neutral",
-    icon: Users,
+    id: "attention-homepage-audit",
+    kind: "PENDING_REVIEW",
+    title: "Audit homepage conversion path",
+    context: "Website Redesign",
+    occurredAt: "2026-07-18T14:20:00.000Z",
+    entityType: "TASK",
+    entityId: "task-website-homepage-audit",
+  },
+  {
+    id: "attention-notification-service",
+    kind: "PENDING_REVIEW",
+    title: "Refactor notification service",
+    context: "Backend API",
+    occurredAt: "2026-07-17T09:10:00.000Z",
+    entityType: "TASK",
+    entityId: "task-refactor-notifications",
+  },
+  {
+    id: "attention-onboarding-checklist",
+    kind: "PENDING_REVIEW",
+    title: "Update onboarding checklist",
+    context: "Mobile Launch",
+    occurredAt: "2026-07-16T11:30:00.000Z",
+    entityType: "TASK",
+    entityId: "task-onboarding-checklist",
   },
 ];
 

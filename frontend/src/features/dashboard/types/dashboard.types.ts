@@ -1,11 +1,17 @@
 import type { LucideIcon } from "lucide-react";
 
-export interface WorkspaceHealthItem {
+export type AttentionItemKind = "OVERDUE_TASK" | "PENDING_REVIEW";
+
+export type AttentionEntityType = "TASK";
+
+export interface WorkspaceAttentionItem {
   id: string;
-  label: string;
-  state: string;
-  tone: "healthy" | "warning" | "neutral";
-  icon: LucideIcon;
+  kind: AttentionItemKind;
+  title: string;
+  context: string;
+  occurredAt: string;
+  entityType: AttentionEntityType;
+  entityId: string;
 }
 
 export interface DashboardEvent {

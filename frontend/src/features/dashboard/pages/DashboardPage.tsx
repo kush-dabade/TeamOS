@@ -2,8 +2,8 @@ import { PageLayout } from "@/components/layout";
 
 import {
   ActiveProjectsPanel,
+  MyTasksPanel,
   SinceLastVisitPanel,
-  TodaysFocusPanel,
   WorkspaceSnapshotPanel,
 } from "../components";
 
@@ -22,7 +22,7 @@ export function DashboardPage() {
         </div>
 
         <section className="grid min-h-80">
-          <TodaysFocusPanel />
+          <MyTasksPanel />
         </section>
 
         <section className="grid">

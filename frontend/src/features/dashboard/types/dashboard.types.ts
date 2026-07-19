@@ -1,15 +1,5 @@
 import type { LucideIcon } from "lucide-react";
 
-export type DashboardTaskPriority = "low" | "medium" | "high" | "urgent";
-
-export interface DashboardTask {
-  id: string;
-  title: string;
-  projectName: string;
-  priority: DashboardTaskPriority;
-  dueDate: string | null;
-}
-
 export interface WorkspaceHealthItem {
   id: string;
   label: string;

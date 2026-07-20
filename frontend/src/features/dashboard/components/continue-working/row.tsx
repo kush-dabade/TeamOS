@@ -49,7 +49,7 @@ export function ContinueWorkingRow({ item, onSelect }: ContinueWorkingRowProps) 
             />
           </div>
 
-          <div className="mt-1 flex items-center gap-2">
+          <div className="mt-0.5 flex min-h-5 items-center gap-2">
             <ProjectStatusBadge status={item.status} />
             <span className="text-muted-foreground truncate text-xs">
               updated {formatRelativeDate(item.lastActivityAt)}

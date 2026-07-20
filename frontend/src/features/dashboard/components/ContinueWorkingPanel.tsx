@@ -60,7 +60,7 @@ export function ContinueWorkingPanel() {
 
   return (
     <DashboardPanel
-      title="Continue Working"
+      title="Continue working"
       action={
         <Button
           type="button"

@@ -1,3 +1,5 @@
+import { ChevronRight } from "lucide-react";
+
 import { getInitials, formatRelativeDate } from "@/utils";
 
 import type { RecentActivityItem } from "../../types";
@@ -61,10 +63,26 @@ export function ActivityRow({ item, interactive, onSelect }: ActivityRowProps) {
       )}
 
       <div className="min-w-0 flex-1">
-        <p className="text-sm leading-5">
-          <span className="font-medium">{item.actor.name}</span>{" "}
-          <span className="text-muted-foreground">{action}</span>
-        </p>
+        <div className="flex items-start justify-between gap-2">
+          <p className="min-w-0 text-sm leading-5">
+            <span className="font-medium">{item.actor.name}</span>{" "}
+            <span className="text-muted-foreground">{action}</span>
+          </p>
+
+          {interactive ? (
+            <ChevronRight
+              className="
+                text-muted-foreground
+                mt-0.5 h-3.5 w-3.5
+                shrink-0
+                opacity-0
+                transition-all duration-150
+                group-hover:translate-x-0.5
+                group-hover:opacity-100
+              "
+            />
+          ) : null}
+        </div>
 
         <div className="text-muted-foreground mt-0.5 flex items-center gap-2 text-xs">
           {entity ? (

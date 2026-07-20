@@ -1,6 +1,6 @@
 import { Skeleton } from "@/components/ui";
 
-const skeletonRows = Array.from({ length: 5 }, (_, index) => index);
+const skeletonRows = Array.from({ length: 4 }, (_, index) => index);
 
 export function RecentActivitySkeleton() {
   return (

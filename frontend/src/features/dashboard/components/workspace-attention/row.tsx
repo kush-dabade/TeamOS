@@ -79,7 +79,7 @@ export function WorkspaceAttentionRow({ item, onSelect }: WorkspaceAttentionRowP
             />
           </div>
 
-          <div className="mt-0.5 flex items-center gap-1.5 text-xs">
+          <div className="mt-0.5 flex min-h-5 items-center gap-1.5 text-xs">
             <span className={cn("shrink-0 font-medium", config.foreground)}>{config.label}</span>
             <span className="text-muted-foreground">·</span>
             <span className="text-muted-foreground truncate">{item.context}</span>

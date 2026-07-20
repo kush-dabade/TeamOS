@@ -56,5 +56,5 @@ export function WorkspaceAttentionPanel() {
     );
   }
 
-  return <DashboardPanel title="Workspace Attention">{content}</DashboardPanel>;
+  return <DashboardPanel title="Workspace attention">{content}</DashboardPanel>;
 }

@@ -53,7 +53,7 @@ export function MyTasksPanel() {
 
   return (
     <DashboardPanel
-      title="My Tasks"
+      title="My tasks"
       action={
         <Button
           type="button"

@@ -3,7 +3,7 @@ import { PageLayout } from "@/components/layout";
 import {
   ContinueWorkingPanel,
   MyTasksPanel,
-  SinceLastVisitPanel,
+  RecentActivityPanel,
   WorkspaceAttentionPanel,
 } from "../components";
 
@@ -26,7 +26,7 @@ export function DashboardPage() {
         </section>
 
         <section className="grid">
-          <SinceLastVisitPanel />
+          <RecentActivityPanel />
         </section>
       </div>
     </PageLayout>

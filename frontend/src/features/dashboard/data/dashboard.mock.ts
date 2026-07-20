@@ -1,8 +1,6 @@
 import type { TaskListItem } from "@/features/tasks/types";
 
-import type { ContinueWorkingItem, DashboardEvent, WorkspaceAttentionItem } from "../types";
-
-import { Archive, CircleCheckBig, MessageSquare, Rocket } from "lucide-react";
+import type { ContinueWorkingItem, RecentActivityItem, WorkspaceAttentionItem } from "../types";
 
 // Actionable items requiring attention. MVP is task-based only (overdue and
 // pending-review); sprint- and notification-sourced kinds arrive once those
@@ -65,38 +63,82 @@ export const mockWorkspaceAttention: WorkspaceAttentionItem[] = [
   },
 ];
 
-export const mockEvents: DashboardEvent[] = [
+// Recent workspace activity, most-recent-first (mirrors the backend
+// `createdAt desc` ordering). Metadata shapes mirror exactly what each backend
+// module emits today, so the `useRecentActivity` boundary can later drop in the
+// real `ActivityResponse` payload unchanged. Project activities expose only the
+// project `id` (not a slug), so they remain non-interactive until the backend
+// provides routing information.
+const activityActors = {
+  sarah: { id: "user-sarah-johnson", name: "Sarah Johnson", image: null },
+  marcus: { id: "user-marcus-chen", name: "Marcus Chen", image: null },
+  priya: { id: "user-priya-patel", name: "Priya Patel", image: null },
+  jordan: { id: "user-jordan-lee", name: "Jordan Lee", image: null },
+} satisfies Record<string, RecentActivityItem["actor"]>;
+
+export const mockRecentActivity: RecentActivityItem[] = [
   {
-    id: "1",
-    title: "Authentication module completed",
-    context: "Backend API",
-    timestamp: "Just now",
-    tone: "success",
-    icon: CircleCheckBig,
+    id: "activity-task-homepage-review",
+    type: "TASK_STATUS_CHANGED",
+    entityType: "TASK",
+    entityId: "task-website-homepage-audit",
+    metadata: { oldStatus: "IN_PROGRESS", newStatus: "REVIEW" },
+    actor: activityActors.sarah,
+    createdAt: "2026-07-19T09:12:00.000Z",
   },
   {
-    id: "2",
-    title: "Sprint 14 started",
-    context: "Website Redesign",
-    timestamp: "18 min",
-    tone: "default",
-    icon: Rocket,
+    id: "activity-comment-auth-session",
+    type: "COMMENT_CREATED",
+    entityType: "COMMENT",
+    entityId: "comment-auth-session-expiry",
+    metadata: { taskId: "task-auth-session-expiry" },
+    actor: activityActors.marcus,
+    createdAt: "2026-07-19T08:40:00.000Z",
   },
   {
-    id: "3",
-    title: "API specification updated",
-    context: "Backend API",
-    timestamp: "1 hr",
-    tone: "default",
-    icon: MessageSquare,
+    id: "activity-task-onboarding-created",
+    type: "TASK_CREATED",
+    entityType: "TASK",
+    entityId: "task-onboarding-checklist",
+    metadata: { taskTitle: "Update onboarding checklist" },
+    actor: activityActors.priya,
+    createdAt: "2026-07-18T16:55:00.000Z",
   },
   {
-    id: "4",
-    title: "Website redesign archived",
-    context: "Marketing Site",
-    timestamp: "Yesterday",
-    tone: "warning",
-    icon: Archive,
+    id: "activity-project-authentication-updated",
+    type: "PROJECT_UPDATED",
+    entityType: "PROJECT",
+    entityId: "project-authentication",
+    metadata: { newStatus: "ACTIVE" },
+    actor: activityActors.marcus,
+    createdAt: "2026-07-18T14:05:00.000Z",
+  },
+  {
+    id: "activity-task-rate-limiting-completed",
+    type: "TASK_COMPLETED",
+    entityType: "TASK",
+    entityId: "task-api-rate-limiting",
+    metadata: { taskTitle: "Finalize API rate limiting" },
+    actor: activityActors.jordan,
+    createdAt: "2026-07-18T11:20:00.000Z",
+  },
+  {
+    id: "activity-project-marketing-created",
+    type: "PROJECT_CREATED",
+    entityType: "PROJECT",
+    entityId: "project-marketing-site",
+    metadata: { projectName: "Marketing Site" },
+    actor: activityActors.sarah,
+    createdAt: "2026-07-17T15:30:00.000Z",
+  },
+  {
+    id: "activity-sprint-14-started",
+    type: "SPRINT_STARTED",
+    entityType: "SPRINT",
+    entityId: "sprint-14",
+    metadata: { sprintName: "Sprint 14" },
+    actor: activityActors.priya,
+    createdAt: "2026-07-17T09:00:00.000Z",
   },
 ];
 

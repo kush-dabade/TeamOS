@@ -1,7 +1,7 @@
 import { ChevronRight } from "lucide-react";
 import { Link, useLocation, useParams } from "react-router-dom";
 
-import { mockTasks } from "@/features/tasks/data/tasks.mock";
+import { useTask } from "@/features/tasks";
 import { useCurrentRoute } from "@/hooks";
 
 export function Breadcrumbs() {
@@ -10,9 +10,8 @@ export function Breadcrumbs() {
   const { slug, taskId } = useParams();
   const isProjectWorkspace = slug && pathname.startsWith(`/projects/${slug}`);
   const isTaskWorkspace = taskId && pathname.startsWith(`/tasks/${taskId}`);
-  const taskTitle = isTaskWorkspace
-    ? (mockTasks.find((taskItem) => taskItem.task.id === taskId)?.task.title ?? "Task")
-    : null;
+  const taskQuery = useTask(isTaskWorkspace ? taskId : undefined);
+  const taskTitle = isTaskWorkspace ? (taskQuery.data?.taskItem.task.title ?? "Task") : null;
 
   return (
     <nav aria-label="Breadcrumb" className="text-muted-foreground flex items-center text-sm">

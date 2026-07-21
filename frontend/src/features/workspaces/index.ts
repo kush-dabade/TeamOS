@@ -1,2 +1,3 @@
 export { useCurrentWorkspace } from "./hooks/use-current-workspace";
-export type { Workspace } from "./api/workspaces.api";
+export { useWorkspaceMembers } from "./hooks/use-workspace-members";
+export type { Workspace, WorkspaceMember } from "./api/workspaces.api";

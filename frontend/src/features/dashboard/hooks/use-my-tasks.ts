@@ -1,6 +1,9 @@
-import type { TaskListItem } from "@/features/tasks/types";
+import { useMemo } from "react";
 
-import { mockMyTasks } from "../data/dashboard.mock";
+import { useAuth } from "@/features/auth";
+import { useTasks } from "@/features/tasks";
+import type { TaskListItem } from "@/features/tasks/types";
+import { useCurrentWorkspace } from "@/features/workspaces";
 
 interface UseMyTasksResult {
   data: TaskListItem[];
@@ -12,15 +15,37 @@ interface UseMyTasksResult {
 /**
  * Data boundary for the dashboard "My Tasks" panel.
  *
- * Currently backed by mock data. The return shape mirrors a TanStack Query
- * `useQuery` result, so integration is a change inside this hook (swap the body
- * for a query against the tasks API) without touching any consuming component.
+ * Composes the Tasks feature's workspace-wide `useTasks` query, filtered to
+ * tasks assigned to the signed-in user. There is no "tasks assigned to me"
+ * backend endpoint, so filtering happens client-side over the same
+ * workspace-wide task set the Tasks page fetches - shared via TanStack
+ * Query's cache, so mounting both adds no extra network cost. `useTasks`
+ * already sorts by `updatedAt` descending, so that ordering is preserved here
+ * without re-sorting.
  */
 export function useMyTasks(): UseMyTasksResult {
-  return {
-    data: mockMyTasks,
-    isLoading: false,
-    isError: false,
-    refetch: () => {},
+  const { user } = useAuth();
+  const workspaceQuery = useCurrentWorkspace();
+  const tasksQuery = useTasks(workspaceQuery.data?.id);
+
+  const data = useMemo<TaskListItem[]>(() => {
+    if (!user) {
+      return [];
+    }
+
+    return tasksQuery.tasks.filter(
+      ({ task }) => task.assigneeId === user.id && task.status !== "DONE",
+    );
+  }, [tasksQuery.tasks, user]);
+
+  const isLoading =
+    workspaceQuery.isLoading || (Boolean(workspaceQuery.data) && tasksQuery.isLoading);
+  const isError = workspaceQuery.isError || Boolean(tasksQuery.error);
+
+  const refetch = () => {
+    workspaceQuery.refetch();
+    tasksQuery.refetch();
   };
+
+  return { data, isLoading, isError, refetch };
 }

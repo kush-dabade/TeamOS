@@ -1,6 +1,9 @@
-import type { ContinueWorkingItem } from "../types";
+import { useMemo } from "react";
 
-import { mockContinueWorking } from "../data/dashboard.mock";
+import { useProjects } from "@/features/projects";
+import { useCurrentWorkspace } from "@/features/workspaces";
+
+import type { ContinueWorkingItem } from "../types";
 
 interface UseContinueWorkingResult {
   data: ContinueWorkingItem[];
@@ -12,16 +15,37 @@ interface UseContinueWorkingResult {
 /**
  * Data boundary for the dashboard "Continue Working" panel.
  *
- * Currently backed by mock data. The return shape mirrors a TanStack Query
- * `useQuery` result, so integration is a change inside this hook (swap the body
- * for a query against the projects API, sorted by recency) without touching any
- * consuming component.
+ * Composes the Projects feature's `useProjects` query rather than owning any
+ * fetch of its own. The backend has no per-user "recently active project"
+ * signal, so `project.updatedAt` is used as the recency proxy (mirrors the
+ * assumption the prior mock data documented).
  */
 export function useContinueWorking(): UseContinueWorkingResult {
-  return {
-    data: mockContinueWorking,
-    isLoading: false,
-    isError: false,
-    refetch: () => {},
+  const workspaceQuery = useCurrentWorkspace();
+  const projectsQuery = useProjects(workspaceQuery.data?.id);
+
+  const data = useMemo<ContinueWorkingItem[]>(() => {
+    return [...(projectsQuery.data ?? [])]
+      .sort(
+        (a, b) => new Date(b.project.updatedAt).getTime() - new Date(a.project.updatedAt).getTime(),
+      )
+      .map(({ project }) => ({
+        id: project.id,
+        slug: project.slug,
+        name: project.name,
+        status: project.status,
+        lastActivityAt: project.updatedAt,
+      }));
+  }, [projectsQuery.data]);
+
+  const isLoading =
+    workspaceQuery.isLoading || (Boolean(workspaceQuery.data) && projectsQuery.isLoading);
+  const isError = workspaceQuery.isError || projectsQuery.isError;
+
+  const refetch = () => {
+    workspaceQuery.refetch();
+    projectsQuery.refetch();
   };
+
+  return { data, isLoading, isError, refetch };
 }

@@ -20,6 +20,7 @@ export interface ProjectListItem {
   project: Project;
   completedTaskCount: number;
   totalTaskCount: number;
+  progressPercentage: number;
 }
 
 export interface ProjectPreviewData {

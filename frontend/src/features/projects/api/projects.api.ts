@@ -40,8 +40,12 @@ export interface UpdateProjectInput {
   status?: ProjectStatus;
 }
 
-// The backend project resource does not include task counts yet - populated
-// once Tasks integration lands. Until then every project reports 0/0.
+// The backend project resource does not include task counts - there is no
+// aggregate endpoint for them. This layer always reports 0/0/0%; real counts
+// are computed client-side from Tasks data by `useProjectsWithTaskCounts` /
+// `useProjectWithTaskCounts`, which overwrite these fields after this mapping
+// runs. Kept here (rather than omitted) so `ProjectListItem` has one shape
+// regardless of which hook produced it.
 function toProjectListItem(project: BackendProject): ProjectListItem {
   return {
     project: {
@@ -55,6 +59,7 @@ function toProjectListItem(project: BackendProject): ProjectListItem {
     },
     completedTaskCount: 0,
     totalTaskCount: 0,
+    progressPercentage: 0,
   };
 }
 

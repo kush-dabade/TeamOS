@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
+import { Button } from "@/components/ui";
 import { PageLayout } from "@/components/layout";
 import { useProjects } from "@/features/projects";
 import { useWorkspaceMembers } from "@/features/workspaces";
@@ -34,6 +35,19 @@ export function TaskWorkspacePage() {
     return (
       <PageLayout>
         <p className="mt-3 text-sm text-muted-foreground">Loading task...</p>
+      </PageLayout>
+    );
+  }
+
+  if (taskQuery.error) {
+    return (
+      <PageLayout>
+        <div className="mt-3 flex min-h-64 flex-col items-center justify-center gap-3 text-center">
+          <p className="text-sm font-medium">Unable to load task</p>
+          <Button type="button" variant="outline" onClick={() => taskQuery.refetch()}>
+            Retry
+          </Button>
+        </div>
       </PageLayout>
     );
   }

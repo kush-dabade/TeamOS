@@ -43,9 +43,7 @@ export function ProjectPreviewPanel({
     return null;
   }
 
-  const { completedTaskCount, project: projectDetails, totalTaskCount } = project;
-  const progress =
-    totalTaskCount === 0 ? 0 : Math.round((completedTaskCount / totalTaskCount) * 100);
+  const { completedTaskCount, progressPercentage, project: projectDetails, totalTaskCount } = project;
 
   return (
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -82,9 +80,14 @@ export function ProjectPreviewPanel({
               <dt className="text-sm text-muted-foreground">Progress</dt>
               <dd className="flex w-36 items-center gap-2">
                 <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                  <div className="h-full rounded-full bg-primary" style={{ width: `${progress}%` }} />
+                  <div
+                    className="h-full rounded-full bg-primary"
+                    style={{ width: `${progressPercentage}%` }}
+                  />
                 </div>
-                <span className="w-8 text-right text-xs text-muted-foreground">{progress}%</span>
+                <span className="w-8 text-right text-xs text-muted-foreground">
+                  {progressPercentage}%
+                </span>
               </dd>
             </div>
             <div className="flex items-center justify-between gap-4">

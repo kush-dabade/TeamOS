@@ -11,9 +11,7 @@ interface ProjectHeaderProps {
 }
 
 export function ProjectHeader({ project, previewData, onEdit }: ProjectHeaderProps) {
-  const { completedTaskCount, project: projectDetails, totalTaskCount } = project;
-  const progress =
-    totalTaskCount === 0 ? 0 : Math.round((completedTaskCount / totalTaskCount) * 100);
+  const { completedTaskCount, progressPercentage, project: projectDetails, totalTaskCount } = project;
 
   return (
     <header className="flex flex-col gap-3 py-4 md:flex-row md:items-start md:justify-between">
@@ -32,7 +30,7 @@ export function ProjectHeader({ project, previewData, onEdit }: ProjectHeaderPro
             <span aria-hidden="true">•</span>
             <span>{completedTaskCount} / {totalTaskCount} Tasks</span>
             <span aria-hidden="true">•</span>
-            <span>{progress}%</span>
+            <span>{progressPercentage}%</span>
           </div>
         </div>
       </div>

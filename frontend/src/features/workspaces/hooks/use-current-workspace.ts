@@ -3,8 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { AppError } from "@/lib/api";
 
 import { fetchWorkspaces, type Workspace } from "../api/workspaces.api";
-
-const CURRENT_WORKSPACE_QUERY_KEY = ["workspaces", "current"] as const;
+import { workspaceKeys } from "../lib/workspace-keys";
 
 /**
  * TeamOS does not yet have workspace switching UI - every user's workspace
@@ -14,7 +13,7 @@ const CURRENT_WORKSPACE_QUERY_KEY = ["workspaces", "current"] as const;
  */
 export function useCurrentWorkspace() {
   return useQuery<Workspace | null, AppError>({
-    queryKey: CURRENT_WORKSPACE_QUERY_KEY,
+    queryKey: workspaceKeys.current(),
     queryFn: async () => {
       const workspaces = await fetchWorkspaces();
 

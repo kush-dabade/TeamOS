@@ -8,7 +8,7 @@ import { useCurrentWorkspace } from "@/features/workspaces";
 import { useArchiveProject } from "../hooks/use-archive-project";
 import { useCreateProject } from "../hooks/use-create-project";
 import { useProject } from "../hooks/use-project";
-import { useProjects } from "../hooks/use-projects";
+import { useProjectsWithTaskCounts } from "../hooks/use-projects-with-task-counts";
 import { useUpdateProject } from "../hooks/use-update-project";
 import { ProjectFormPanel } from "../components/form";
 import { ProjectPreviewPanel } from "../components/preview";
@@ -41,7 +41,7 @@ export function ProjectsPage() {
   const [isFormPanelOpen, setIsFormPanelOpen] = useState(false);
   const [formPanelTrigger, setFormPanelTrigger] = useState<HTMLButtonElement | null>(null);
 
-  const projectsQuery = useProjects(
+  const projectsQuery = useProjectsWithTaskCounts(
     workspace?.id,
     statusFilter === "ALL" ? undefined : statusFilter,
   );
@@ -186,11 +186,7 @@ export function ProjectsPage() {
             selectedProjectId={selectedProjectId}
             isLoading={workspaceQuery.isLoading || projectsQuery.isLoading}
             error={
-              workspaceQuery.isError
-                ? workspaceQuery.error.message
-                : projectsQuery.isError
-                  ? projectsQuery.error.message
-                  : null
+              workspaceQuery.isError ? workspaceQuery.error.message : (projectsQuery.error?.message ?? null)
             }
             hasActiveFilters={Boolean(searchQuery.trim()) || statusFilter !== "ALL"}
             onProjectSelect={handleProjectSelect}

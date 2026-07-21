@@ -4,7 +4,7 @@ import { env } from "../env";
 import { normalizeError } from "./error";
 
 export const apiClient = axios.create({
-  baseURL: env.apiUrl,
+  baseURL: `${env.apiUrl}/api/v1`,
   // Default for typical JSON requests; slower calls (e.g. file uploads) should
   // override this per-request via axios config rather than raising it globally.
   timeout: 10_000,

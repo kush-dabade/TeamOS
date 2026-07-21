@@ -2,17 +2,28 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { PageLayout } from "@/components/layout";
+import { useCurrentWorkspace } from "@/features/workspaces";
 
-import { mockProjectPreviewData, mockProjects } from "../data/projects.mock";
+import { useProject } from "../hooks/use-project";
+import { useProjects } from "../hooks/use-projects";
+import { useUpdateProject } from "../hooks/use-update-project";
 import { ProjectFormPanel } from "../components/form";
 import { ProjectHeader, ProjectNavigation, WorkspaceContent } from "../components/workspace";
-import type { ProjectListItem, ProjectWorkspaceTab } from "../types";
+import type { ProjectWorkspaceTab } from "../types";
 import type { ProjectFormData } from "../validation/project";
 
 export function ProjectWorkspacePage() {
   const { slug } = useParams();
-  const resolvedProject = mockProjects.find((item) => item.project.slug === slug) ?? null;
-  const [editedProject, setEditedProject] = useState<ProjectListItem | null>(null);
+  const workspaceQuery = useCurrentWorkspace();
+  const projectsQuery = useProjects(workspaceQuery.data?.id);
+
+  const resolvedProjectId = projectsQuery.data?.find(
+    (item) => item.project.slug === slug,
+  )?.project.id;
+
+  const projectDetailQuery = useProject(resolvedProjectId);
+  const updateProject = useUpdateProject();
+
   const [tabSelection, setTabSelection] = useState<{
     projectSlug: string | undefined;
     tab: ProjectWorkspaceTab;
@@ -20,8 +31,20 @@ export function ProjectWorkspacePage() {
   const [isFormPanelOpen, setIsFormPanelOpen] = useState(false);
   const [formPanelTrigger, setFormPanelTrigger] = useState<HTMLButtonElement | null>(null);
 
-  const project = editedProject?.project.slug === slug ? editedProject : resolvedProject;
   const activeTab = tabSelection.projectSlug === slug ? tabSelection.tab : "tasks";
+
+  const isResolvingProject = workspaceQuery.isPending || projectsQuery.isPending;
+  const isLoadingDetail = Boolean(resolvedProjectId) && projectDetailQuery.isPending;
+
+  if (isResolvingProject || isLoadingDetail) {
+    return (
+      <PageLayout>
+        <p className="mt-3 text-sm text-muted-foreground">Loading project...</p>
+      </PageLayout>
+    );
+  }
+
+  const project = projectDetailQuery.data?.project;
 
   if (!project) {
     return (
@@ -31,7 +54,7 @@ export function ProjectWorkspacePage() {
     );
   }
 
-  const previewData = mockProjectPreviewData[project.project.id] ?? null;
+  const previewData = projectDetailQuery.data?.previewData ?? null;
 
   const handleEdit = (trigger: HTMLButtonElement) => {
     setFormPanelTrigger(trigger);
@@ -43,17 +66,20 @@ export function ProjectWorkspacePage() {
     setFormPanelTrigger(null);
   };
 
-  const handleProjectSubmit = (data: ProjectFormData) => {
-    setEditedProject({
-      ...project,
-      project: {
-        ...project.project,
+  const handleProjectSubmit = async (data: ProjectFormData) => {
+    if (!resolvedProjectId) {
+      return;
+    }
+
+    await updateProject.mutateAsync({
+      projectId: resolvedProjectId,
+      input: {
         name: data.name,
         description: data.description || null,
         status: data.status,
-        updatedAt: new Date().toISOString(),
       },
     });
+
     setIsFormPanelOpen(false);
   };
 

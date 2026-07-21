@@ -3,8 +3,13 @@ import { useNavigate } from "react-router-dom";
 
 import { PageLayout } from "@/components/layout";
 import { useAuth } from "@/features/auth";
+import { useCurrentWorkspace } from "@/features/workspaces";
 
-import { mockProjectPreviewData, mockProjects } from "../data/projects.mock";
+import { useArchiveProject } from "../hooks/use-archive-project";
+import { useCreateProject } from "../hooks/use-create-project";
+import { useProject } from "../hooks/use-project";
+import { useProjects } from "../hooks/use-projects";
+import { useUpdateProject } from "../hooks/use-update-project";
 import { ProjectFormPanel } from "../components/form";
 import { ProjectPreviewPanel } from "../components/preview";
 import { ProjectsTable } from "../components/table";
@@ -12,7 +17,6 @@ import { ProjectsToolbar } from "../components/toolbar";
 import type {
   Project,
   ProjectListItem,
-  ProjectPreviewData,
   ProjectSortOption,
   ProjectStatusFilter,
 } from "../types";
@@ -21,10 +25,9 @@ import type { ProjectFormData } from "../validation/project";
 export function ProjectsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [projectItems, setProjectItems] = useState<ProjectListItem[]>(mockProjects);
-  const [projectPreviewData, setProjectPreviewData] = useState<Record<string, ProjectPreviewData>>(
-    mockProjectPreviewData,
-  );
+  const workspaceQuery = useCurrentWorkspace();
+  const workspace = workspaceQuery.data;
+
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ProjectStatusFilter>("ALL");
   const [sortOption, setSortOption] = useState<ProjectSortOption>("RECENTLY_UPDATED");
@@ -37,18 +40,24 @@ export function ProjectsPage() {
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [isFormPanelOpen, setIsFormPanelOpen] = useState(false);
   const [formPanelTrigger, setFormPanelTrigger] = useState<HTMLButtonElement | null>(null);
-  const [error, setError] = useState<string | null>(null);
+
+  const projectsQuery = useProjects(
+    workspace?.id,
+    statusFilter === "ALL" ? undefined : statusFilter,
+  );
+  const projectItems = useMemo(() => projectsQuery.data ?? [], [projectsQuery.data]);
+
+  const selectedProjectPreviewQuery = useProject(selectedProjectId ?? undefined);
+
+  const createProject = useCreateProject(workspace?.id ?? "");
+  const updateProject = useUpdateProject();
+  const archiveProject = useArchiveProject();
 
   const projects = useMemo(() => {
     const normalizedSearchQuery = searchQuery.trim().toLowerCase();
 
     return projectItems
-      .filter(({ project }) => {
-        const matchesSearch = project.name.toLowerCase().includes(normalizedSearchQuery);
-        const matchesStatus = statusFilter === "ALL" || project.status === statusFilter;
-
-        return matchesSearch && matchesStatus;
-      })
+      .filter(({ project }) => project.name.toLowerCase().includes(normalizedSearchQuery))
       .sort((firstProject, secondProject) => {
         if (sortOption === "NAME_ASC") {
           return firstProject.project.name.localeCompare(secondProject.project.name);
@@ -63,9 +72,16 @@ export function ProjectsPage() {
           new Date(firstProject.project.updatedAt).getTime()
         );
       });
-  }, [projectItems, searchQuery, sortOption, statusFilter]);
+  }, [projectItems, searchQuery, sortOption]);
 
-  const handleRetry = () => setError(null);
+  const handleRetry = () => {
+    if (workspaceQuery.isError) {
+      workspaceQuery.refetch();
+      return;
+    }
+
+    projectsQuery.refetch();
+  };
 
   const handleClearFilters = () => {
     setSearchQuery("");
@@ -75,9 +91,7 @@ export function ProjectsPage() {
   const selectedProject = projectItems.find(
     ({ project }) => project.id === selectedProjectId,
   );
-  const selectedProjectPreviewData = selectedProject
-    ? projectPreviewData[selectedProject.project.id]
-    : null;
+  const selectedProjectPreviewData = selectedProjectPreviewQuery.data?.previewData ?? null;
 
   const handleProjectSelect = (projectId: string, trigger: HTMLButtonElement | null) => {
     setSelectedProjectId(projectId);
@@ -117,59 +131,40 @@ export function ProjectsPage() {
     setFormPanelTrigger(null);
   };
 
-  const handleProjectFormSubmit = (data: ProjectFormData) => {
-    const now = new Date().toISOString();
-
+  const handleProjectFormSubmit = async (data: ProjectFormData) => {
     if (formMode === "create") {
-      const id = crypto.randomUUID();
-      const slug = createProjectSlug(data.name, projectItems);
+      if (!workspace || !user) {
+        return;
+      }
 
-      setProjectItems((currentProjects) => [
-        {
-          project: {
-            id,
-            slug,
-            name: data.name,
-            description: data.description || null,
-            status: data.status,
-            createdAt: now,
-            updatedAt: now,
-          },
-          completedTaskCount: 0,
-          totalTaskCount: 0,
-        },
-        ...currentProjects,
-      ]);
-      setProjectPreviewData((currentPreviewData) => ({
-        ...currentPreviewData,
-        [id]: {
-          ownerName: user?.name ?? "TeamOS User",
-          startDate: null,
-          targetDate: null,
-        },
-      }));
+      await createProject.mutateAsync({
+        ownerId: user.id,
+        name: data.name,
+        description: data.description || undefined,
+      });
     }
 
     if (formMode === "edit" && editingProjectId) {
-      setProjectItems((currentProjects) =>
-        currentProjects.map((item) =>
-          item.project.id === editingProjectId
-            ? {
-                ...item,
-                project: {
-                  ...item.project,
-                  name: data.name,
-                  description: data.description || null,
-                  status: data.status,
-                  updatedAt: now,
-                },
-              }
-            : item,
-        ),
-      );
+      await updateProject.mutateAsync({
+        projectId: editingProjectId,
+        input: {
+          name: data.name,
+          description: data.description || null,
+          status: data.status,
+        },
+      });
     }
 
     handleFormPanelClose();
+  };
+
+  const handleArchiveProject = async () => {
+    if (!selectedProjectId) {
+      return;
+    }
+
+    await archiveProject.mutateAsync(selectedProjectId);
+    handlePreviewClose();
   };
 
   return (
@@ -189,8 +184,14 @@ export function ProjectsPage() {
           <ProjectsTable
             projects={projects}
             selectedProjectId={selectedProjectId}
-            isLoading={false}
-            error={error}
+            isLoading={workspaceQuery.isLoading || projectsQuery.isLoading}
+            error={
+              workspaceQuery.isError
+                ? workspaceQuery.error.message
+                : projectsQuery.isError
+                  ? projectsQuery.error.message
+                  : null
+            }
             hasActiveFilters={Boolean(searchQuery.trim()) || statusFilter !== "ALL"}
             onProjectSelect={handleProjectSelect}
             onRetry={handleRetry}
@@ -202,12 +203,15 @@ export function ProjectsPage() {
 
       <ProjectPreviewPanel
         project={selectedProject ?? null}
-        previewData={selectedProjectPreviewData ?? null}
+        previewData={selectedProjectPreviewData}
+        isPreviewLoading={selectedProjectPreviewQuery.isLoading}
+        isArchiving={archiveProject.isPending}
         open={isPreviewOpen}
         onClose={handlePreviewClose}
         onCloseAutoFocus={handlePreviewCloseAutoFocus}
         onOpenProject={(slug) => navigate(`/projects/${slug}`)}
         onEdit={handleEditProject}
+        onArchive={handleArchiveProject}
       />
 
       <ProjectFormPanel
@@ -220,25 +224,6 @@ export function ProjectsPage() {
       />
     </PageLayout>
   );
-}
-
-function createProjectSlug(name: string, projects: ProjectListItem[]) {
-  const baseSlug = name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "") || "project";
-  const existingSlugs = new Set(projects.map(({ project }) => project.slug));
-
-  let slug = baseSlug;
-  let suffix = 2;
-
-  while (existingSlugs.has(slug)) {
-    slug = `${baseSlug}-${suffix}`;
-    suffix += 1;
-  }
-
-  return slug;
 }
 
 function findProject(projectId: string | null, projects: ProjectListItem[]): Project | null {

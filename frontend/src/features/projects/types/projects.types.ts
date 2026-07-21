@@ -27,3 +27,8 @@ export interface ProjectPreviewData {
   startDate: string | null;
   targetDate: string | null;
 }
+
+export interface ProjectDetail {
+  project: ProjectListItem;
+  previewData: ProjectPreviewData;
+}

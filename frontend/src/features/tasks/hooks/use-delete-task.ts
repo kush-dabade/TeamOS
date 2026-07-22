@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 import type { AppError } from "@/lib/api";
 
@@ -18,6 +19,9 @@ export function useDeleteTask() {
     onSuccess: (_data, { taskId, projectId }) => {
       queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
       queryClient.invalidateQueries({ queryKey: taskKeys.list(projectId) });
+    },
+    onError: (error) => {
+      toast.error(error.message);
     },
   });
 }

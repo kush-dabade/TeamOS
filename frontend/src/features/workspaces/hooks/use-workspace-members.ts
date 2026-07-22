@@ -2,8 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 
 import type { AppError } from "@/lib/api";
 
-import { fetchWorkspaceMembers, type WorkspaceMember } from "../api/workspaces.api";
+import { fetchWorkspaceMembers } from "../api/workspaces.api";
 import { workspaceKeys } from "../lib/workspace-keys";
+import type { WorkspaceMember } from "../types";
 
 export function useWorkspaceMembers(workspaceId: string | undefined) {
   return useQuery<WorkspaceMember[], AppError>({

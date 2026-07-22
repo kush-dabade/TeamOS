@@ -1,41 +1,47 @@
 import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 
-import { useTasks } from "@/features/tasks";
+import { fetchProjectTasks } from "@/features/tasks/api/tasks.api";
+import { taskKeys } from "@/features/tasks/lib/task-keys";
+import type { Task } from "@/features/tasks/types";
+import type { AppError } from "@/lib/api";
 
 import { countTasks } from "../lib/task-counts";
 import type { ProjectDetail } from "../types";
 
 import { useProject } from "./use-project";
 
-// Same composition approach as `useProjectsWithTaskCounts`, scoped to a
-// single project: reuses the Tasks feature's workspace-wide `useTasks` query
-// and filters it down, rather than introducing a per-project task fetch.
-export function useProjectWithTaskCounts(
-  projectId: string | undefined,
-  workspaceId: string | undefined,
-) {
+// Fetches this project's tasks directly (rather than composing the Tasks
+// feature's workspace-wide `useTasks`, which fetches its own project list
+// without a status filter - excluding archived projects by backend default -
+// and would never fetch tasks for an archived project, silently reporting
+// its progress as 0/0).
+export function useProjectWithTaskCounts(projectId: string | undefined) {
   const projectQuery = useProject(projectId);
-  const tasksQuery = useTasks(workspaceId);
+
+  const tasksQuery = useQuery<Task[], AppError>({
+    queryKey: taskKeys.list(projectId ?? ""),
+    queryFn: () => fetchProjectTasks(projectId as string),
+    enabled: Boolean(projectId),
+  });
 
   const data = useMemo<ProjectDetail | undefined>(() => {
     if (!projectQuery.data) {
       return undefined;
     }
 
-    const projectTasks = tasksQuery.tasks.filter((item) => item.project.id === projectId);
-
     return {
       ...projectQuery.data,
       project: {
         ...projectQuery.data.project,
-        ...countTasks(projectTasks),
+        ...countTasks(tasksQuery.data ?? []),
       },
     };
-  }, [projectQuery.data, tasksQuery.tasks, projectId]);
+  }, [projectQuery.data, tasksQuery.data]);
 
   const isLoading =
     projectQuery.isLoading || (Boolean(projectQuery.data) && tasksQuery.isLoading);
-  const isError = projectQuery.isError || Boolean(tasksQuery.error);
+  const isError = projectQuery.isError || tasksQuery.isError;
   const error = projectQuery.error ?? tasksQuery.error ?? null;
 
   const refetch = () => {

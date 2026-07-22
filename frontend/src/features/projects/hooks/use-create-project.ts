@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 import type { AppError } from "@/lib/api";
 
@@ -13,6 +14,9 @@ export function useCreateProject(workspaceId: string) {
     mutationFn: (input: CreateProjectInput) => createProject(workspaceId, input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
+    },
+    onError: (error) => {
+      toast.error(error.message);
     },
   });
 }

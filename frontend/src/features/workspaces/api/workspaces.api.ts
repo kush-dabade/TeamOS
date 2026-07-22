@@ -1,6 +1,8 @@
 import { apiClient, type ApiSuccess } from "@/lib/api";
 
-export interface Workspace {
+import type { Workspace, WorkspaceMember } from "../types";
+
+interface BackendWorkspace {
   id: string;
   name: string;
   slug: string;
@@ -8,13 +10,7 @@ export interface Workspace {
   createdAt: string;
 }
 
-export async function fetchWorkspaces(): Promise<Workspace[]> {
-  const response = await apiClient.get<ApiSuccess<Workspace[]>>("/workspaces");
-
-  return response.data.data;
-}
-
-export interface WorkspaceMember {
+interface BackendWorkspaceMember {
   id: string;
   userId: string;
   name: string;
@@ -23,10 +19,37 @@ export interface WorkspaceMember {
   joinedAt: string;
 }
 
+function toWorkspace(workspace: BackendWorkspace): Workspace {
+  return {
+    id: workspace.id,
+    name: workspace.name,
+    slug: workspace.slug,
+    role: workspace.role,
+    createdAt: workspace.createdAt,
+  };
+}
+
+function toWorkspaceMember(member: BackendWorkspaceMember): WorkspaceMember {
+  return {
+    id: member.id,
+    userId: member.userId,
+    name: member.name,
+    email: member.email,
+    role: member.role,
+    joinedAt: member.joinedAt,
+  };
+}
+
+export async function fetchWorkspaces(): Promise<Workspace[]> {
+  const response = await apiClient.get<ApiSuccess<BackendWorkspace[]>>("/workspaces");
+
+  return response.data.data.map(toWorkspace);
+}
+
 export async function fetchWorkspaceMembers(workspaceId: string): Promise<WorkspaceMember[]> {
-  const response = await apiClient.get<ApiSuccess<WorkspaceMember[]>>(
+  const response = await apiClient.get<ApiSuccess<BackendWorkspaceMember[]>>(
     `/workspaces/${workspaceId}/members`,
   );
 
-  return response.data.data;
+  return response.data.data.map(toWorkspaceMember);
 }

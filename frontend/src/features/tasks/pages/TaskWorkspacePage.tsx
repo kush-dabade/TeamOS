@@ -39,7 +39,7 @@ export function TaskWorkspacePage() {
     );
   }
 
-  if (taskQuery.error) {
+  if (taskQuery.error && !taskQuery.isNotFound) {
     return (
       <PageLayout>
         <div className="mt-3 flex min-h-64 flex-col items-center justify-center gap-3 text-center">
@@ -110,9 +110,13 @@ export function TaskWorkspacePage() {
       return;
     }
 
-    await deleteTask.mutateAsync({ taskId, projectId: taskItem.task.projectId });
-    toast.success("Task deleted");
-    navigate("/tasks");
+    try {
+      await deleteTask.mutateAsync({ taskId, projectId: taskItem.task.projectId });
+      toast.success("Task deleted");
+      navigate("/tasks");
+    } catch {
+      // Failure feedback is already surfaced via the mutation's onError toast.
+    }
   };
 
   return (

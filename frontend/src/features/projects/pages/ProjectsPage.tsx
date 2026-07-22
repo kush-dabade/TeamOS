@@ -163,8 +163,12 @@ export function ProjectsPage() {
       return;
     }
 
-    await archiveProject.mutateAsync(selectedProjectId);
-    handlePreviewClose();
+    try {
+      await archiveProject.mutateAsync(selectedProjectId);
+      handlePreviewClose();
+    } catch {
+      // Failure feedback is already surfaced via the mutation's onError toast.
+    }
   };
 
   return (

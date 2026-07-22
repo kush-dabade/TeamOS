@@ -29,6 +29,7 @@ export function useTask(taskId: string | undefined) {
     taskQuery.isLoading || (Boolean(task) && (projectQuery.isLoading || membersQuery.isLoading));
 
   const error = taskQuery.error ?? projectQuery.error ?? membersQuery.error ?? null;
+  const isNotFound = taskQuery.error?.type === "not_found";
 
   const data = useMemo<TaskDetail | undefined>(() => {
     if (!task || !projectQuery.data || !membersQuery.data) {
@@ -55,5 +56,17 @@ export function useTask(taskId: string | undefined) {
     };
   }, [task, projectQuery.data, membersQuery.data]);
 
-  return { data, isLoading, error, refetch: taskQuery.refetch };
+  const refetch = () => {
+    taskQuery.refetch();
+
+    if (task?.projectId) {
+      projectQuery.refetch();
+    }
+
+    if (task?.workspaceId) {
+      membersQuery.refetch();
+    }
+  };
+
+  return { data, isLoading, error, isNotFound, refetch };
 }

@@ -22,7 +22,7 @@ export function ProjectWorkspacePage() {
     (item) => item.project.slug === slug,
   )?.project.id;
 
-  const projectDetailQuery = useProjectWithTaskCounts(resolvedProjectId, workspaceQuery.data?.id);
+  const projectDetailQuery = useProjectWithTaskCounts(resolvedProjectId);
   const updateProject = useUpdateProject();
 
   const [tabSelection, setTabSelection] = useState<{

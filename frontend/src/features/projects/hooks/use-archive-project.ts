@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 import type { AppError } from "@/lib/api";
 
@@ -14,6 +15,9 @@ export function useArchiveProject() {
     onSuccess: (_data, projectId) => {
       queryClient.invalidateQueries({ queryKey: projectKeys.detail(projectId) });
       queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
+    },
+    onError: (error) => {
+      toast.error(error.message);
     },
   });
 }

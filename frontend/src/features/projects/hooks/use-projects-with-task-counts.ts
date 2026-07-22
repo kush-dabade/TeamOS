@@ -1,6 +1,9 @@
 import { useMemo } from "react";
+import { useQueries } from "@tanstack/react-query";
 
-import { useTasks, type TaskListItem } from "@/features/tasks";
+import { fetchProjectTasks } from "@/features/tasks/api/tasks.api";
+import { taskKeys } from "@/features/tasks/lib/task-keys";
+import type { AppError } from "@/lib/api";
 
 import { countTasks } from "../lib/task-counts";
 import type { ProjectListItem, ProjectStatus } from "../types";
@@ -8,43 +11,47 @@ import type { ProjectListItem, ProjectStatus } from "../types";
 import { useProjects } from "./use-projects";
 
 // The backend Project resource has no aggregated task-count fields, so counts
-// are computed client-side by composing the Tasks feature's workspace-wide
-// `useTasks` query - the same composition approach the Dashboard uses for its
-// panels, rather than a new per-project fetch.
+// are computed client-side. Task queries are fanned out per project returned
+// by `projectsQuery` (rather than composing the Tasks feature's workspace-wide
+// `useTasks`), because that hook fetches its own project list without a
+// status filter - which the backend defaults to excluding archived projects
+// from - so it never fetches tasks for an archived project and its counts
+// would silently read as 0/0.
 export function useProjectsWithTaskCounts(workspaceId: string | undefined, status?: ProjectStatus) {
   const projectsQuery = useProjects(workspaceId, status);
-  const tasksQuery = useTasks(workspaceId);
+  const projects = useMemo(() => projectsQuery.data ?? [], [projectsQuery.data]);
+
+  const taskQueries = useQueries({
+    queries: projects.map(({ project }) => ({
+      queryKey: taskKeys.list(project.id),
+      queryFn: () => fetchProjectTasks(project.id),
+      enabled: Boolean(workspaceId),
+    })),
+  });
 
   const data = useMemo<ProjectListItem[] | undefined>(() => {
     if (!projectsQuery.data) {
       return undefined;
     }
 
-    const tasksByProjectId = new Map<string, TaskListItem[]>();
-
-    for (const item of tasksQuery.tasks) {
-      const existing = tasksByProjectId.get(item.project.id);
-      if (existing) {
-        existing.push(item);
-      } else {
-        tasksByProjectId.set(item.project.id, [item]);
-      }
-    }
-
-    return projectsQuery.data.map((item) => ({
+    return projects.map((item, index) => ({
       ...item,
-      ...countTasks(tasksByProjectId.get(item.project.id) ?? []),
+      ...countTasks(taskQueries[index]?.data ?? []),
     }));
-  }, [projectsQuery.data, tasksQuery.tasks]);
+  }, [projectsQuery.data, projects, taskQueries]);
 
   const isLoading =
-    projectsQuery.isLoading || (Boolean(projectsQuery.data) && tasksQuery.isLoading);
-  const isError = projectsQuery.isError || Boolean(tasksQuery.error);
-  const error = projectsQuery.error ?? tasksQuery.error ?? null;
+    projectsQuery.isLoading ||
+    (projects.length > 0 && taskQueries.some((query) => query.isLoading));
+  const isError = projectsQuery.isError || taskQueries.some((query) => query.isError);
+  const error =
+    projectsQuery.error ??
+    (taskQueries.find((query) => query.error)?.error as AppError | undefined) ??
+    null;
 
   const refetch = () => {
     projectsQuery.refetch();
-    tasksQuery.refetch();
+    taskQueries.forEach((query) => query.refetch());
   };
 
   return { data, isLoading, isError, error, refetch };

@@ -2,8 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 
 import type { AppError } from "@/lib/api";
 
-import { fetchWorkspaces, type Workspace } from "../api/workspaces.api";
+import { fetchWorkspaces } from "../api/workspaces.api";
 import { workspaceKeys } from "../lib/workspace-keys";
+import type { Workspace } from "../types";
 
 /**
  * TeamOS does not yet have workspace switching UI - every user's workspace

@@ -22,7 +22,6 @@ interface TaskPreviewPanelProps {
   onCloseAutoFocus: () => void;
   onOpenTask: (taskId: string) => void;
   onEdit: () => void;
-  onDelete?: () => void;
 }
 
 export function TaskPreviewPanel({
@@ -33,7 +32,6 @@ export function TaskPreviewPanel({
   onCloseAutoFocus,
   onOpenTask,
   onEdit,
-  onDelete,
 }: TaskPreviewPanelProps) {
   if (!taskItem) {
     return null;
@@ -76,11 +74,6 @@ export function TaskPreviewPanel({
             <Button type="button" variant="ghost" onClick={onEdit}>
               Edit
             </Button>
-            {onDelete ? (
-              <Button type="button" variant="ghost" onClick={onDelete}>
-                Delete
-              </Button>
-            ) : null}
           </div>
           <Button type="button" onClick={() => onOpenTask(task.id)}>
             Open Task

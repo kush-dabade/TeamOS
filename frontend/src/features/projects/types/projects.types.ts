@@ -20,10 +20,16 @@ export interface ProjectListItem {
   project: Project;
   completedTaskCount: number;
   totalTaskCount: number;
+  progressPercentage: number;
 }
 
 export interface ProjectPreviewData {
   ownerName: string;
   startDate: string | null;
   targetDate: string | null;
+}
+
+export interface ProjectDetail {
+  project: ProjectListItem;
+  previewData: ProjectPreviewData;
 }

@@ -9,17 +9,30 @@ interface TasksTableProps {
   tasks: TaskListItem[];
   selectedTaskId: string | null;
   isLoading: boolean;
+  error: string | null;
   onTaskSelect: (taskId: string, trigger: HTMLButtonElement | null) => void;
   onCreateTask: (trigger: HTMLButtonElement) => void;
+  onRetry: () => void;
 }
 
 export function TasksTable({
   tasks,
   selectedTaskId,
   isLoading,
+  error,
   onTaskSelect,
   onCreateTask,
+  onRetry,
 }: TasksTableProps) {
+  if (error) {
+    return (
+      <div className="flex min-h-64 flex-col items-center justify-center gap-3 text-center">
+        <p className="text-sm font-medium">Unable to load tasks</p>
+        <Button type="button" variant="outline" onClick={onRetry}>Retry</Button>
+      </div>
+    );
+  }
+
   if (!isLoading && tasks.length === 0) {
     return (
       <div className="flex min-h-64 flex-col items-center justify-center gap-1 text-center">

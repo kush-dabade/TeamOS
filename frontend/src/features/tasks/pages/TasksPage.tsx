@@ -1,18 +1,26 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { PageLayout } from "@/components/layout";
-import { mockProjects } from "@/features/projects/data/projects.mock";
+import { useProjects } from "@/features/projects";
+import { useCurrentWorkspace, useWorkspaceMembers } from "@/features/workspaces";
 
+import { useCreateTask } from "../hooks/use-create-task";
+import { useTasks } from "../hooks/use-tasks";
+import { useUpdateTask } from "../hooks/use-update-task";
 import { TaskPreviewPanel } from "../components/preview";
 import { TaskFormPanel } from "../components/form";
 import { TasksTable } from "../components/table";
 import { TasksToolbar } from "../components/toolbar";
-import { mockTasks, mockWorkspaceUsers } from "../data/tasks.mock";
-import type { TaskPriorityFilter, TaskStatusFilter } from "../types";
+import type { TaskAssignee, TaskPriorityFilter, TaskProject, TaskStatusFilter } from "../types";
+import type { TaskFormData } from "../validation/task";
 
 export function TasksPage() {
+  const navigate = useNavigate();
+  const workspaceQuery = useCurrentWorkspace();
+  const workspace = workspaceQuery.data;
+
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>("ALL");
   const [priorityFilter, setPriorityFilter] = useState<TaskPriorityFilter>("ALL");
@@ -26,7 +34,72 @@ export function TasksPage() {
   const [isFormPanelOpen, setIsFormPanelOpen] = useState(false);
   const [formPanelTrigger, setFormPanelTrigger] = useState<HTMLButtonElement | null>(null);
 
-  const navigate = useNavigate();
+  const {
+    tasks: taskItems,
+    isLoading: isLoadingTasks,
+    error: tasksError,
+    refetch: refetchTasks,
+  } = useTasks(workspace?.id);
+  const projectsQuery = useProjects(workspace?.id);
+  const membersQuery = useWorkspaceMembers(workspace?.id);
+
+  const projects: TaskProject[] = useMemo(
+    () =>
+      (projectsQuery.data ?? []).map(({ project }) => ({
+        id: project.id,
+        slug: project.slug,
+        name: project.name,
+      })),
+    [projectsQuery.data],
+  );
+  const assignees: TaskAssignee[] = useMemo(
+    () => (membersQuery.data ?? []).map((member) => ({ id: member.userId, name: member.name })),
+    [membersQuery.data],
+  );
+
+  const createTask = useCreateTask();
+  const updateTask = useUpdateTask();
+
+  const tasks = useMemo(() => {
+    const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+
+    return taskItems.filter(({ task, assignee, project }) => {
+      if (normalizedSearchQuery && !task.title.toLowerCase().includes(normalizedSearchQuery)) {
+        return false;
+      }
+
+      if (statusFilter !== "ALL" && task.status !== statusFilter) {
+        return false;
+      }
+
+      if (priorityFilter !== "ALL" && task.priority !== priorityFilter) {
+        return false;
+      }
+
+      if (projectFilter !== "ALL" && project.id !== projectFilter) {
+        return false;
+      }
+
+      if (assigneeFilter === "UNASSIGNED" && assignee !== null) {
+        return false;
+      }
+
+      if (assigneeFilter !== "ALL" && assigneeFilter !== "UNASSIGNED" && assignee?.id !== assigneeFilter) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [taskItems, searchQuery, statusFilter, priorityFilter, projectFilter, assigneeFilter]);
+
+  const handleRetry = () => {
+    if (workspaceQuery.isError) {
+      workspaceQuery.refetch();
+      return;
+    }
+
+    refetchTasks();
+  };
 
   const handleCreateTask = (trigger: HTMLButtonElement) => {
     setEditingTaskId(null);
@@ -34,18 +107,19 @@ export function TasksPage() {
     setFormPanelTrigger(trigger);
     setIsFormPanelOpen(true);
   };
+
   const handleTaskSelect = (taskId: string, trigger: HTMLButtonElement | null) => {
     setSelectedTaskId(taskId);
     setSelectedTaskTrigger(trigger);
     setIsPreviewOpen(true);
   };
-  const selectedTask = mockTasks.find((taskItem) => taskItem.task.id === selectedTaskId) ?? null;
+
+  const selectedTask = taskItems.find((taskItem) => taskItem.task.id === selectedTaskId) ?? null;
   const selectedTaskCreator = selectedTask
-    ? (mockWorkspaceUsers.find((user) => user.id === selectedTask.task.createdById) ?? null)
+    ? (assignees.find((assignee) => assignee.id === selectedTask.task.createdById) ?? null)
     : null;
-  const handleOpenTask = (taskId: string) => {
-    navigate(`/tasks/${taskId}`);
-  };
+
+  const handleOpenTask = (taskId: string) => navigate(`/tasks/${taskId}`);
   const handlePreviewClose = () => setIsPreviewOpen(false);
   const handlePreviewCloseAutoFocus = () => {
     selectedTaskTrigger?.focus();
@@ -66,8 +140,40 @@ export function TasksPage() {
     setFormMode(null);
     setFormPanelTrigger(null);
   };
-  const handleTaskFormSubmit = async () => {
-    toast.success(formMode === "create" ? "Task created" : "Task updated");
+
+  const handleTaskFormSubmit = async (data: TaskFormData) => {
+    if (formMode === "create") {
+      if (!data.projectId) {
+        return;
+      }
+
+      await createTask.mutateAsync({
+        projectId: data.projectId,
+        input: {
+          title: data.title,
+          description: data.description || undefined,
+          priority: data.priority,
+          assigneeId: data.assigneeId || undefined,
+          dueDate: data.dueDate || undefined,
+        },
+      });
+      toast.success("Task created");
+    }
+
+    if (formMode === "edit" && editingTaskId) {
+      await updateTask.mutateAsync({
+        taskId: editingTaskId,
+        input: {
+          title: data.title,
+          description: data.description || null,
+          priority: data.priority,
+          assigneeId: data.assigneeId || null,
+          dueDate: data.dueDate || null,
+        },
+      });
+      toast.success("Task updated");
+    }
+
     handleFormPanelClose();
   };
 
@@ -80,8 +186,8 @@ export function TasksPage() {
           priorityFilter={priorityFilter}
           projectFilter={projectFilter}
           assigneeFilter={assigneeFilter}
-          projects={mockProjects.map(({ project }) => project)}
-          assignees={mockWorkspaceUsers}
+          projects={projects}
+          assignees={assignees}
           onSearchQueryChange={setSearchQuery}
           onStatusFilterChange={setStatusFilter}
           onPriorityFilterChange={setPriorityFilter}
@@ -91,11 +197,13 @@ export function TasksPage() {
         />
         <div className="mt-4">
           <TasksTable
-            tasks={mockTasks}
+            tasks={tasks}
             selectedTaskId={selectedTaskId}
-            isLoading={false}
+            isLoading={workspaceQuery.isLoading || isLoadingTasks}
+            error={workspaceQuery.isError ? workspaceQuery.error.message : (tasksError?.message ?? null)}
             onTaskSelect={handleTaskSelect}
             onCreateTask={handleCreateTask}
+            onRetry={handleRetry}
           />
         </div>
       </div>
@@ -108,13 +216,13 @@ export function TasksPage() {
         onCloseAutoFocus={handlePreviewCloseAutoFocus}
         onOpenTask={handleOpenTask}
         onEdit={handleEditTask}
-        />
+      />
 
       <TaskFormPanel
         mode={formMode}
-        taskItem={mockTasks.find((taskItem) => taskItem.task.id === editingTaskId) ?? null}
-        projects={mockProjects.map(({ project }) => project)}
-        assignees={mockWorkspaceUsers}
+        taskItem={taskItems.find((taskItem) => taskItem.task.id === editingTaskId) ?? null}
+        projects={projects}
+        assignees={assignees}
         open={isFormPanelOpen}
         onClose={handleFormPanelClose}
         onCloseAutoFocus={handleFormPanelCloseAutoFocus}

@@ -6,6 +6,7 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
+  Skeleton,
 } from "@/components/ui";
 import { formatDate, formatRelativeDate } from "@/utils";
 
@@ -16,29 +17,33 @@ import type { ProjectListItem, ProjectPreviewData } from "../../types";
 interface ProjectPreviewPanelProps {
   project: ProjectListItem | null;
   previewData: ProjectPreviewData | null;
+  isPreviewLoading: boolean;
+  isArchiving: boolean;
   open: boolean;
   onClose: () => void;
   onCloseAutoFocus: () => void;
   onOpenProject: (slug: string) => void;
   onEdit: (trigger: HTMLButtonElement) => void;
+  onArchive: () => void;
 }
 
 export function ProjectPreviewPanel({
   project,
   previewData,
+  isPreviewLoading,
+  isArchiving,
   open,
   onClose,
   onCloseAutoFocus,
   onOpenProject,
   onEdit,
+  onArchive,
 }: ProjectPreviewPanelProps) {
-  if (!project || !previewData) {
+  if (!project) {
     return null;
   }
 
-  const { completedTaskCount, project: projectDetails, totalTaskCount } = project;
-  const progress =
-    totalTaskCount === 0 ? 0 : Math.round((completedTaskCount / totalTaskCount) * 100);
+  const { completedTaskCount, progressPercentage, project: projectDetails, totalTaskCount } = project;
 
   return (
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -63,15 +68,26 @@ export function ProjectPreviewPanel({
           <dl className={projectDetails.description ? "mt-5 space-y-3" : "space-y-3"}>
             <div className="flex items-center justify-between gap-4">
               <dt className="text-sm text-muted-foreground">Owner</dt>
-              <dd className="text-right text-sm font-medium">{previewData.ownerName}</dd>
+              <dd className="text-right text-sm font-medium">
+                {isPreviewLoading ? (
+                  <Skeleton className="h-4 w-24" />
+                ) : (
+                  (previewData?.ownerName ?? "—")
+                )}
+              </dd>
             </div>
             <div className="flex items-center justify-between gap-4">
               <dt className="text-sm text-muted-foreground">Progress</dt>
               <dd className="flex w-36 items-center gap-2">
                 <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                  <div className="h-full rounded-full bg-primary" style={{ width: `${progress}%` }} />
+                  <div
+                    className="h-full rounded-full bg-primary"
+                    style={{ width: `${progressPercentage}%` }}
+                  />
                 </div>
-                <span className="w-8 text-right text-xs text-muted-foreground">{progress}%</span>
+                <span className="w-8 text-right text-xs text-muted-foreground">
+                  {progressPercentage}%
+                </span>
               </dd>
             </div>
             <div className="flex items-center justify-between gap-4">
@@ -84,13 +100,13 @@ export function ProjectPreviewPanel({
               <dt className="text-sm text-muted-foreground">Updated</dt>
               <dd className="text-sm font-medium">{formatRelativeDate(projectDetails.updatedAt)}</dd>
             </div>
-            {previewData.startDate ? (
+            {previewData?.startDate ? (
               <div className="flex items-center justify-between gap-4">
                 <dt className="text-sm text-muted-foreground">Start</dt>
                 <dd className="text-sm font-medium">{formatDate(previewData.startDate, "MMM d")}</dd>
               </div>
             ) : null}
-            {previewData.targetDate ? (
+            {previewData?.targetDate ? (
               <div className="flex items-center justify-between gap-4">
                 <dt className="text-sm text-muted-foreground">Target</dt>
                 <dd className="text-sm font-medium">{formatDate(previewData.targetDate, "MMM d")}</dd>
@@ -106,7 +122,14 @@ export function ProjectPreviewPanel({
             <Button type="button" variant="ghost" onClick={(event) => onEdit(event.currentTarget)}>
               Edit
             </Button>
-            <Button type="button" variant="ghost">Archive</Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={onArchive}
+              disabled={isArchiving || projectDetails.status === "ARCHIVED"}
+            >
+              {isArchiving ? "Archiving..." : "Archive"}
+            </Button>
           </div>
           <Button type="button" onClick={() => onOpenProject(projectDetails.slug)}>Open Project</Button>
         </SheetFooter>

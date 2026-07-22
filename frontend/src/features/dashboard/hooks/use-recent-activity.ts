@@ -1,6 +1,11 @@
-import type { RecentActivityItem } from "../types";
+import { useQuery } from "@tanstack/react-query";
 
-import { mockRecentActivity } from "../data/dashboard.mock";
+import type { AppError } from "@/lib/api";
+import { useCurrentWorkspace } from "@/features/workspaces";
+
+import { fetchRecentActivity } from "../api/dashboard.api";
+import { dashboardKeys } from "../lib/dashboard-keys";
+import type { RecentActivityItem } from "../types";
 
 interface UseRecentActivityResult {
   data: RecentActivityItem[];
@@ -9,15 +14,30 @@ interface UseRecentActivityResult {
   refetch: () => void;
 }
 
-// Data boundary for the Recent Activity feed. Mirrors the `useQuery` return
-// shape so swapping the mock for the existing
-// `GET /api/v1/workspaces/:workspaceId/activity` endpoint is a one-file change:
-// map `ActivityResponse` -> `RecentActivityItem` (Date -> ISO string) here.
+const RECENT_ACTIVITY_LIMIT = 6;
+
+// Data boundary for the Recent Activity feed. No existing feature owns
+// Activity data, so this is the one panel that queries the backend
+// (`GET /workspaces/:workspaceId/activity`) through a dashboard-owned API
+// module instead of composing another feature's hook.
 export function useRecentActivity(): UseRecentActivityResult {
-  return {
-    data: mockRecentActivity,
-    isLoading: false,
-    isError: false,
-    refetch: () => {},
+  const workspaceQuery = useCurrentWorkspace();
+  const workspaceId = workspaceQuery.data?.id;
+
+  const activityQuery = useQuery<RecentActivityItem[], AppError>({
+    queryKey: dashboardKeys.recentActivity(workspaceId ?? ""),
+    queryFn: () => fetchRecentActivity(workspaceId as string, RECENT_ACTIVITY_LIMIT),
+    enabled: Boolean(workspaceId),
+  });
+
+  const isLoading =
+    workspaceQuery.isLoading || (Boolean(workspaceId) && activityQuery.isLoading);
+  const isError = workspaceQuery.isError || activityQuery.isError;
+
+  const refetch = () => {
+    workspaceQuery.refetch();
+    activityQuery.refetch();
   };
+
+  return { data: activityQuery.data ?? [], isLoading, isError, refetch };
 }

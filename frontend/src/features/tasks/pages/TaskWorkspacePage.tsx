@@ -1,26 +1,58 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
+import { Button } from "@/components/ui";
 import { PageLayout } from "@/components/layout";
-import { mockProjects } from "@/features/projects/data/projects.mock";
+import { useProjects } from "@/features/projects";
+import { useWorkspaceMembers } from "@/features/workspaces";
 
+import { useDeleteTask } from "../hooks/use-delete-task";
+import { useTask } from "../hooks/use-task";
+import { useUpdateTask } from "../hooks/use-update-task";
 import { TaskFormPanel } from "../components/form";
 import { TaskHeader, TaskWorkspace } from "../components/workspace";
-import { mockTasks, mockWorkspaceUsers } from "../data/tasks.mock";
-import type { TaskListItem } from "../types";
+import type { TaskAssignee, TaskProject } from "../types";
 import type { TaskFormData } from "../validation/task";
 
 export function TaskWorkspacePage() {
   const { taskId } = useParams();
-  const resolvedTask = mockTasks.find((taskItem) => taskItem.task.id === taskId) ?? null;
-  const [editedTask, setEditedTask] = useState<TaskListItem | null>(null);
+  const navigate = useNavigate();
+  const taskQuery = useTask(taskId);
+  const taskDetail = taskQuery.data;
+
+  const workspaceId = taskDetail?.taskItem.task.workspaceId;
+  const projectsQuery = useProjects(workspaceId);
+  const membersQuery = useWorkspaceMembers(workspaceId);
+
   const [isFormPanelOpen, setIsFormPanelOpen] = useState(false);
   const [formPanelTrigger, setFormPanelTrigger] = useState<HTMLButtonElement | null>(null);
 
-  const taskItem = editedTask?.task.id === taskId ? editedTask : resolvedTask;
+  const updateTask = useUpdateTask();
+  const deleteTask = useDeleteTask();
 
-  if (!taskItem) {
+  if (taskQuery.isLoading) {
+    return (
+      <PageLayout>
+        <p className="mt-3 text-sm text-muted-foreground">Loading task...</p>
+      </PageLayout>
+    );
+  }
+
+  if (taskQuery.error && !taskQuery.isNotFound) {
+    return (
+      <PageLayout>
+        <div className="mt-3 flex min-h-64 flex-col items-center justify-center gap-3 text-center">
+          <p className="text-sm font-medium">Unable to load task</p>
+          <Button type="button" variant="outline" onClick={() => taskQuery.refetch()}>
+            Retry
+          </Button>
+        </div>
+      </PageLayout>
+    );
+  }
+
+  if (!taskDetail) {
     return (
       <PageLayout>
         <h1 className="mt-3 text-xl font-semibold tracking-tight">Task not found</h1>
@@ -31,7 +63,17 @@ export function TaskWorkspacePage() {
     );
   }
 
-  const createdBy = mockWorkspaceUsers.find((user) => user.id === taskItem.task.createdById) ?? null;
+  const { taskItem, createdBy } = taskDetail;
+
+  const projects: TaskProject[] = (projectsQuery.data ?? []).map(({ project }) => ({
+    id: project.id,
+    slug: project.slug,
+    name: project.name,
+  }));
+  const assignees: TaskAssignee[] = (membersQuery.data ?? []).map((member) => ({
+    id: member.userId,
+    name: member.name,
+  }));
 
   const handleEdit = (trigger: HTMLButtonElement) => {
     setFormPanelTrigger(trigger);
@@ -43,51 +85,50 @@ export function TaskWorkspacePage() {
     setFormPanelTrigger(null);
   };
 
-  const handleTaskSubmit = (data: TaskFormData) => {
-    const selectedProject = mockProjects.find((item) => item.project.id === data.projectId)?.project;
-
-    if (!selectedProject) {
+  const handleTaskSubmit = async (data: TaskFormData) => {
+    if (!taskId) {
       return;
     }
 
-    const assignee = mockWorkspaceUsers.find((user) => user.id === data.assigneeId) ?? null;
-
-    setEditedTask({
-      ...taskItem,
-      task: {
-        ...taskItem.task,
+    await updateTask.mutateAsync({
+      taskId,
+      input: {
         title: data.title,
-        projectId: data.projectId,
         description: data.description || null,
         priority: data.priority,
         assigneeId: data.assigneeId || null,
-        dueDate: data.dueDate ? new Date(data.dueDate).toISOString() : null,
-        updatedAt: new Date().toISOString(),
+        dueDate: data.dueDate || null,
       },
-      assignee,
-      project: selectedProject,
     });
+
     toast.success("Task updated");
     setIsFormPanelOpen(false);
   };
 
+  const handleDelete = async () => {
+    if (!taskId) {
+      return;
+    }
+
+    try {
+      await deleteTask.mutateAsync({ taskId, projectId: taskItem.task.projectId });
+      toast.success("Task deleted");
+      navigate("/tasks");
+    } catch {
+      // Failure feedback is already surfaced via the mutation's onError toast.
+    }
+  };
+
   return (
     <PageLayout>
-      <TaskHeader
-        taskItem={taskItem}
-        onEdit={handleEdit}
-        onDelete={() => undefined}
-      />
-      <TaskWorkspace
-        taskItem={taskItem}
-        createdBy={createdBy}
-      />
+      <TaskHeader taskItem={taskItem} onEdit={handleEdit} onDelete={handleDelete} />
+      <TaskWorkspace taskItem={taskItem} createdBy={createdBy} />
 
       <TaskFormPanel
         mode="edit"
         taskItem={taskItem}
-        projects={mockProjects.map(({ project }) => project)}
-        assignees={mockWorkspaceUsers}
+        projects={projects}
+        assignees={assignees}
         open={isFormPanelOpen}
         onClose={() => setIsFormPanelOpen(false)}
         onCloseAutoFocus={handleCloseAutoFocus}

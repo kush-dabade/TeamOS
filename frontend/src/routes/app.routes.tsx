@@ -6,6 +6,9 @@ import { ProjectsPage, ProjectWorkspacePage } from "@/features/projects";
 import { TasksPage, TaskWorkspacePage } from "@/features/tasks";
 import { OnboardingPage, WorkspaceGuard, WorkspaceSettingsPage } from "@/features/workspaces";
 import AppShell from "@/layouts/AppShell";
+import RouteErrorBoundary from "@/layouts/RouteErrorBoundary";
+import AppNotFoundPage from "@/pages/AppNotFoundPage";
+import ForbiddenPage from "@/pages/ForbiddenPage";
 import { DashboardPage } from "@/features/dashboard";
 
 export const appRoutes: RouteObject[] = [
@@ -23,32 +26,45 @@ export const appRoutes: RouteObject[] = [
             element: <AppShell />,
             children: [
               {
-                path: "/dashboard",
-                element: <DashboardPage />,
-              },
-              {
-                path: "/projects",
-                element: <ProjectsPage />,
-              },
-              {
-                path: "/projects/:slug",
-                element: <ProjectWorkspacePage />,
-              },
-              {
-                path: "/tasks",
-                element: <TasksPage />,
-              },
-              {
-                path: "/tasks/:taskId",
-                element: <TaskWorkspacePage />,
-              },
-              {
-                path: "/profile",
-                element: <ProfilePage />,
-              },
-              {
-                path: "/workspace/settings",
-                element: <WorkspaceSettingsPage />,
+                errorElement: <RouteErrorBoundary />,
+                children: [
+                  {
+                    path: "/dashboard",
+                    element: <DashboardPage />,
+                  },
+                  {
+                    path: "/projects",
+                    element: <ProjectsPage />,
+                  },
+                  {
+                    path: "/projects/:slug",
+                    element: <ProjectWorkspacePage />,
+                  },
+                  {
+                    path: "/tasks",
+                    element: <TasksPage />,
+                  },
+                  {
+                    path: "/tasks/:taskId",
+                    element: <TaskWorkspacePage />,
+                  },
+                  {
+                    path: "/profile",
+                    element: <ProfilePage />,
+                  },
+                  {
+                    path: "/workspace/settings",
+                    element: <WorkspaceSettingsPage />,
+                  },
+                  {
+                    path: "/403",
+                    element: <ForbiddenPage />,
+                  },
+                  {
+                    path: "/not-found",
+                    element: <AppNotFoundPage />,
+                  },
+                ],
               },
             ],
           },

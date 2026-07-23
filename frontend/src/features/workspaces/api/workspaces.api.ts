@@ -53,3 +53,11 @@ export async function fetchWorkspaceMembers(workspaceId: string): Promise<Worksp
 
   return response.data.data.map(toWorkspaceMember);
 }
+
+export interface CreateWorkspaceInput {
+  name: string;
+}
+
+export async function createWorkspace(input: CreateWorkspaceInput): Promise<void> {
+  await apiClient.post("/workspaces", input);
+}

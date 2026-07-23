@@ -5,9 +5,9 @@ import { FullPageLoader } from "@/components/full-page-loader";
 import { useCurrentWorkspace } from "../hooks/use-current-workspace";
 
 export function WorkspaceGuard() {
-  const { data: workspace, isLoading } = useCurrentWorkspace();
+  const { data: workspace, isPending } = useCurrentWorkspace();
 
-  if (isLoading) {
+  if (isPending) {
     return <FullPageLoader />;
   }
 

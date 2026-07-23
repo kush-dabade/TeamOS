@@ -37,4 +37,16 @@ export const appRoutesConfig: AppRoute[] = [
     icon: Milestone,
     showInSidebar: true,
   },
+  {
+    path: "/profile",
+    title: "Profile",
+    navigationLabel: "Profile",
+    showInSidebar: false,
+  },
+  {
+    path: "/workspace/settings",
+    title: "Workspace Settings",
+    navigationLabel: "Workspace Settings",
+    showInSidebar: false,
+  },
 ];

@@ -1,4 +1,7 @@
+import { ListTodo, SearchX } from "lucide-react";
+
 import { Button } from "@/components/ui";
+import { EmptyState } from "@/components/ux";
 
 import type { TaskListItem } from "../../types";
 
@@ -10,9 +13,11 @@ interface TasksTableProps {
   selectedTaskId: string | null;
   isLoading: boolean;
   error: string | null;
+  hasActiveFilters: boolean;
   onTaskSelect: (taskId: string, trigger: HTMLButtonElement | null) => void;
   onCreateTask: (trigger: HTMLButtonElement) => void;
   onRetry: () => void;
+  onClearFilters: () => void;
 }
 
 export function TasksTable({
@@ -20,9 +25,11 @@ export function TasksTable({
   selectedTaskId,
   isLoading,
   error,
+  hasActiveFilters,
   onTaskSelect,
   onCreateTask,
   onRetry,
+  onClearFilters,
 }: TasksTableProps) {
   if (error) {
     return (
@@ -35,12 +42,30 @@ export function TasksTable({
 
   if (!isLoading && tasks.length === 0) {
     return (
-      <div className="flex min-h-64 flex-col items-center justify-center gap-1 text-center">
-        <p className="text-sm font-medium">No tasks yet</p>
-        <p className="text-sm text-muted-foreground">Create a task to start organizing work.</p>
-        <Button type="button" className="mt-2" onClick={(event) => onCreateTask(event.currentTarget)}>
-          Create Task
-        </Button>
+      <div className="flex min-h-64 items-center justify-center">
+        {hasActiveFilters ? (
+          <EmptyState
+            icon={SearchX}
+            title="No tasks match your filters"
+            description="Try adjusting your search, status, or other filters."
+            action={
+              <Button type="button" variant="outline" onClick={onClearFilters}>
+                Clear filters
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState
+            icon={ListTodo}
+            title="No tasks yet"
+            description="Create a task to start organizing work."
+            action={
+              <Button type="button" onClick={(event) => onCreateTask(event.currentTarget)}>
+                Create Task
+              </Button>
+            }
+          />
+        )}
       </div>
     );
   }

@@ -92,6 +92,13 @@ export function TasksPage() {
     });
   }, [taskItems, searchQuery, statusFilter, priorityFilter, projectFilter, assigneeFilter]);
 
+  const hasActiveFilters =
+    Boolean(searchQuery.trim()) ||
+    statusFilter !== "ALL" ||
+    priorityFilter !== "ALL" ||
+    projectFilter !== "ALL" ||
+    assigneeFilter !== "ALL";
+
   const handleRetry = () => {
     if (workspaceQuery.isError) {
       workspaceQuery.refetch();
@@ -99,6 +106,14 @@ export function TasksPage() {
     }
 
     refetchTasks();
+  };
+
+  const handleClearFilters = () => {
+    setSearchQuery("");
+    setStatusFilter("ALL");
+    setPriorityFilter("ALL");
+    setProjectFilter("ALL");
+    setAssigneeFilter("ALL");
   };
 
   const handleCreateTask = (trigger: HTMLButtonElement) => {
@@ -201,9 +216,11 @@ export function TasksPage() {
             selectedTaskId={selectedTaskId}
             isLoading={workspaceQuery.isLoading || isLoadingTasks}
             error={workspaceQuery.isError ? workspaceQuery.error.message : (tasksError?.message ?? null)}
+            hasActiveFilters={hasActiveFilters}
             onTaskSelect={handleTaskSelect}
             onCreateTask={handleCreateTask}
             onRetry={handleRetry}
+            onClearFilters={handleClearFilters}
           />
         </div>
       </div>

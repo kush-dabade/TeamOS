@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
+import { Activity } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui";
+import { EmptyState } from "@/components/ux";
 
 import { DashboardPanel } from "./layout";
 import { ActivityRow, RecentActivitySkeleton } from "./recent-activity";
@@ -51,11 +53,12 @@ export function RecentActivityPanel() {
     content = <RecentActivitySkeleton />;
   } else if (visibleItems.length === 0) {
     content = (
-      <div className="flex min-h-40 flex-col items-center justify-center gap-1 text-center">
-        <p className="text-sm font-medium">No recent activity</p>
-        <p className="text-muted-foreground text-sm">
-          Updates across your workspace will appear here.
-        </p>
+      <div className="flex min-h-40 items-center justify-center">
+        <EmptyState
+          icon={Activity}
+          title="No recent activity"
+          description="Updates across your workspace will appear here."
+        />
       </div>
     );
   } else {

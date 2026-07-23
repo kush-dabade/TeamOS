@@ -4,8 +4,9 @@ import { GuestRoute } from "@/features/auth";
 import PublicLayout from "@/layouts/PublicLayout";
 import HomePage from "@/pages/HomePage";
 import LoginPage from "@/pages/LoginPage";
-import NotFoundPage from "@/pages/NotFoundPage";
 import RegisterPage from "@/pages/RegisterPage";
+
+import { NotFoundGate } from "./not-found-gate";
 
 export const publicRoutes: RouteObject[] = [
   {
@@ -14,7 +15,7 @@ export const publicRoutes: RouteObject[] = [
   },
   {
     path: "*",
-    element: <NotFoundPage />,
+    element: <NotFoundGate />,
   },
   {
     element: <GuestRoute />,

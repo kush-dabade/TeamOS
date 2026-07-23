@@ -49,4 +49,16 @@ export const appRoutesConfig: AppRoute[] = [
     navigationLabel: "Workspace Settings",
     showInSidebar: false,
   },
+  {
+    path: "/403",
+    title: "Access Denied",
+    navigationLabel: "Access Denied",
+    showInSidebar: false,
+  },
+  {
+    path: "/not-found",
+    title: "Page Not Found",
+    navigationLabel: "Page Not Found",
+    showInSidebar: false,
+  },
 ];

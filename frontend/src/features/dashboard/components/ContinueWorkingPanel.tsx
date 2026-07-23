@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, History } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui";
+import { EmptyState } from "@/components/ux";
 
 import { DashboardPanel } from "./layout";
 import { ContinueWorkingRow, ContinueWorkingSkeleton } from "./continue-working";
@@ -40,12 +41,17 @@ export function ContinueWorkingPanel() {
     content = <ContinueWorkingSkeleton />;
   } else if (visibleItems.length === 0) {
     content = (
-      <div className="flex min-h-40 flex-col items-center justify-center gap-1 text-center">
-        <p className="text-sm font-medium">No recent work</p>
-        <p className="text-muted-foreground text-sm">Projects you work on will appear here.</p>
-        <Button type="button" size="sm" className="mt-2" onClick={() => navigate("/projects")}>
-          Browse projects
-        </Button>
+      <div className="flex min-h-40 items-center justify-center">
+        <EmptyState
+          icon={History}
+          title="No recent work"
+          description="Projects you work on will appear here."
+          action={
+            <Button type="button" size="sm" onClick={() => navigate("/projects")}>
+              Browse projects
+            </Button>
+          }
+        />
       </div>
     );
   } else {

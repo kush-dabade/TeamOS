@@ -1,4 +1,7 @@
+import { BriefcaseBusiness, SearchX } from "lucide-react";
+
 import { Button } from "@/components/ui";
+import { EmptyState } from "@/components/ux";
 
 import type { ProjectListItem } from "../../types";
 
@@ -39,23 +42,29 @@ export function ProjectsTable({
 
   if (!isLoading && projects.length === 0) {
     return (
-      <div className="flex min-h-64 flex-col items-center justify-center gap-1 text-center">
-        <p className="text-sm font-medium">
-          {hasActiveFilters ? "No projects match your filters" : "No projects yet"}
-        </p>
-        <p className="text-sm text-muted-foreground">
-          {hasActiveFilters
-            ? "Try adjusting your search or status filter."
-            : "Create your first project to start organizing work."}
-        </p>
+      <div className="flex min-h-64 items-center justify-center">
         {hasActiveFilters ? (
-          <Button type="button" variant="outline" className="mt-2" onClick={onClearFilters}>
-            Clear filters
-          </Button>
+          <EmptyState
+            icon={SearchX}
+            title="No projects match your filters"
+            description="Try adjusting your search or status filter."
+            action={
+              <Button type="button" variant="outline" onClick={onClearFilters}>
+                Clear filters
+              </Button>
+            }
+          />
         ) : (
-          <Button type="button" className="mt-2" onClick={(event) => onNewProject(event.currentTarget)}>
-            New Project
-          </Button>
+          <EmptyState
+            icon={BriefcaseBusiness}
+            title="No projects yet"
+            description="Create your first project to start organizing work."
+            action={
+              <Button type="button" onClick={(event) => onNewProject(event.currentTarget)}>
+                New Project
+              </Button>
+            }
+          />
         )}
       </div>
     );

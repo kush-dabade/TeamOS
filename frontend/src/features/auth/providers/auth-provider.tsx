@@ -2,7 +2,7 @@ import { createContext, useMemo, type PropsWithChildren } from "react";
 
 import { authClient } from "@/lib/auth-client";
 
-type AuthStatus = "pending" | "authenticated" | "unauthenticated";
+type AuthStatus = "pending" | "authenticated" | "unauthenticated" | "error";
 
 type SessionData = ReturnType<typeof authClient.useSession>["data"];
 type User = NonNullable<SessionData>["user"];
@@ -12,17 +12,20 @@ interface AuthContextValue {
   status: AuthStatus;
   isAuthenticated: boolean;
   isPending: boolean;
+  refetch: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: PropsWithChildren) {
-  const { data, isPending } = authClient.useSession();
+  const { data, isPending, error, refetch } = authClient.useSession();
 
   let status: AuthStatus;
 
   if (isPending) {
     status = "pending";
+  } else if (error) {
+    status = "error";
   } else if (data) {
     status = "authenticated";
   } else {
@@ -38,8 +41,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
       status,
       isAuthenticated,
       isPending,
+      refetch,
     }),
-    [user, status, isAuthenticated, isPending],
+    [user, status, isAuthenticated, isPending, refetch],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

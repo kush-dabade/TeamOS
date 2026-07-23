@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ListChecks } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui";
+import { EmptyState } from "@/components/ux";
 
 import { DashboardPanel } from "./layout";
 import { MyTasksTable } from "./my-tasks";
@@ -33,12 +34,17 @@ export function MyTasksPanel() {
     );
   } else if (!isLoading && visibleTasks.length === 0) {
     content = (
-      <div className="flex min-h-40 flex-col items-center justify-center gap-1 text-center">
-        <p className="text-sm font-medium">No assigned tasks</p>
-        <p className="text-muted-foreground text-sm">Tasks assigned to you will appear here.</p>
-        <Button type="button" size="sm" className="mt-2" onClick={() => navigate("/tasks")}>
-          Create task
-        </Button>
+      <div className="flex min-h-40 items-center justify-center">
+        <EmptyState
+          icon={ListChecks}
+          title="No assigned tasks"
+          description="Tasks assigned to you will appear here."
+          action={
+            <Button type="button" size="sm" onClick={() => navigate("/tasks")}>
+              Create task
+            </Button>
+          }
+        />
       </div>
     );
   } else {

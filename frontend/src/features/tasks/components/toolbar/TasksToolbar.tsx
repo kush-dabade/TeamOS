@@ -119,7 +119,7 @@ export function TasksToolbar({
         className="w-full sm:ml-auto sm:w-auto"
         onClick={(event) => onCreateTask(event.currentTarget)}
       >
-        Create Task
+        Create task
       </Button>
     </div>
   );

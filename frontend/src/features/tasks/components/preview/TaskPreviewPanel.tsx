@@ -76,7 +76,7 @@ export function TaskPreviewPanel({
             </Button>
           </div>
           <Button type="button" onClick={() => onOpenTask(task.id)}>
-            Open Task
+            Open task
           </Button>
         </SheetFooter>
       </SheetContent>

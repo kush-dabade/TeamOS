@@ -68,7 +68,7 @@ export function TaskFormPanel({
         }}
       >
         <SheetHeader className="border-b p-4 pr-12">
-          <SheetTitle>{mode === "create" ? "New Task" : "Edit Task"}</SheetTitle>
+          <SheetTitle>{mode === "create" ? "New task" : "Edit task"}</SheetTitle>
         </SheetHeader>
 
         <TaskForm

@@ -36,7 +36,7 @@ export function ProjectHeader({ project, previewData, onEdit }: ProjectHeaderPro
       </div>
 
       <Button type="button" variant="outline" onClick={(event) => onEdit(event.currentTarget)}>
-        Edit Project
+        Edit project
       </Button>
     </header>
   );

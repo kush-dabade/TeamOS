@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { SearchX, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui";
 import { PageLayout } from "@/components/layout";
+import { ErrorState, PageError } from "@/components/ux";
 import { useProjects } from "@/features/projects";
 import { useWorkspaceMembers } from "@/features/workspaces";
 
@@ -41,25 +43,35 @@ export function TaskWorkspacePage() {
 
   if (taskQuery.error && !taskQuery.isNotFound) {
     return (
-      <PageLayout>
-        <div className="mt-3 flex min-h-64 flex-col items-center justify-center gap-3 text-center">
-          <p className="text-sm font-medium">Unable to load task</p>
-          <Button type="button" variant="outline" onClick={() => taskQuery.refetch()}>
-            Retry
-          </Button>
-        </div>
-      </PageLayout>
+      <PageError>
+        <ErrorState
+          icon={TriangleAlert}
+          title="Unable to load task"
+          description="Something went wrong while loading this task. Check your connection and try again."
+          action={
+            <Button type="button" onClick={() => taskQuery.refetch()}>
+              Retry
+            </Button>
+          }
+        />
+      </PageError>
     );
   }
 
   if (!taskDetail) {
     return (
-      <PageLayout>
-        <h1 className="mt-3 text-xl font-semibold tracking-tight">Task not found</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          The task may have been removed or you may not have access to it.
-        </p>
-      </PageLayout>
+      <PageError>
+        <ErrorState
+          icon={SearchX}
+          title="Task not found"
+          description="The task may have been removed or you may not have access to it."
+          action={
+            <Button asChild>
+              <Link to="/tasks">Back to tasks</Link>
+            </Button>
+          }
+        />
+      </PageError>
     );
   }
 

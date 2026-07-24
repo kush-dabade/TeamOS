@@ -1,7 +1,7 @@
-import { ListTodo, SearchX } from "lucide-react";
+import { ListTodo, SearchX, TriangleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui";
-import { EmptyState } from "@/components/ux";
+import { EmptyState, ErrorState } from "@/components/ux";
 
 import type { TaskListItem } from "../../types";
 
@@ -33,9 +33,17 @@ export function TasksTable({
 }: TasksTableProps) {
   if (error) {
     return (
-      <div className="flex min-h-64 flex-col items-center justify-center gap-3 text-center">
-        <p className="text-sm font-medium">Unable to load tasks</p>
-        <Button type="button" variant="outline" onClick={onRetry}>Retry</Button>
+      <div className="flex min-h-64 items-center justify-center">
+        <ErrorState
+          icon={TriangleAlert}
+          title="Unable to load tasks"
+          description="Something went wrong while loading tasks. Check your connection and try again."
+          action={
+            <Button type="button" variant="outline" onClick={onRetry}>
+              Retry
+            </Button>
+          }
+        />
       </div>
     );
   }
@@ -61,7 +69,7 @@ export function TasksTable({
             description="Create a task to start organizing work."
             action={
               <Button type="button" onClick={(event) => onCreateTask(event.currentTarget)}>
-                Create Task
+                Create task
               </Button>
             }
           />

@@ -101,9 +101,8 @@ export function HeaderCreate() {
           <Button
             ref={triggerRef}
             type="button"
-            size="icon"
+            size="icon-lg"
             variant="secondary"
-            className="size-9 rounded-lg"
             aria-label="Create"
           >
             <PlusIcon className="size-4" />

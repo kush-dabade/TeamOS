@@ -131,7 +131,7 @@ export function ProjectPreviewPanel({
               {isArchiving ? "Archiving..." : "Archive"}
             </Button>
           </div>
-          <Button type="button" onClick={() => onOpenProject(projectDetails.slug)}>Open Project</Button>
+          <Button type="button" onClick={() => onOpenProject(projectDetails.slug)}>Open project</Button>
         </SheetFooter>
       </SheetContent>
     </Sheet>

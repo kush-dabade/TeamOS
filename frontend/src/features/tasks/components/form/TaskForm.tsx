@@ -229,7 +229,7 @@ export function TaskForm({
           Cancel
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Saving..." : mode === "create" ? "Create Task" : "Save Changes"}
+          {isSubmitting ? "Saving..." : mode === "create" ? "Create task" : "Save changes"}
         </Button>
       </div>
     </form>

@@ -122,7 +122,7 @@ export function ProjectForm({
           Cancel
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Saving..." : mode === "create" ? "Create Project" : "Save Changes"}
+          {isSubmitting ? "Saving..." : mode === "create" ? "Create project" : "Save changes"}
         </Button>
       </div>
     </form>

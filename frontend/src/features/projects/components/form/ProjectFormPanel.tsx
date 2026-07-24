@@ -58,7 +58,7 @@ export function ProjectFormPanel({
         }}
       >
         <SheetHeader className="border-b p-4 pr-12">
-          <SheetTitle>{mode === "create" ? "New Project" : "Edit Project"}</SheetTitle>
+          <SheetTitle>{mode === "create" ? "New project" : "Edit project"}</SheetTitle>
         </SheetHeader>
 
         <ProjectForm

@@ -22,9 +22,9 @@ export function ProjectRow({ project, isSelected, onSelect }: ProjectRowProps) {
     <tr
       aria-selected={isSelected}
       onClick={selectProject}
-      className="h-12 cursor-pointer border-b transition-colors hover:bg-muted/50 aria-selected:bg-muted/70"
+      className="cursor-pointer border-b transition-colors hover:bg-muted/50 aria-selected:bg-muted/70"
     >
-      <th scope="row" className="px-3 py-2 text-left font-medium">
+      <th scope="row" className="max-w-0 px-3 py-1.5 text-left font-medium">
         <button
           type="button"
           onClick={(event) => {
@@ -32,15 +32,15 @@ export function ProjectRow({ project, isSelected, onSelect }: ProjectRowProps) {
             selectProject();
           }}
           ref={projectNameButtonRef}
-          className="rounded-sm text-left outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+          className="block w-full truncate rounded-sm text-left outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
         >
           {projectDetails.name}
         </button>
       </th>
-      <td className="px-3 py-2">
+      <td className="px-3 py-1.5">
         <ProjectStatusBadge status={projectDetails.status} />
       </td>
-      <td className="px-3 py-2">
+      <td className="px-3 py-1.5">
         <div className="flex min-w-28 items-center gap-2">
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
             <div
@@ -51,10 +51,10 @@ export function ProjectRow({ project, isSelected, onSelect }: ProjectRowProps) {
           <span className="w-8 text-right text-xs text-muted-foreground">{progressPercentage}%</span>
         </div>
       </td>
-      <td className="px-3 py-2 text-sm tabular-nums text-muted-foreground">
+      <td className="px-3 py-1.5 text-sm tabular-nums text-muted-foreground">
         {completedTaskCount} / {totalTaskCount}
       </td>
-      <td className="px-3 py-2 text-sm whitespace-nowrap text-muted-foreground">
+      <td className="px-3 py-1.5 text-sm whitespace-nowrap text-muted-foreground">
         {formatRelativeDate(projectDetails.updatedAt)}
       </td>
     </tr>

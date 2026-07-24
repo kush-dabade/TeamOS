@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
+import { SearchX, TriangleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui";
 import { PageLayout } from "@/components/layout";
+import { ErrorState, PageError } from "@/components/ux";
 import { useCurrentWorkspace } from "@/features/workspaces";
 
 import { useProjectWithTaskCounts } from "../hooks/use-project-with-task-counts";
@@ -61,14 +63,18 @@ export function ProjectWorkspacePage() {
 
   if (workspaceQuery.isError || projectsQuery.isError || projectDetailQuery.isError) {
     return (
-      <PageLayout>
-        <div className="mt-3 flex min-h-64 flex-col items-center justify-center gap-3 text-center">
-          <p className="text-sm font-medium">Unable to load project</p>
-          <Button type="button" variant="outline" onClick={handleRetry}>
-            Retry
-          </Button>
-        </div>
-      </PageLayout>
+      <PageError>
+        <ErrorState
+          icon={TriangleAlert}
+          title="Unable to load project"
+          description="Something went wrong while loading this project. Check your connection and try again."
+          action={
+            <Button type="button" onClick={handleRetry}>
+              Retry
+            </Button>
+          }
+        />
+      </PageError>
     );
   }
 
@@ -76,9 +82,18 @@ export function ProjectWorkspacePage() {
 
   if (!project) {
     return (
-      <PageLayout>
-        <p className="mt-3 text-sm text-muted-foreground">Project not found.</p>
-      </PageLayout>
+      <PageError>
+        <ErrorState
+          icon={SearchX}
+          title="Project not found"
+          description="This project may have been removed or you may not have access to it."
+          action={
+            <Button asChild>
+              <Link to="/projects">Back to projects</Link>
+            </Button>
+          }
+        />
+      </PageError>
     );
   }
 

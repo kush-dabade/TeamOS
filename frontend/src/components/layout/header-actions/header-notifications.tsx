@@ -16,9 +16,8 @@ export function HeaderNotifications() {
       <PopoverTrigger asChild>
         <Button
           type="button"
-          size="icon"
+          size="icon-lg"
           variant="secondary"
-          className="hidden size-9 rounded-lg sm:inline-flex"
           aria-label="Notifications"
         >
           <BellIcon className="size-4" />

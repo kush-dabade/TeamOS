@@ -1,7 +1,7 @@
-import { BriefcaseBusiness, SearchX } from "lucide-react";
+import { BriefcaseBusiness, SearchX, TriangleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui";
-import { EmptyState } from "@/components/ux";
+import { EmptyState, ErrorState } from "@/components/ux";
 
 import type { ProjectListItem } from "../../types";
 
@@ -33,9 +33,17 @@ export function ProjectsTable({
 }: ProjectsTableProps) {
   if (error) {
     return (
-      <div className="flex min-h-64 flex-col items-center justify-center gap-3 text-center">
-        <p className="text-sm font-medium">Unable to load projects</p>
-        <Button type="button" variant="outline" onClick={onRetry}>Retry</Button>
+      <div className="flex min-h-64 items-center justify-center">
+        <ErrorState
+          icon={TriangleAlert}
+          title="Unable to load projects"
+          description="Something went wrong while loading projects. Check your connection and try again."
+          action={
+            <Button type="button" variant="outline" onClick={onRetry}>
+              Retry
+            </Button>
+          }
+        />
       </div>
     );
   }
@@ -61,7 +69,7 @@ export function ProjectsTable({
             description="Create your first project to start organizing work."
             action={
               <Button type="button" onClick={(event) => onNewProject(event.currentTarget)}>
-                New Project
+                New project
               </Button>
             }
           />
@@ -76,11 +84,11 @@ export function ProjectsTable({
         <caption className="sr-only">Projects</caption>
         <thead className="sticky top-0 z-10 border-b bg-background/95 text-left text-xs font-medium text-muted-foreground backdrop-blur">
           <tr>
-            <th scope="col" className="w-[36%] px-3 py-2.5 font-medium">Project</th>
-            <th scope="col" className="w-28 px-3 py-2.5 font-medium">Status</th>
-            <th scope="col" className="w-40 px-3 py-2.5 font-medium">Progress</th>
-            <th scope="col" className="w-28 px-3 py-2.5 font-medium">Tasks</th>
-            <th scope="col" className="w-28 px-3 py-2.5 font-medium">Updated</th>
+            <th scope="col" className="w-[36%] px-3 py-2 font-medium">Project</th>
+            <th scope="col" className="w-28 px-3 py-2 font-medium">Status</th>
+            <th scope="col" className="w-40 px-3 py-2 font-medium">Progress</th>
+            <th scope="col" className="w-28 px-3 py-2 font-medium">Tasks</th>
+            <th scope="col" className="w-28 px-3 py-2 font-medium">Updated</th>
           </tr>
         </thead>
         <tbody>

@@ -42,9 +42,9 @@ export function TaskHeader({ taskItem, onEdit, onDelete }: TaskHeaderProps) {
 
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" variant="outline" onClick={(event) => onEdit(event.currentTarget)}>
-          Edit Task
+          Edit task
         </Button>
-        <Button type="button" variant="destructive" onClick={onDelete}>Delete Task</Button>
+        <Button type="button" variant="destructive" onClick={onDelete}>Delete task</Button>
       </div>
     </header>
   );

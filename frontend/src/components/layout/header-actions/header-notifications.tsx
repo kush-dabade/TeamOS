@@ -18,7 +18,6 @@ export function HeaderNotifications() {
           type="button"
           size="icon-lg"
           variant="secondary"
-          className="hidden sm:inline-flex"
           aria-label="Notifications"
         >
           <BellIcon className="size-4" />

@@ -2,6 +2,25 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!--
+      Applies the theme class before React loads, to avoid a flash of the wrong theme.
+      This intentionally duplicates the resolution logic in
+      src/providers/theme-provider.tsx (resolveTheme) since it must run before any
+      JS module exists. Keep both in sync if the resolution rules ever change.
+    -->
+    <script>
+      (function () {
+        try {
+          var theme = localStorage.getItem("teamos-theme");
+          var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          var isDark = theme === "dark" || (theme !== "light" && prefersDark);
+
+          if (isDark) {
+            document.documentElement.classList.add("dark");
+          }
+        } catch (e) {}
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>frontend</title>

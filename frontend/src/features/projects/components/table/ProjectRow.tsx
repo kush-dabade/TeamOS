@@ -22,7 +22,7 @@ export function ProjectRow({ project, isSelected, onSelect }: ProjectRowProps) {
     <tr
       aria-selected={isSelected}
       onClick={selectProject}
-      className="cursor-pointer border-b transition-colors hover:bg-muted/50 aria-selected:bg-muted/70"
+      className="cursor-pointer border-b transition-colors even:bg-muted/20 hover:bg-muted/50 aria-selected:bg-muted/70"
     >
       <th scope="row" className="max-w-0 px-3 py-1.5 text-left font-medium">
         <button

@@ -45,20 +45,20 @@ export const appRoutesConfig: AppRoute[] = [
   },
   {
     path: "/workspace/settings",
-    title: "Workspace Settings",
-    navigationLabel: "Workspace Settings",
+    title: "Workspace settings",
+    navigationLabel: "Workspace settings",
     showInSidebar: false,
   },
   {
     path: "/403",
-    title: "Access Denied",
-    navigationLabel: "Access Denied",
+    title: "Access denied",
+    navigationLabel: "Access denied",
     showInSidebar: false,
   },
   {
     path: "/not-found",
-    title: "Page Not Found",
-    navigationLabel: "Page Not Found",
+    title: "Page not found",
+    navigationLabel: "Page not found",
     showInSidebar: false,
   },
 ];

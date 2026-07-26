@@ -64,7 +64,7 @@ export function SidebarUser() {
 
             <DropdownMenuItem onSelect={() => navigate("/workspace/settings")}>
               <Settings className="size-4" />
-              Workspace Settings
+              Workspace settings
             </DropdownMenuItem>
 
             <ThemeToggle />
@@ -73,7 +73,7 @@ export function SidebarUser() {
 
             <DropdownMenuItem variant="destructive" onSelect={handleSignOut}>
               <LogOut className="size-4" />
-              Sign Out
+              Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

@@ -2,7 +2,21 @@ import type { RefObject } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 
-import { Button, Field, FieldError, FieldLabel, Input } from "@/components/ui";
+import {
+  Button,
+  Field,
+  FieldError,
+  FieldLabel,
+  Input,
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui";
+
+const UNASSIGNED_VALUE = "UNASSIGNED";
 
 import type { TaskAssignee, TaskProject } from "../../types";
 import { taskSchema, type TaskFormData } from "../../validation/task";
@@ -89,23 +103,32 @@ export function TaskForm({
                   <FieldLabel htmlFor={field.name}>
                     Project <span aria-hidden="true">*</span>
                   </FieldLabel>
-                  <select
-                    {...field}
-                    id={field.name}
-                    required
+                  <Select
+                    value={field.value}
+                    onValueChange={field.onChange}
                     disabled={mode === "edit"}
-                    aria-required="true"
-                    aria-invalid={fieldState.invalid}
-                    aria-describedby={mode === "edit" ? `${field.name}-hint` : fieldState.error ? errorId : undefined}
-                    className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-hidden transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40"
                   >
-                    <option value="">Select a project</option>
-                    {projects.map((project) => (
-                      <option key={project.id} value={project.id}>
-                        {project.name}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger
+                      id={field.name}
+                      aria-required="true"
+                      aria-invalid={fieldState.invalid}
+                      aria-describedby={
+                        mode === "edit" ? `${field.name}-hint` : fieldState.error ? errorId : undefined
+                      }
+                      className="w-full"
+                    >
+                      <SelectValue placeholder="Select a project" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {projects.map((project) => (
+                          <SelectItem key={project.id} value={project.id}>
+                            {project.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
                   {mode === "edit" ? (
                     <p id={`${field.name}-hint`} className="text-xs text-muted-foreground">
                       Project can only be selected when creating a task.
@@ -151,18 +174,24 @@ export function TaskForm({
               return (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor={field.name}>Priority</FieldLabel>
-                  <select
-                    {...field}
-                    id={field.name}
-                    aria-invalid={fieldState.invalid}
-                    aria-describedby={fieldState.error ? errorId : undefined}
-                    className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-hidden transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:bg-input/30 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40"
-                  >
-                    <option value="LOW">Low</option>
-                    <option value="MEDIUM">Medium</option>
-                    <option value="HIGH">High</option>
-                    <option value="URGENT">Urgent</option>
-                  </select>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger
+                      id={field.name}
+                      aria-invalid={fieldState.invalid}
+                      aria-describedby={fieldState.error ? errorId : undefined}
+                      className="w-full"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="LOW">Low</SelectItem>
+                        <SelectItem value="MEDIUM">Medium</SelectItem>
+                        <SelectItem value="HIGH">High</SelectItem>
+                        <SelectItem value="URGENT">Urgent</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
                   <FieldError id={errorId} errors={[fieldState.error]} />
                 </Field>
               );
@@ -178,20 +207,31 @@ export function TaskForm({
               return (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor={field.name}>Assignee</FieldLabel>
-                  <select
-                    {...field}
-                    id={field.name}
-                    aria-invalid={fieldState.invalid}
-                    aria-describedby={fieldState.error ? errorId : undefined}
-                    className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-hidden transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:bg-input/30 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40"
+                  <Select
+                    value={field.value === "" ? UNASSIGNED_VALUE : field.value}
+                    onValueChange={(value) =>
+                      field.onChange(value === UNASSIGNED_VALUE ? "" : value)
+                    }
                   >
-                    <option value="">Unassigned</option>
-                    {assignees.map((assignee) => (
-                      <option key={assignee.id} value={assignee.id}>
-                        {assignee.name}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger
+                      id={field.name}
+                      aria-invalid={fieldState.invalid}
+                      aria-describedby={fieldState.error ? errorId : undefined}
+                      className="w-full"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value={UNASSIGNED_VALUE}>Unassigned</SelectItem>
+                        {assignees.map((assignee) => (
+                          <SelectItem key={assignee.id} value={assignee.id}>
+                            {assignee.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
                   <FieldError id={errorId} errors={[fieldState.error]} />
                 </Field>
               );

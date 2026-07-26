@@ -13,7 +13,7 @@ function AppNotFoundPage() {
         description="The page you're looking for doesn't exist or may have been moved."
         action={
           <Button asChild>
-            <Link to="/dashboard">Back to Dashboard</Link>
+            <Link to="/dashboard">Back to dashboard</Link>
           </Button>
         }
       />

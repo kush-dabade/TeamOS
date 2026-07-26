@@ -9,9 +9,9 @@ interface TaskPriorityBadgeProps {
 
 const priorityStyles: Record<TaskPriority, string> = {
   LOW: "bg-muted text-muted-foreground",
-  MEDIUM: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
-  HIGH: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
-  URGENT: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
+  MEDIUM: "bg-info/10 text-info",
+  HIGH: "bg-warning/10 text-warning",
+  URGENT: "bg-destructive/10 text-destructive",
 };
 
 const priorityLabels: Record<TaskPriority, string> = {

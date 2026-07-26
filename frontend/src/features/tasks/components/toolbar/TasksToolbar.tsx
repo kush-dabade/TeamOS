@@ -1,6 +1,15 @@
 import { SearchIcon } from "lucide-react";
 
-import { Button, Input } from "@/components/ui";
+import {
+  Button,
+  Input,
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui";
 
 import type {
   TaskAssignee,
@@ -58,60 +67,74 @@ export function TasksToolbar({
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-        <select
+        <Select
           value={statusFilter}
-          onChange={(event) => onStatusFilterChange(event.target.value as TaskStatusFilter)}
-          aria-label="Filter tasks by status"
-          className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-hidden transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:w-auto dark:bg-input/30"
+          onValueChange={(value) => onStatusFilterChange(value as TaskStatusFilter)}
         >
-          <option value="ALL">All Statuses</option>
-          <option value="TODO">Todo</option>
-          <option value="IN_PROGRESS">In Progress</option>
-          <option value="REVIEW">Review</option>
-          <option value="DONE">Done</option>
-        </select>
+          <SelectTrigger aria-label="Filter tasks by status" className="w-full sm:w-auto">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="ALL">All Statuses</SelectItem>
+              <SelectItem value="TODO">Todo</SelectItem>
+              <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+              <SelectItem value="REVIEW">Review</SelectItem>
+              <SelectItem value="DONE">Done</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
 
-        <select
+        <Select
           value={priorityFilter}
-          onChange={(event) => onPriorityFilterChange(event.target.value as TaskPriorityFilter)}
-          aria-label="Filter tasks by priority"
-          className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-hidden transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:w-auto dark:bg-input/30"
+          onValueChange={(value) => onPriorityFilterChange(value as TaskPriorityFilter)}
         >
-          <option value="ALL">All Priorities</option>
-          <option value="LOW">Low</option>
-          <option value="MEDIUM">Medium</option>
-          <option value="HIGH">High</option>
-          <option value="URGENT">Urgent</option>
-        </select>
+          <SelectTrigger aria-label="Filter tasks by priority" className="w-full sm:w-auto">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="ALL">All Priorities</SelectItem>
+              <SelectItem value="LOW">Low</SelectItem>
+              <SelectItem value="MEDIUM">Medium</SelectItem>
+              <SelectItem value="HIGH">High</SelectItem>
+              <SelectItem value="URGENT">Urgent</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
 
-        <select
-          value={projectFilter}
-          onChange={(event) => onProjectFilterChange(event.target.value)}
-          aria-label="Filter tasks by project"
-          className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-hidden transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:w-auto dark:bg-input/30"
-        >
-          <option value="ALL">All Projects</option>
-          {projects.map((project) => (
-            <option key={project.id} value={project.id}>
-              {project.name}
-            </option>
-          ))}
-        </select>
+        <Select value={projectFilter} onValueChange={onProjectFilterChange}>
+          <SelectTrigger aria-label="Filter tasks by project" className="w-full sm:w-auto">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="ALL">All Projects</SelectItem>
+              {projects.map((project) => (
+                <SelectItem key={project.id} value={project.id}>
+                  {project.name}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
 
-        <select
-          value={assigneeFilter}
-          onChange={(event) => onAssigneeFilterChange(event.target.value)}
-          aria-label="Filter tasks by assignee"
-          className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-hidden transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:w-auto dark:bg-input/30"
-        >
-          <option value="ALL">All Assignees</option>
-          <option value="UNASSIGNED">Unassigned</option>
-          {assignees.map((assignee) => (
-            <option key={assignee.id} value={assignee.id}>
-              {assignee.name}
-            </option>
-          ))}
-        </select>
+        <Select value={assigneeFilter} onValueChange={onAssigneeFilterChange}>
+          <SelectTrigger aria-label="Filter tasks by assignee" className="w-full sm:w-auto">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="ALL">All Assignees</SelectItem>
+              <SelectItem value="UNASSIGNED">Unassigned</SelectItem>
+              {assignees.map((assignee) => (
+                <SelectItem key={assignee.id} value={assignee.id}>
+                  {assignee.name}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </div>
 
       <Button

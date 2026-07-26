@@ -13,7 +13,7 @@ function ForbiddenPage() {
         description="You don't have permission to view this page. Return to your dashboard to keep working."
         action={
           <Button asChild>
-            <Link to="/dashboard">Back to Dashboard</Link>
+            <Link to="/dashboard">Back to dashboard</Link>
           </Button>
         }
       />

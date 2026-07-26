@@ -9,8 +9,8 @@ interface ProjectStatusBadgeProps {
 
 const statusStyles: Record<ProjectStatus, string> = {
   PLANNED: "bg-muted text-muted-foreground",
-  ACTIVE: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
-  COMPLETED: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+  ACTIVE: "bg-info/10 text-info",
+  COMPLETED: "bg-success/10 text-success",
   ARCHIVED: "bg-secondary text-secondary-foreground",
 };
 

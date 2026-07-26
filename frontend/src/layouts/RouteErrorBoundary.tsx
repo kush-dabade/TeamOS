@@ -25,7 +25,7 @@ export default function RouteErrorBoundary() {
             </Button>
 
             <Button asChild>
-              <Link to="/dashboard">Back to Dashboard</Link>
+              <Link to="/dashboard">Back to dashboard</Link>
             </Button>
           </>
         }

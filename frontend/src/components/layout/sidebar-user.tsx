@@ -12,6 +12,8 @@ import {
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { logout, useAuth } from "@/features/auth";
 
+import { ThemeToggle } from "./theme-toggle";
+
 export function SidebarUser() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -62,14 +64,16 @@ export function SidebarUser() {
 
             <DropdownMenuItem onSelect={() => navigate("/workspace/settings")}>
               <Settings className="size-4" />
-              Workspace Settings
+              Workspace settings
             </DropdownMenuItem>
+
+            <ThemeToggle />
 
             <DropdownMenuSeparator />
 
             <DropdownMenuItem variant="destructive" onSelect={handleSignOut}>
               <LogOut className="size-4" />
-              Sign Out
+              Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

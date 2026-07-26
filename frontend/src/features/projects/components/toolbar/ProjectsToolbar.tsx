@@ -1,6 +1,15 @@
 import { SearchIcon } from "lucide-react";
 
-import { Button, Input } from "@/components/ui";
+import {
+  Button,
+  Input,
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui";
 
 import type { ProjectSortOption, ProjectStatusFilter } from "../../types";
 
@@ -41,29 +50,39 @@ export function ProjectsToolbar({
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-        <select
+        <Select
           value={statusFilter}
-          onChange={(event) => onStatusFilterChange(event.target.value as ProjectStatusFilter)}
-          aria-label="Filter projects by status"
-          className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-hidden transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:w-auto dark:bg-input/30"
+          onValueChange={(value) => onStatusFilterChange(value as ProjectStatusFilter)}
         >
-          <option value="ALL">All</option>
-          <option value="PLANNED">Planned</option>
-          <option value="ACTIVE">Active</option>
-          <option value="COMPLETED">Completed</option>
-          <option value="ARCHIVED">Archived</option>
-        </select>
+          <SelectTrigger aria-label="Filter projects by status" className="w-full sm:w-auto">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="ALL">All</SelectItem>
+              <SelectItem value="PLANNED">Planned</SelectItem>
+              <SelectItem value="ACTIVE">Active</SelectItem>
+              <SelectItem value="COMPLETED">Completed</SelectItem>
+              <SelectItem value="ARCHIVED">Archived</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
 
-        <select
+        <Select
           value={sortOption}
-          onChange={(event) => onSortOptionChange(event.target.value as ProjectSortOption)}
-          aria-label="Sort projects"
-          className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-hidden transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 sm:w-auto dark:bg-input/30"
+          onValueChange={(value) => onSortOptionChange(value as ProjectSortOption)}
         >
-          <option value="RECENTLY_UPDATED">Recently Updated</option>
-          <option value="NAME_ASC">Name (A–Z)</option>
-          <option value="NAME_DESC">Name (Z–A)</option>
-        </select>
+          <SelectTrigger aria-label="Sort projects" className="w-full sm:w-auto">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectGroup>
+              <SelectItem value="RECENTLY_UPDATED">Recently Updated</SelectItem>
+              <SelectItem value="NAME_ASC">Name (A–Z)</SelectItem>
+              <SelectItem value="NAME_DESC">Name (Z–A)</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </div>
 
       <Button

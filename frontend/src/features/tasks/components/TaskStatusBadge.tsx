@@ -9,9 +9,9 @@ interface TaskStatusBadgeProps {
 
 const statusStyles: Record<TaskStatus, string> = {
   TODO: "bg-muted text-muted-foreground",
-  IN_PROGRESS: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
-  REVIEW: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
-  DONE: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+  IN_PROGRESS: "bg-info/10 text-info",
+  REVIEW: "bg-warning/10 text-warning",
+  DONE: "bg-success/10 text-success",
 };
 
 const statusLabels: Record<TaskStatus, string> = {

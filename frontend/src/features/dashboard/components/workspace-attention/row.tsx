@@ -27,8 +27,8 @@ const kindConfig: Record<AttentionItemKind, AttentionKindConfig> = {
   PENDING_REVIEW: {
     icon: Eye,
     label: "Pending review",
-    foreground: "text-amber-600 dark:text-amber-400",
-    background: "bg-amber-500/10",
+    foreground: "text-warning",
+    background: "bg-warning/10",
   },
 };
 

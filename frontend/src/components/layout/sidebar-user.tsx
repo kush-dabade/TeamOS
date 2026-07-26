@@ -12,6 +12,8 @@ import {
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { logout, useAuth } from "@/features/auth";
 
+import { ThemeToggle } from "./theme-toggle";
+
 export function SidebarUser() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -64,6 +66,8 @@ export function SidebarUser() {
               <Settings className="size-4" />
               Workspace Settings
             </DropdownMenuItem>
+
+            <ThemeToggle />
 
             <DropdownMenuSeparator />
 

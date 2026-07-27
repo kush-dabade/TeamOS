@@ -37,8 +37,8 @@ export function WorkspaceInvitationsCard({ workspace }: WorkspaceInvitationsCard
         <div className="flex flex-col gap-6">
           <WorkspaceInviteForm workspaceId={workspace.id} actorRole={workspace.role} />
 
-          <div className="flex flex-col gap-3">
-            <h3 className="text-sm font-medium">Pending Invitations</h3>
+          <div className="flex flex-col gap-3 border-t pt-6">
+            <h3 className="text-xs font-medium text-muted-foreground">Pending Invitations</h3>
 
             {invitationsQuery.isError ? (
               <ErrorState
@@ -52,7 +52,9 @@ export function WorkspaceInvitationsCard({ workspace }: WorkspaceInvitationsCard
                 }
               />
             ) : invitationsQuery.data.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No pending invitations.</p>
+              <div className="rounded-lg border border-dashed py-6 text-center text-sm text-muted-foreground">
+                No pending invitations.
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[560px] border-collapse text-sm">

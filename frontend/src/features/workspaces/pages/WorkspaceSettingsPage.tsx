@@ -1,6 +1,6 @@
 import { TriangleAlert } from "lucide-react";
 
-import { PageHeader, PageLayout } from "@/components/layout";
+import { PageLayout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { ErrorState, PageError } from "@/components/ux";
 
@@ -17,11 +17,6 @@ export function WorkspaceSettingsPage() {
 
   return (
     <PageLayout>
-      <PageHeader
-        title="Workspace Settings"
-        description="Manage your workspace's name, members, and settings."
-      />
-
       {workspaceQuery.isError ? (
         <PageError>
           <ErrorState
@@ -36,7 +31,7 @@ export function WorkspaceSettingsPage() {
           />
         </PageError>
       ) : (
-        <div className="mt-6 flex max-w-2xl flex-col gap-6">
+        <div className="mt-3 flex flex-col gap-6">
           {workspaceQuery.isPending ? (
             <WorkspaceGeneralSettingsCardSkeleton />
           ) : workspaceQuery.data ? (

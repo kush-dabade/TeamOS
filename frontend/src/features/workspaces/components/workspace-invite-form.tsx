@@ -54,9 +54,9 @@ export function WorkspaceInviteForm({ workspaceId, actorRole }: WorkspaceInviteF
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-3" noValidate>
-      <h3 className="text-sm font-medium">Invite Member</h3>
+      <h3 className="text-xs font-medium text-muted-foreground">Invite Member</h3>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
         <Controller
           name="email"
           control={form.control}
@@ -109,7 +109,7 @@ export function WorkspaceInviteForm({ workspaceId, actorRole }: WorkspaceInviteF
           )}
         />
 
-        <Button type="submit" disabled={isSubmitting}>
+        <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitting}>
           {isSubmitting ? "Inviting..." : "Invite"}
         </Button>
       </div>

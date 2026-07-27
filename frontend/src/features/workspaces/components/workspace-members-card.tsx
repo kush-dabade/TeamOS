@@ -71,9 +71,9 @@ export function WorkspaceMembersCard({ workspace }: WorkspaceMembersCardProps) {
             </div>
 
             {membersQuery.data.length <= 1 ? (
-              <p className="text-center text-sm text-muted-foreground">
+              <div className="rounded-lg border border-dashed py-6 text-center text-sm text-muted-foreground">
                 No additional members yet.
-              </p>
+              </div>
             ) : null}
           </div>
         )}

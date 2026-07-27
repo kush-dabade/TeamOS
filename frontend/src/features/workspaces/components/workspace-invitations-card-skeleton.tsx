@@ -12,10 +12,10 @@ export function WorkspaceInvitationsCardSkeleton() {
 
       <CardContent>
         <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-            <Skeleton className="h-9 sm:flex-1" />
-            <Skeleton className="h-9 sm:w-40" />
-            <Skeleton className="h-9 w-20" />
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+            <Skeleton className="h-8 sm:flex-1" />
+            <Skeleton className="h-8 sm:w-40" />
+            <Skeleton className="h-8 w-full sm:w-20" />
           </div>
 
           <div className="flex flex-col gap-4">

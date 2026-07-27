@@ -20,7 +20,7 @@ export function WorkspaceGeneralSettingsCardSkeleton() {
           ))}
 
           <div className="flex justify-end">
-            <Skeleton className="h-9 w-32" />
+            <Skeleton className="h-8 w-32" />
           </div>
         </div>
       </CardContent>

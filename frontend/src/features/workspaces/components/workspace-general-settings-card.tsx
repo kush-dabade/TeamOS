@@ -54,7 +54,11 @@ export function WorkspaceGeneralSettingsCard({ workspace }: WorkspaceGeneralSett
       </CardHeader>
 
       <CardContent>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-5" noValidate>
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="flex max-w-2xl flex-col gap-5"
+          noValidate
+        >
           <Controller
             name="name"
             control={form.control}

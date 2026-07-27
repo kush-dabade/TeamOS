@@ -3,11 +3,14 @@ import { ZodError } from "zod";
 
 import {
   createWorkspaceSchema,
+  updateWorkspaceSchema,
   updateWorkspaceMemberRoleSchema,
 } from "./workspace.schema.js";
 import {
   createWorkspace,
   getUserWorkspaces,
+  getWorkspace,
+  updateWorkspace,
   listWorkspaceMembers,
   updateWorkspaceMemberRole,
   removeWorkspaceMember,
@@ -79,6 +82,107 @@ export async function getUserWorkspacesHandler(req: Request, res: Response) {
     success: true,
     data: workspaces,
   });
+}
+
+export async function getWorkspaceHandler(req: Request, res: Response) {
+  try {
+    const workspace = await getWorkspace(
+      req.params.workspaceId as string,
+      req.user!.id,
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: workspace,
+    });
+  } catch (error) {
+    if (error instanceof ForbiddenError) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: error.message,
+        },
+      });
+    }
+
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: "WORKSPACE_NOT_FOUND",
+          message: error.message,
+        },
+      });
+    }
+
+    console.error("Get workspace error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "An internal error occurred",
+      },
+    });
+  }
+}
+
+export async function updateWorkspaceHandler(req: Request, res: Response) {
+  try {
+    const body = updateWorkspaceSchema.parse(req.body);
+
+    const workspace = await updateWorkspace(
+      req.user!.id,
+      req.params.workspaceId as string,
+      body,
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: workspace,
+    });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: error.issues[0]?.message ?? "Invalid request",
+        },
+      });
+    }
+
+    if (error instanceof ForbiddenError) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: error.message,
+        },
+      });
+    }
+
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: "WORKSPACE_NOT_FOUND",
+          message: error.message,
+        },
+      });
+    }
+
+    console.error("Update workspace error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "An internal error occurred",
+      },
+    });
+  }
 }
 
 export async function listWorkspaceMembersHandler(req: Request, res: Response) {

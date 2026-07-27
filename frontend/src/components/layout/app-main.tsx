@@ -17,10 +17,10 @@ export function AppMain({ children }: AppMainProps) {
         state === "collapsed" ? "pl-2" : "pl-3 md:pl-4",
       )}
     >
-      <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg bg-background shadow-sm">
+      <div className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-lg bg-background shadow-sm">
         <AppHeader />
 
-        <main className="min-h-0 flex-1 overflow-y-auto pb-4">{children}</main>
+        <div className="min-h-0 flex-1 overflow-y-auto pb-4">{children}</div>
       </div>
     </SidebarInset>
   );

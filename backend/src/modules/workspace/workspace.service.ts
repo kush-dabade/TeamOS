@@ -6,6 +6,7 @@ import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
 import { NotFoundError } from "../../shared/errors/not-found-error.js";
 import { ValidationError } from "../../shared/errors/validation-error.js";
 import type { CreateWorkspaceData } from "./workspace.types.js";
+import type { UpdateWorkspaceInput } from "./workspace.schema.js";
 
 async function generateUniqueSlug(name: string): Promise<string> {
   const baseSlug = generateSlug(name);
@@ -172,6 +173,53 @@ export async function getUserWorkspaces(userId: string) {
       createdAt: membership.workspace.createdAt,
     }),
   );
+}
+
+export async function getWorkspace(workspaceId: string, actorId: string) {
+  const membership = await getWorkspaceMembership(workspaceId, actorId);
+  const workspace = await getWorkspaceById(workspaceId);
+
+  return {
+    id: workspace.id,
+    name: workspace.name,
+    slug: workspace.slug,
+    role: membership.role,
+    createdAt: workspace.createdAt,
+    updatedAt: workspace.updatedAt,
+  };
+}
+
+export async function updateWorkspace(
+  actorId: string,
+  workspaceId: string,
+  data: UpdateWorkspaceInput,
+) {
+  const membership = await getWorkspaceMembership(workspaceId, actorId);
+
+  if (membership.role !== WorkspaceRole.OWNER) {
+    throw new ForbiddenError(
+      "Only the workspace owner can update this workspace",
+    );
+  }
+
+  const workspace = await prisma.workspace.update({
+    where: {
+      id: workspaceId,
+    },
+
+    data: {
+      name: data.name,
+    },
+  });
+
+  return {
+    id: workspace.id,
+    name: workspace.name,
+    slug: workspace.slug,
+    role: membership.role,
+    createdAt: workspace.createdAt,
+    updatedAt: workspace.updatedAt,
+  };
 }
 
 export async function listWorkspaceMembers(

@@ -4,6 +4,7 @@ import { toNodeHandler } from "better-auth/node";
 
 import { auth } from "./lib/auth.js";
 import workspaceRoutes from "./modules/workspace/workspace.routes.js";
+import workspaceItemRoutes from "./modules/workspace/workspace-item.routes.js";
 import projectRoutes from "./modules/project/project.routes.js";
 import taskRoutes from "./modules/task/task.routes.js";
 import commentRoutes from "./modules/comments/comments.routes.js";
@@ -41,6 +42,7 @@ app.use(express.json());
 
 // workspace resources
 app.use("/api/v1/workspaces", workspaceRoutes);
+app.use("/api/v1/workspaces", workspaceItemRoutes);
 app.use("/api/v1/workspaces", projectRoutes);
 app.use("/api/v1/workspaces", activityRoutes);
 app.use("/api/v1/workspaces", workspaceInvitationRoutes);

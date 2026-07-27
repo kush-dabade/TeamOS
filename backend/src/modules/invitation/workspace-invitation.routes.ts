@@ -5,6 +5,8 @@ import { requireAuth } from "../../middleware/require-auth.js";
 import {
   createInvitationHandler,
   listWorkspaceInvitationsHandler,
+  cancelInvitationHandler,
+  resendInvitationHandler,
 } from "./invitation.controller.js";
 
 const router = Router();
@@ -15,6 +17,18 @@ router.get(
   "/:workspaceId/invitations",
   requireAuth,
   listWorkspaceInvitationsHandler,
+);
+
+router.post(
+  "/:workspaceId/invitations/:invitationId/resend",
+  requireAuth,
+  resendInvitationHandler,
+);
+
+router.delete(
+  "/:workspaceId/invitations/:invitationId",
+  requireAuth,
+  cancelInvitationHandler,
 );
 
 export default router;

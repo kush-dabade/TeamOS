@@ -16,15 +16,9 @@ import { Input } from "@/components/ui/input";
 import { formatDate } from "@/utils/formatDate";
 
 import { useUpdateWorkspace } from "../hooks/use-update-workspace";
-import type { Workspace, WorkspaceRole } from "../types";
+import { ROLE_LABELS } from "../lib/workspace-roles";
+import type { Workspace } from "../types";
 import { updateWorkspaceSchema, type UpdateWorkspaceFormData } from "../validation/update-workspace";
-
-const ROLE_LABELS: Record<WorkspaceRole, string> = {
-  OWNER: "Owner",
-  ADMIN: "Admin",
-  MEMBER: "Member",
-  GUEST: "Guest",
-};
 
 interface WorkspaceGeneralSettingsCardProps {
   workspace: Workspace;

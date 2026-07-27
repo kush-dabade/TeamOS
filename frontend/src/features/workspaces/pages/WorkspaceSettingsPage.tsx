@@ -6,6 +6,7 @@ import { ErrorState, PageError } from "@/components/ux";
 
 import { WorkspaceGeneralSettingsCard } from "../components/workspace-general-settings-card";
 import { WorkspaceGeneralSettingsCardSkeleton } from "../components/workspace-general-settings-card-skeleton";
+import { WorkspaceMembersCard } from "../components/workspace-members-card";
 import { useCurrentWorkspace } from "../hooks/use-current-workspace";
 import { useWorkspace } from "../hooks/use-workspace";
 
@@ -17,7 +18,7 @@ export function WorkspaceSettingsPage() {
     <PageLayout>
       <PageHeader
         title="Workspace Settings"
-        description="Manage your workspace's name and view its details."
+        description="Manage your workspace's name, members, and settings."
       />
 
       {workspaceQuery.isError ? (
@@ -34,11 +35,14 @@ export function WorkspaceSettingsPage() {
           />
         </PageError>
       ) : (
-        <div className="mt-6 max-w-2xl">
+        <div className="mt-6 flex max-w-2xl flex-col gap-6">
           {workspaceQuery.isPending ? (
             <WorkspaceGeneralSettingsCardSkeleton />
           ) : workspaceQuery.data ? (
-            <WorkspaceGeneralSettingsCard workspace={workspaceQuery.data} />
+            <>
+              <WorkspaceGeneralSettingsCard workspace={workspaceQuery.data} />
+              <WorkspaceMembersCard workspace={workspaceQuery.data} />
+            </>
           ) : null}
         </div>
       )}

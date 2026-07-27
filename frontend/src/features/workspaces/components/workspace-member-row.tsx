@@ -42,7 +42,11 @@ export function WorkspaceMemberRow({ workspaceId, member, actorRole }: Workspace
   const assignableRoles = getAssignableRoles(actorRole);
 
   async function handleRoleChange(role: WorkspaceRole) {
-    await updateRole.mutateAsync({ memberId: member.id, role });
+    try {
+      await updateRole.mutateAsync({ memberId: member.id, role });
+    } catch {
+      // Failure feedback is already surfaced via the mutation's onError toast.
+    }
   }
 
   async function handleConfirmRemove() {

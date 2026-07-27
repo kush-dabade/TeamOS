@@ -15,16 +15,30 @@ export function WorkspaceSettingsPage() {
   const currentWorkspaceQuery = useCurrentWorkspace();
   const workspaceQuery = useWorkspace(currentWorkspaceQuery.data?.id);
 
+  const isPending =
+    currentWorkspaceQuery.isPending ||
+    (Boolean(currentWorkspaceQuery.data) && workspaceQuery.isPending);
+  const isError = currentWorkspaceQuery.isError || workspaceQuery.isError;
+
+  function handleRetry() {
+    if (currentWorkspaceQuery.isError) {
+      currentWorkspaceQuery.refetch();
+      return;
+    }
+
+    workspaceQuery.refetch();
+  }
+
   return (
     <PageLayout>
-      {workspaceQuery.isError ? (
+      {isError ? (
         <PageError>
           <ErrorState
             icon={TriangleAlert}
             title="Unable to load workspace settings"
             description="Something went wrong while loading your workspace settings. Check your connection and try again."
             action={
-              <Button type="button" onClick={() => workspaceQuery.refetch()}>
+              <Button type="button" onClick={handleRetry}>
                 Retry
               </Button>
             }
@@ -32,7 +46,7 @@ export function WorkspaceSettingsPage() {
         </PageError>
       ) : (
         <div className="mt-3 flex flex-col gap-6">
-          {workspaceQuery.isPending ? (
+          {isPending ? (
             <WorkspaceGeneralSettingsCardSkeleton />
           ) : workspaceQuery.data ? (
             <>

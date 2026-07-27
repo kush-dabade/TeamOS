@@ -122,6 +122,15 @@ function isInvitationExpired(invitation: { expiresAt: Date }) {
   return invitation.expiresAt < new Date();
 }
 
+function isRecordNotFoundError(
+  error: unknown,
+): error is Prisma.PrismaClientKnownRequestError {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2025"
+  );
+}
+
 type InvitationEntity = {
   id: string;
 
@@ -328,11 +337,19 @@ export async function cancelInvitation(
     throw new ValidationError("Invitation is no longer pending");
   }
 
-  await prisma.workspaceInvitation.delete({
-    where: {
-      id: invitation.id,
-    },
-  });
+  try {
+    await prisma.workspaceInvitation.delete({
+      where: {
+        id: invitation.id,
+      },
+    });
+  } catch (error) {
+    if (isRecordNotFoundError(error)) {
+      throw new NotFoundError("Invitation not found");
+    }
+
+    throw error;
+  }
 
   return { success: true };
 }
@@ -372,15 +389,25 @@ export async function resendInvitation(
     throw new NotFoundError("User not found");
   }
 
-  const updatedInvitation = await prisma.workspaceInvitation.update({
-    where: {
-      id: invitation.id,
-    },
+  let updatedInvitation;
 
-    data: {
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    },
-  });
+  try {
+    updatedInvitation = await prisma.workspaceInvitation.update({
+      where: {
+        id: invitation.id,
+      },
+
+      data: {
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
+    });
+  } catch (error) {
+    if (isRecordNotFoundError(error)) {
+      throw new NotFoundError("Invitation not found");
+    }
+
+    throw error;
+  }
 
   await enqueueWorkspaceInvitationEmail({
     invitationId: updatedInvitation.id,
@@ -456,27 +483,37 @@ export async function acceptInvitation(
     throw new ValidationError("You are already a member of this workspace");
   }
 
-  const updatedInvitation = await prisma.$transaction(
-    async (tx: Prisma.TransactionClient) => {
-      await tx.workspaceMember.create({
-        data: {
-          workspaceId: invitation.workspaceId,
-          userId,
-          role: invitation.role,
-        },
-      });
+  let updatedInvitation;
 
-      return tx.workspaceInvitation.update({
-        where: {
-          id: invitation.id,
-        },
+  try {
+    updatedInvitation = await prisma.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        await tx.workspaceMember.create({
+          data: {
+            workspaceId: invitation.workspaceId,
+            userId,
+            role: invitation.role,
+          },
+        });
 
-        data: {
-          status: InvitationStatus.ACCEPTED,
-        },
-      });
-    },
-  );
+        return tx.workspaceInvitation.update({
+          where: {
+            id: invitation.id,
+          },
+
+          data: {
+            status: InvitationStatus.ACCEPTED,
+          },
+        });
+      },
+    );
+  } catch (error) {
+    if (isRecordNotFoundError(error)) {
+      throw new NotFoundError("Invitation not found");
+    }
+
+    throw error;
+  }
 
   await createActivity({
     workspaceId: invitation.workspaceId,
@@ -532,15 +569,25 @@ export async function declineInvitation(
     throw new ForbiddenError("You do not have access to this invitation");
   }
 
-  const updatedInvitation = await prisma.workspaceInvitation.update({
-    where: {
-      id: invitation.id,
-    },
+  let updatedInvitation;
 
-    data: {
-      status: InvitationStatus.DECLINED,
-    },
-  });
+  try {
+    updatedInvitation = await prisma.workspaceInvitation.update({
+      where: {
+        id: invitation.id,
+      },
+
+      data: {
+        status: InvitationStatus.DECLINED,
+      },
+    });
+  } catch (error) {
+    if (isRecordNotFoundError(error)) {
+      throw new NotFoundError("Invitation not found");
+    }
+
+    throw error;
+  }
 
   const user = await findUserByEmail(normalizedEmail);
 

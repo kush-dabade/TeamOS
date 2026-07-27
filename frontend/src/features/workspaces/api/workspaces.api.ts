@@ -1,6 +1,12 @@
 import { apiClient, type ApiSuccess } from "@/lib/api";
 
-import type { Workspace, WorkspaceMember, WorkspaceRole } from "../types";
+import type {
+  InvitationStatus,
+  Workspace,
+  WorkspaceInvitation,
+  WorkspaceMember,
+  WorkspaceRole,
+} from "../types";
 
 interface BackendWorkspace {
   id: string;
@@ -39,6 +45,28 @@ function toWorkspaceMember(member: BackendWorkspaceMember): WorkspaceMember {
     email: member.email,
     role: member.role,
     joinedAt: member.joinedAt,
+  };
+}
+
+interface BackendInvitation {
+  id: string;
+  workspaceId: string;
+  email: string;
+  role: WorkspaceRole;
+  status: InvitationStatus;
+  expiresAt: string;
+  createdAt: string;
+}
+
+function toWorkspaceInvitation(invitation: BackendInvitation): WorkspaceInvitation {
+  return {
+    id: invitation.id,
+    workspaceId: invitation.workspaceId,
+    email: invitation.email,
+    role: invitation.role,
+    status: invitation.status,
+    expiresAt: invitation.expiresAt,
+    createdAt: invitation.createdAt,
   };
 }
 
@@ -103,4 +131,46 @@ export async function updateWorkspaceMemberRole(
 
 export async function removeWorkspaceMember(workspaceId: string, memberId: string): Promise<void> {
   await apiClient.delete(`/workspaces/${workspaceId}/members/${memberId}`);
+}
+
+export async function fetchWorkspaceInvitations(
+  workspaceId: string,
+): Promise<WorkspaceInvitation[]> {
+  const response = await apiClient.get<ApiSuccess<BackendInvitation[]>>(
+    `/workspaces/${workspaceId}/invitations`,
+  );
+
+  return response.data.data.map(toWorkspaceInvitation);
+}
+
+export interface CreateInvitationInput {
+  email: string;
+  role: WorkspaceRole;
+}
+
+export async function createInvitation(
+  workspaceId: string,
+  input: CreateInvitationInput,
+): Promise<WorkspaceInvitation> {
+  const response = await apiClient.post<ApiSuccess<BackendInvitation>>(
+    `/workspaces/${workspaceId}/invitations`,
+    input,
+  );
+
+  return toWorkspaceInvitation(response.data.data);
+}
+
+export async function resendInvitation(
+  workspaceId: string,
+  invitationId: string,
+): Promise<WorkspaceInvitation> {
+  const response = await apiClient.post<ApiSuccess<BackendInvitation>>(
+    `/workspaces/${workspaceId}/invitations/${invitationId}/resend`,
+  );
+
+  return toWorkspaceInvitation(response.data.data);
+}
+
+export async function cancelInvitation(workspaceId: string, invitationId: string): Promise<void> {
+  await apiClient.delete(`/workspaces/${workspaceId}/invitations/${invitationId}`);
 }

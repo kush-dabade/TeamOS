@@ -6,6 +6,7 @@ import { ErrorState, PageError } from "@/components/ux";
 
 import { WorkspaceGeneralSettingsCard } from "../components/workspace-general-settings-card";
 import { WorkspaceGeneralSettingsCardSkeleton } from "../components/workspace-general-settings-card-skeleton";
+import { WorkspaceInvitationsCard } from "../components/workspace-invitations-card";
 import { WorkspaceMembersCard } from "../components/workspace-members-card";
 import { useCurrentWorkspace } from "../hooks/use-current-workspace";
 import { useWorkspace } from "../hooks/use-workspace";
@@ -42,6 +43,7 @@ export function WorkspaceSettingsPage() {
             <>
               <WorkspaceGeneralSettingsCard workspace={workspaceQuery.data} />
               <WorkspaceMembersCard workspace={workspaceQuery.data} />
+              <WorkspaceInvitationsCard workspace={workspaceQuery.data} />
             </>
           ) : null}
         </div>

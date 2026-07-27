@@ -66,6 +66,24 @@ async function findInvitationById(invitationId: string) {
   });
 }
 
+async function getWorkspaceInvitationById(
+  workspaceId: string,
+  invitationId: string,
+) {
+  const invitation = await prisma.workspaceInvitation.findFirst({
+    where: {
+      id: invitationId,
+      workspaceId,
+    },
+  });
+
+  if (!invitation) {
+    throw new NotFoundError("Invitation not found");
+  }
+
+  return invitation;
+}
+
 async function findPendingInvitation(workspaceId: string, email: string) {
   return prisma.workspaceInvitation.findFirst({
     where: {
@@ -288,6 +306,93 @@ export async function listWorkspaceInvitations(
   });
 
   return invitations.map(toInvitationResponse);
+}
+
+export async function cancelInvitation(
+  actorId: string,
+  workspaceId: string,
+  invitationId: string,
+): Promise<{ success: true }> {
+  const actorMembership = await getWorkspaceMembership(workspaceId, actorId);
+
+  if (
+    actorMembership.role !== WorkspaceRole.OWNER &&
+    actorMembership.role !== WorkspaceRole.ADMIN
+  ) {
+    throw new ForbiddenError("You do not have permission to cancel invitations");
+  }
+
+  const invitation = await getWorkspaceInvitationById(workspaceId, invitationId);
+
+  if (invitation.status !== InvitationStatus.PENDING) {
+    throw new ValidationError("Invitation is no longer pending");
+  }
+
+  await prisma.workspaceInvitation.delete({
+    where: {
+      id: invitation.id,
+    },
+  });
+
+  return { success: true };
+}
+
+export async function resendInvitation(
+  actorId: string,
+  workspaceId: string,
+  invitationId: string,
+): Promise<InvitationResponse> {
+  const actorMembership = await getWorkspaceMembership(workspaceId, actorId);
+
+  if (
+    actorMembership.role !== WorkspaceRole.OWNER &&
+    actorMembership.role !== WorkspaceRole.ADMIN
+  ) {
+    throw new ForbiddenError("You do not have permission to resend invitations");
+  }
+
+  const invitation = await getWorkspaceInvitationById(workspaceId, invitationId);
+
+  if (invitation.status !== InvitationStatus.PENDING) {
+    throw new ValidationError("Invitation is no longer pending");
+  }
+
+  const workspace = await getWorkspaceById(workspaceId);
+
+  const inviter = await prisma.user.findUnique({
+    where: {
+      id: invitation.invitedById,
+    },
+    select: {
+      name: true,
+    },
+  });
+
+  if (!inviter) {
+    throw new NotFoundError("User not found");
+  }
+
+  const updatedInvitation = await prisma.workspaceInvitation.update({
+    where: {
+      id: invitation.id,
+    },
+
+    data: {
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    },
+  });
+
+  await enqueueWorkspaceInvitationEmail({
+    invitationId: updatedInvitation.id,
+    email: updatedInvitation.email,
+    workspaceName: workspace.name,
+    role: updatedInvitation.role,
+    invitedByName: inviter.name,
+    token: updatedInvitation.token,
+    expiresAt: updatedInvitation.expiresAt.toISOString(),
+  });
+
+  return toInvitationResponse(updatedInvitation);
 }
 
 export async function listUserInvitations(

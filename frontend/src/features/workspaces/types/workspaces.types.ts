@@ -17,3 +17,15 @@ export interface WorkspaceMember {
   role: WorkspaceRole;
   joinedAt: string;
 }
+
+export type InvitationStatus = "PENDING" | "ACCEPTED" | "DECLINED" | "EXPIRED";
+
+export interface WorkspaceInvitation {
+  id: string;
+  workspaceId: string;
+  email: string;
+  role: WorkspaceRole;
+  status: InvitationStatus;
+  expiresAt: string;
+  createdAt: string;
+}

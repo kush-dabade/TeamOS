@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { useAuth } from "@/features/auth";
 import { useTasks } from "@/features/tasks";
 import type { TaskListItem } from "@/features/tasks/types";
-import { useCurrentWorkspace } from "@/features/workspaces";
+import { useActiveWorkspace } from "@/features/workspaces";
 
 interface UseMyTasksResult {
   data: TaskListItem[];
@@ -25,8 +25,13 @@ interface UseMyTasksResult {
  */
 export function useMyTasks(): UseMyTasksResult {
   const { user } = useAuth();
-  const workspaceQuery = useCurrentWorkspace();
-  const tasksQuery = useTasks(workspaceQuery.data?.id);
+  const {
+    activeWorkspaceId,
+    isLoading: isWorkspaceLoading,
+    isError: isWorkspaceError,
+    refetch: refetchWorkspace,
+  } = useActiveWorkspace();
+  const tasksQuery = useTasks(activeWorkspaceId ?? undefined);
 
   const data = useMemo<TaskListItem[]>(() => {
     if (!user) {
@@ -38,12 +43,11 @@ export function useMyTasks(): UseMyTasksResult {
     );
   }, [tasksQuery.tasks, user]);
 
-  const isLoading =
-    workspaceQuery.isLoading || (Boolean(workspaceQuery.data) && tasksQuery.isLoading);
-  const isError = workspaceQuery.isError || Boolean(tasksQuery.error);
+  const isLoading = isWorkspaceLoading || (Boolean(activeWorkspaceId) && tasksQuery.isLoading);
+  const isError = isWorkspaceError || Boolean(tasksQuery.error);
 
   const refetch = () => {
-    workspaceQuery.refetch();
+    refetchWorkspace();
     tasksQuery.refetch();
   };
 

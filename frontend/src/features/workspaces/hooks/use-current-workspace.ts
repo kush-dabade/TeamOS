@@ -1,24 +1,22 @@
-import { useQuery } from "@tanstack/react-query";
-
-import type { AppError } from "@/lib/api";
-
-import { fetchWorkspaces } from "../api/workspaces.api";
-import { workspaceKeys } from "../lib/workspace-keys";
-import type { Workspace } from "../types";
+import { useWorkspaceList } from "./use-workspace-list";
 
 /**
- * TeamOS does not yet have workspace switching UI - every user's workspace
- * list is rendered as a single fixed entry (see WorkspaceSwitcher). Until
- * that exists, "current workspace" is simply the first workspace returned
- * for the signed-in user.
+ * Legacy "current workspace" hook — still powers `WorkspaceGuard` and
+ * `WorkspaceSwitcher` until they migrate to `useActiveWorkspace`.
+ *
+ * Delegates to `useWorkspaceList()` instead of running its own query so it
+ * shares a cache entry (and an in-flight request) with `WorkspaceProvider`
+ * rather than issuing a second, redundant `/workspaces` fetch.
  */
 export function useCurrentWorkspace() {
-  return useQuery<Workspace | null, AppError>({
-    queryKey: workspaceKeys.current(),
-    queryFn: async () => {
-      const workspaces = await fetchWorkspaces();
+  const workspacesQuery = useWorkspaceList();
 
-      return workspaces[0] ?? null;
-    },
-  });
+  return {
+    data: workspacesQuery.data ? (workspacesQuery.data[0] ?? null) : undefined,
+    isPending: workspacesQuery.isPending,
+    isLoading: workspacesQuery.isLoading,
+    isError: workspacesQuery.isError,
+    error: workspacesQuery.error,
+    refetch: workspacesQuery.refetch,
+  };
 }

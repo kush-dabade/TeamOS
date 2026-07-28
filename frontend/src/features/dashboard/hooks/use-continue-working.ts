@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 
 import { useProjects } from "@/features/projects";
-import { useCurrentWorkspace } from "@/features/workspaces";
+import { useActiveWorkspace } from "@/features/workspaces";
 
 import type { ContinueWorkingItem } from "../types";
 
@@ -21,8 +21,13 @@ interface UseContinueWorkingResult {
  * assumption the prior mock data documented).
  */
 export function useContinueWorking(): UseContinueWorkingResult {
-  const workspaceQuery = useCurrentWorkspace();
-  const projectsQuery = useProjects(workspaceQuery.data?.id);
+  const {
+    activeWorkspaceId,
+    isLoading: isWorkspaceLoading,
+    isError: isWorkspaceError,
+    refetch: refetchWorkspace,
+  } = useActiveWorkspace();
+  const projectsQuery = useProjects(activeWorkspaceId ?? undefined);
 
   const data = useMemo<ContinueWorkingItem[]>(() => {
     return [...(projectsQuery.data ?? [])]
@@ -38,12 +43,11 @@ export function useContinueWorking(): UseContinueWorkingResult {
       }));
   }, [projectsQuery.data]);
 
-  const isLoading =
-    workspaceQuery.isLoading || (Boolean(workspaceQuery.data) && projectsQuery.isLoading);
-  const isError = workspaceQuery.isError || projectsQuery.isError;
+  const isLoading = isWorkspaceLoading || (Boolean(activeWorkspaceId) && projectsQuery.isLoading);
+  const isError = isWorkspaceError || projectsQuery.isError;
 
   const refetch = () => {
-    workspaceQuery.refetch();
+    refetchWorkspace();
     projectsQuery.refetch();
   };
 

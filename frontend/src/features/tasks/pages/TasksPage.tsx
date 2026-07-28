@@ -4,7 +4,7 @@ import { toast } from "sonner";
 
 import { PageLayout } from "@/components/layout";
 import { useProjects } from "@/features/projects";
-import { useCurrentWorkspace, useWorkspaceMembers } from "@/features/workspaces";
+import { useActiveWorkspace, useWorkspaceMembers } from "@/features/workspaces";
 
 import { useCreateTask } from "../hooks/use-create-task";
 import { useTasks } from "../hooks/use-tasks";
@@ -18,8 +18,13 @@ import type { TaskFormData } from "../validation/task";
 
 export function TasksPage() {
   const navigate = useNavigate();
-  const workspaceQuery = useCurrentWorkspace();
-  const workspace = workspaceQuery.data;
+  const {
+    activeWorkspace: workspace,
+    isLoading: isWorkspaceLoading,
+    isError: isWorkspaceError,
+    error: workspaceError,
+    refetch: refetchWorkspace,
+  } = useActiveWorkspace();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>("ALL");
@@ -84,7 +89,11 @@ export function TasksPage() {
         return false;
       }
 
-      if (assigneeFilter !== "ALL" && assigneeFilter !== "UNASSIGNED" && assignee?.id !== assigneeFilter) {
+      if (
+        assigneeFilter !== "ALL" &&
+        assigneeFilter !== "UNASSIGNED" &&
+        assignee?.id !== assigneeFilter
+      ) {
         return false;
       }
 
@@ -100,8 +109,8 @@ export function TasksPage() {
     assigneeFilter !== "ALL";
 
   const handleRetry = () => {
-    if (workspaceQuery.isError) {
-      workspaceQuery.refetch();
+    if (isWorkspaceError) {
+      refetchWorkspace();
       return;
     }
 
@@ -214,8 +223,10 @@ export function TasksPage() {
           <TasksTable
             tasks={tasks}
             selectedTaskId={selectedTaskId}
-            isLoading={workspaceQuery.isLoading || isLoadingTasks}
-            error={workspaceQuery.isError ? workspaceQuery.error.message : (tasksError?.message ?? null)}
+            isLoading={isWorkspaceLoading || isLoadingTasks}
+            error={
+              isWorkspaceError ? (workspaceError?.message ?? null) : (tasksError?.message ?? null)
+            }
             hasActiveFilters={hasActiveFilters}
             onTaskSelect={handleTaskSelect}
             onCreateTask={handleCreateTask}

@@ -23,14 +23,13 @@ import {
   type TaskFormData,
   type TaskProject,
 } from "@/features/tasks";
-import { useCurrentWorkspace, useWorkspaceMembers } from "@/features/workspaces";
+import { useActiveWorkspace, useWorkspaceMembers } from "@/features/workspaces";
 
 type CreatePanel = "project" | "task" | null;
 
 export function HeaderCreate() {
   const { user } = useAuth();
-  const workspaceQuery = useCurrentWorkspace();
-  const workspace = workspaceQuery.data;
+  const { activeWorkspace: workspace } = useActiveWorkspace();
 
   const [activePanel, setActivePanel] = useState<CreatePanel>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);

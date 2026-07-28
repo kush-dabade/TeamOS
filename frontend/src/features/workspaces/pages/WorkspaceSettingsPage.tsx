@@ -8,21 +8,25 @@ import { WorkspaceGeneralSettingsCard } from "../components/workspace-general-se
 import { WorkspaceGeneralSettingsCardSkeleton } from "../components/workspace-general-settings-card-skeleton";
 import { WorkspaceInvitationsCard } from "../components/workspace-invitations-card";
 import { WorkspaceMembersCard } from "../components/workspace-members-card";
-import { useCurrentWorkspace } from "../hooks/use-current-workspace";
+import { useActiveWorkspace } from "../hooks/use-active-workspace";
 import { useWorkspace } from "../hooks/use-workspace";
 
 export function WorkspaceSettingsPage() {
-  const currentWorkspaceQuery = useCurrentWorkspace();
-  const workspaceQuery = useWorkspace(currentWorkspaceQuery.data?.id);
+  const {
+    activeWorkspaceId,
+    isLoading: isActiveWorkspaceLoading,
+    isError: isActiveWorkspaceError,
+    refetch: refetchActiveWorkspace,
+  } = useActiveWorkspace();
+  const workspaceQuery = useWorkspace(activeWorkspaceId ?? undefined);
 
   const isPending =
-    currentWorkspaceQuery.isPending ||
-    (Boolean(currentWorkspaceQuery.data) && workspaceQuery.isPending);
-  const isError = currentWorkspaceQuery.isError || workspaceQuery.isError;
+    isActiveWorkspaceLoading || (Boolean(activeWorkspaceId) && workspaceQuery.isPending);
+  const isError = isActiveWorkspaceError || workspaceQuery.isError;
 
   function handleRetry() {
-    if (currentWorkspaceQuery.isError) {
-      currentWorkspaceQuery.refetch();
+    if (isActiveWorkspaceError) {
+      refetchActiveWorkspace();
       return;
     }
 

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import type { AppError } from "@/lib/api";
-import { useCurrentWorkspace } from "@/features/workspaces";
+import { useActiveWorkspace } from "@/features/workspaces";
 
 import { fetchRecentActivity } from "../api/dashboard.api";
 import { dashboardKeys } from "../lib/dashboard-keys";
@@ -21,8 +21,12 @@ const RECENT_ACTIVITY_LIMIT = 6;
 // (`GET /workspaces/:workspaceId/activity`) through a dashboard-owned API
 // module instead of composing another feature's hook.
 export function useRecentActivity(): UseRecentActivityResult {
-  const workspaceQuery = useCurrentWorkspace();
-  const workspaceId = workspaceQuery.data?.id;
+  const {
+    activeWorkspaceId: workspaceId,
+    isLoading: isWorkspaceLoading,
+    isError: isWorkspaceError,
+    refetch: refetchWorkspace,
+  } = useActiveWorkspace();
 
   const activityQuery = useQuery<RecentActivityItem[], AppError>({
     queryKey: dashboardKeys.recentActivity(workspaceId ?? ""),
@@ -30,12 +34,11 @@ export function useRecentActivity(): UseRecentActivityResult {
     enabled: Boolean(workspaceId),
   });
 
-  const isLoading =
-    workspaceQuery.isLoading || (Boolean(workspaceId) && activityQuery.isLoading);
-  const isError = workspaceQuery.isError || activityQuery.isError;
+  const isLoading = isWorkspaceLoading || (Boolean(workspaceId) && activityQuery.isLoading);
+  const isError = isWorkspaceError || activityQuery.isError;
 
   const refetch = () => {
-    workspaceQuery.refetch();
+    refetchWorkspace();
     activityQuery.refetch();
   };
 

@@ -4,7 +4,12 @@ import { AuthenticatedRoute } from "@/features/auth";
 import { ProfilePage } from "@/features/profile";
 import { ProjectsPage, ProjectWorkspacePage } from "@/features/projects";
 import { TasksPage, TaskWorkspacePage } from "@/features/tasks";
-import { OnboardingPage, WorkspaceGuard, WorkspaceSettingsPage } from "@/features/workspaces";
+import {
+  OnboardingPage,
+  WorkspaceGuard,
+  WorkspaceProvider,
+  WorkspaceSettingsPage,
+} from "@/features/workspaces";
 import AppShell from "@/layouts/AppShell";
 import RouteErrorBoundary from "@/layouts/RouteErrorBoundary";
 import AppNotFoundPage from "@/pages/AppNotFoundPage";
@@ -23,7 +28,11 @@ export const appRoutes: RouteObject[] = [
         element: <WorkspaceGuard />,
         children: [
           {
-            element: <AppShell />,
+            element: (
+              <WorkspaceProvider>
+                <AppShell />
+              </WorkspaceProvider>
+            ),
             children: [
               {
                 errorElement: <RouteErrorBoundary />,

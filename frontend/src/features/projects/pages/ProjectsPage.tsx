@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 
 import { PageLayout } from "@/components/layout";
 import { useAuth } from "@/features/auth";
-import { useCurrentWorkspace } from "@/features/workspaces";
+import { useActiveWorkspace } from "@/features/workspaces";
 
 import { useArchiveProject } from "../hooks/use-archive-project";
 import { useCreateProject } from "../hooks/use-create-project";
@@ -14,19 +14,19 @@ import { ProjectFormPanel } from "../components/form";
 import { ProjectPreviewPanel } from "../components/preview";
 import { ProjectsTable } from "../components/table";
 import { ProjectsToolbar } from "../components/toolbar";
-import type {
-  Project,
-  ProjectListItem,
-  ProjectSortOption,
-  ProjectStatusFilter,
-} from "../types";
+import type { Project, ProjectListItem, ProjectSortOption, ProjectStatusFilter } from "../types";
 import type { ProjectFormData } from "../validation/project";
 
 export function ProjectsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const workspaceQuery = useCurrentWorkspace();
-  const workspace = workspaceQuery.data;
+  const {
+    activeWorkspace: workspace,
+    isLoading: isWorkspaceLoading,
+    isError: isWorkspaceError,
+    error: workspaceError,
+    refetch: refetchWorkspace,
+  } = useActiveWorkspace();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ProjectStatusFilter>("ALL");
@@ -75,8 +75,8 @@ export function ProjectsPage() {
   }, [projectItems, searchQuery, sortOption]);
 
   const handleRetry = () => {
-    if (workspaceQuery.isError) {
-      workspaceQuery.refetch();
+    if (isWorkspaceError) {
+      refetchWorkspace();
       return;
     }
 
@@ -88,9 +88,7 @@ export function ProjectsPage() {
     setStatusFilter("ALL");
   };
 
-  const selectedProject = projectItems.find(
-    ({ project }) => project.id === selectedProjectId,
-  );
+  const selectedProject = projectItems.find(({ project }) => project.id === selectedProjectId);
   const selectedProjectPreviewData = selectedProjectPreviewQuery.data?.previewData ?? null;
 
   const handleProjectSelect = (projectId: string, trigger: HTMLButtonElement | null) => {
@@ -188,9 +186,11 @@ export function ProjectsPage() {
           <ProjectsTable
             projects={projects}
             selectedProjectId={selectedProjectId}
-            isLoading={workspaceQuery.isLoading || projectsQuery.isLoading}
+            isLoading={isWorkspaceLoading || projectsQuery.isLoading}
             error={
-              workspaceQuery.isError ? workspaceQuery.error.message : (projectsQuery.error?.message ?? null)
+              isWorkspaceError
+                ? (workspaceError?.message ?? null)
+                : (projectsQuery.error?.message ?? null)
             }
             hasActiveFilters={Boolean(searchQuery.trim()) || statusFilter !== "ALL"}
             onProjectSelect={handleProjectSelect}

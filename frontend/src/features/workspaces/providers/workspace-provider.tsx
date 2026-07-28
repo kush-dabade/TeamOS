@@ -85,10 +85,17 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     }
   }, [activeWorkspaceId, storedWorkspaceId]);
 
-  const switchWorkspace = useCallback((workspaceId: string) => {
-    setStoredWorkspaceId(workspaceId);
-    setStoredActiveWorkspaceId(workspaceId);
-  }, []);
+  const switchWorkspace = useCallback(
+    (workspaceId: string) => {
+      if (workspaceId === activeWorkspaceId) {
+        return;
+      }
+
+      setStoredWorkspaceId(workspaceId);
+      setStoredActiveWorkspaceId(workspaceId);
+    },
+    [activeWorkspaceId],
+  );
 
   const value = useMemo<WorkspaceContextValue>(
     () => ({

@@ -18,13 +18,7 @@ import type { TaskFormData } from "../validation/task";
 
 export function TasksPage() {
   const navigate = useNavigate();
-  const {
-    activeWorkspace: workspace,
-    isLoading: isWorkspaceLoading,
-    isError: isWorkspaceError,
-    error: workspaceError,
-    refetch: refetchWorkspace,
-  } = useActiveWorkspace();
+  const { workspace } = useActiveWorkspace();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>("ALL");
@@ -109,11 +103,6 @@ export function TasksPage() {
     assigneeFilter !== "ALL";
 
   const handleRetry = () => {
-    if (isWorkspaceError) {
-      refetchWorkspace();
-      return;
-    }
-
     refetchTasks();
   };
 
@@ -223,10 +212,8 @@ export function TasksPage() {
           <TasksTable
             tasks={tasks}
             selectedTaskId={selectedTaskId}
-            isLoading={isWorkspaceLoading || isLoadingTasks}
-            error={
-              isWorkspaceError ? (workspaceError?.message ?? null) : (tasksError?.message ?? null)
-            }
+            isLoading={isLoadingTasks}
+            error={tasksError?.message ?? null}
             hasActiveFilters={hasActiveFilters}
             onTaskSelect={handleTaskSelect}
             onCreateTask={handleCreateTask}

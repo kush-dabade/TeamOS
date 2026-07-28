@@ -1,18 +1,19 @@
-import { useContext } from "react";
-
-import { WorkspaceContext } from "../providers/workspace-provider";
+import { useWorkspaceResolution } from "./use-workspace-resolution";
 
 /**
- * Reads the active workspace from WorkspaceProvider. Replaces
- * `useCurrentWorkspace` for feature code; `WorkspaceGuard` still uses the
- * legacy hook until it migrates in a later commit.
+ * Public workspace-resolution API for feature code. WorkspaceGuard has
+ * already guaranteed a resolved workspace list by the time anything below
+ * it renders, so this deliberately excludes loading/error/refetch — those
+ * belong exclusively to WorkspaceGuard (see use-workspace-resolution.ts).
  */
 export function useActiveWorkspace() {
-  const context = useContext(WorkspaceContext);
+  const { activeWorkspace, activeWorkspaceId, workspaces, switchWorkspace } =
+    useWorkspaceResolution();
 
-  if (context === undefined) {
-    throw new Error("useActiveWorkspace must be used within a WorkspaceProvider");
-  }
-
-  return context;
+  return {
+    workspace: activeWorkspace,
+    workspaceId: activeWorkspaceId,
+    workspaces,
+    switchWorkspace,
+  };
 }

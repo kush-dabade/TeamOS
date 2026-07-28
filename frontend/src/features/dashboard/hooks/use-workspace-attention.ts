@@ -22,13 +22,8 @@ interface UseWorkspaceAttentionResult {
  * more urgent signal, so a task is never double-counted.
  */
 export function useWorkspaceAttention(): UseWorkspaceAttentionResult {
-  const {
-    activeWorkspaceId,
-    isLoading: isWorkspaceLoading,
-    isError: isWorkspaceError,
-    refetch: refetchWorkspace,
-  } = useActiveWorkspace();
-  const tasksQuery = useTasks(activeWorkspaceId ?? undefined);
+  const { workspaceId } = useActiveWorkspace();
+  const tasksQuery = useTasks(workspaceId ?? undefined);
 
   // Captured once per mount rather than read fresh on every render - the
   // purpose is "is this overdue as of when the panel loaded", not a live
@@ -80,11 +75,10 @@ export function useWorkspaceAttention(): UseWorkspaceAttentionResult {
     return [...overdue, ...pendingReview];
   }, [tasksQuery.tasks, now]);
 
-  const isLoading = isWorkspaceLoading || (Boolean(activeWorkspaceId) && tasksQuery.isLoading);
-  const isError = isWorkspaceError || Boolean(tasksQuery.error);
+  const isLoading = tasksQuery.isLoading;
+  const isError = Boolean(tasksQuery.error);
 
   const refetch = () => {
-    refetchWorkspace();
     tasksQuery.refetch();
   };
 

@@ -2,10 +2,10 @@ import { AlertCircle, ChevronDown } from "lucide-react";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
-import { useCurrentWorkspace } from "@/features/workspaces";
+import { useWorkspaceResolution } from "@/features/workspaces";
 
 export function WorkspaceSwitcher() {
-  const { data: workspace, isLoading, isError, refetch } = useCurrentWorkspace();
+  const { activeWorkspace: workspace, isLoading, isError, refetch } = useWorkspaceResolution();
 
   if (isLoading) {
     return (
@@ -59,9 +59,7 @@ export function WorkspaceSwitcher() {
           <div className="flex min-w-0 flex-1 flex-col text-left group-data-[collapsible=icon]:hidden">
             <span className="truncate text-sm font-medium">{name}</span>
 
-            <span className="text-muted-foreground truncate text-xs">
-              {workspace?.role ?? ""}
-            </span>
+            <span className="text-muted-foreground truncate text-xs">{workspace?.role ?? ""}</span>
           </div>
 
           <ChevronDown className="text-muted-foreground size-4 transition-transform group-data-[collapsible=icon]:hidden" />

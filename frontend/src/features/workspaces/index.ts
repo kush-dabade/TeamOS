@@ -1,5 +1,5 @@
 export { useActiveWorkspace } from "./hooks/use-active-workspace";
-export { useCurrentWorkspace } from "./hooks/use-current-workspace";
+export { useWorkspaceResolution } from "./hooks/use-workspace-resolution";
 export { useWorkspaceMembers } from "./hooks/use-workspace-members";
 export { OnboardingPage } from "./pages/OnboardingPage";
 export { WorkspaceSettingsPage } from "./pages/WorkspaceSettingsPage";

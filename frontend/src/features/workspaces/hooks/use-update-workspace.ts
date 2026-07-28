@@ -18,8 +18,6 @@ export function useUpdateWorkspace(workspaceId: string) {
         refetchType: "all",
       });
 
-      // Targets list() rather than current() since useCurrentWorkspace now
-      // delegates to useWorkspaceList and no query reads under current().
       await queryClient.invalidateQueries({
         queryKey: workspaceKeys.list(),
         refetchType: "all",

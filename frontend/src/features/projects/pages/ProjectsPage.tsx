@@ -20,13 +20,7 @@ import type { ProjectFormData } from "../validation/project";
 export function ProjectsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const {
-    activeWorkspace: workspace,
-    isLoading: isWorkspaceLoading,
-    isError: isWorkspaceError,
-    error: workspaceError,
-    refetch: refetchWorkspace,
-  } = useActiveWorkspace();
+  const { workspace } = useActiveWorkspace();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ProjectStatusFilter>("ALL");
@@ -75,11 +69,6 @@ export function ProjectsPage() {
   }, [projectItems, searchQuery, sortOption]);
 
   const handleRetry = () => {
-    if (isWorkspaceError) {
-      refetchWorkspace();
-      return;
-    }
-
     projectsQuery.refetch();
   };
 
@@ -186,12 +175,8 @@ export function ProjectsPage() {
           <ProjectsTable
             projects={projects}
             selectedProjectId={selectedProjectId}
-            isLoading={isWorkspaceLoading || projectsQuery.isLoading}
-            error={
-              isWorkspaceError
-                ? (workspaceError?.message ?? null)
-                : (projectsQuery.error?.message ?? null)
-            }
+            isLoading={projectsQuery.isLoading}
+            error={projectsQuery.error?.message ?? null}
             hasActiveFilters={Boolean(searchQuery.trim()) || statusFilter !== "ALL"}
             onProjectSelect={handleProjectSelect}
             onRetry={handleRetry}

@@ -25,14 +25,14 @@ export const appRoutes: RouteObject[] = [
         element: <OnboardingPage />,
       },
       {
-        element: <WorkspaceGuard />,
+        element: (
+          <WorkspaceProvider>
+            <WorkspaceGuard />
+          </WorkspaceProvider>
+        ),
         children: [
           {
-            element: (
-              <WorkspaceProvider>
-                <AppShell />
-              </WorkspaceProvider>
-            ),
+            element: <AppShell />,
             children: [
               {
                 errorElement: <RouteErrorBoundary />,

@@ -14,8 +14,6 @@ export function useCreateWorkspace() {
     onSuccess: async () => {
       // Awaited (and forced via refetchType) so the cache already holds the
       // new workspace by the time WorkspaceGuard re-evaluates on navigation.
-      // Targets list() rather than current() since useCurrentWorkspace now
-      // delegates to useWorkspaceList and no query reads under current().
       await queryClient.invalidateQueries({
         queryKey: workspaceKeys.list(),
         refetchType: "all",

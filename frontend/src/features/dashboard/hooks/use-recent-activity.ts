@@ -21,12 +21,7 @@ const RECENT_ACTIVITY_LIMIT = 6;
 // (`GET /workspaces/:workspaceId/activity`) through a dashboard-owned API
 // module instead of composing another feature's hook.
 export function useRecentActivity(): UseRecentActivityResult {
-  const {
-    activeWorkspaceId: workspaceId,
-    isLoading: isWorkspaceLoading,
-    isError: isWorkspaceError,
-    refetch: refetchWorkspace,
-  } = useActiveWorkspace();
+  const { workspaceId } = useActiveWorkspace();
 
   const activityQuery = useQuery<RecentActivityItem[], AppError>({
     queryKey: dashboardKeys.recentActivity(workspaceId ?? ""),
@@ -34,11 +29,10 @@ export function useRecentActivity(): UseRecentActivityResult {
     enabled: Boolean(workspaceId),
   });
 
-  const isLoading = isWorkspaceLoading || (Boolean(workspaceId) && activityQuery.isLoading);
-  const isError = isWorkspaceError || activityQuery.isError;
+  const isLoading = activityQuery.isLoading;
+  const isError = activityQuery.isError;
 
   const refetch = () => {
-    refetchWorkspace();
     activityQuery.refetch();
   };
 

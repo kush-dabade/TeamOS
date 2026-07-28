@@ -21,13 +21,8 @@ interface UseContinueWorkingResult {
  * assumption the prior mock data documented).
  */
 export function useContinueWorking(): UseContinueWorkingResult {
-  const {
-    activeWorkspaceId,
-    isLoading: isWorkspaceLoading,
-    isError: isWorkspaceError,
-    refetch: refetchWorkspace,
-  } = useActiveWorkspace();
-  const projectsQuery = useProjects(activeWorkspaceId ?? undefined);
+  const { workspaceId } = useActiveWorkspace();
+  const projectsQuery = useProjects(workspaceId ?? undefined);
 
   const data = useMemo<ContinueWorkingItem[]>(() => {
     return [...(projectsQuery.data ?? [])]
@@ -43,11 +38,10 @@ export function useContinueWorking(): UseContinueWorkingResult {
       }));
   }, [projectsQuery.data]);
 
-  const isLoading = isWorkspaceLoading || (Boolean(activeWorkspaceId) && projectsQuery.isLoading);
-  const isError = isWorkspaceError || projectsQuery.isError;
+  const isLoading = projectsQuery.isLoading;
+  const isError = projectsQuery.isError;
 
   const refetch = () => {
-    refetchWorkspace();
     projectsQuery.refetch();
   };
 

@@ -29,7 +29,7 @@ type CreatePanel = "project" | "task" | null;
 
 export function HeaderCreate() {
   const { user } = useAuth();
-  const { activeWorkspace: workspace } = useActiveWorkspace();
+  const { workspace } = useActiveWorkspace();
 
   const [activePanel, setActivePanel] = useState<CreatePanel>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);

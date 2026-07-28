@@ -17,13 +17,8 @@ import type { ProjectFormData } from "../validation/project";
 
 export function ProjectWorkspacePage() {
   const { slug } = useParams();
-  const {
-    activeWorkspaceId,
-    isLoading: isWorkspaceLoading,
-    isError: isWorkspaceError,
-    refetch: refetchWorkspace,
-  } = useActiveWorkspace();
-  const projectsQuery = useProjects(activeWorkspaceId ?? undefined);
+  const { workspaceId } = useActiveWorkspace();
+  const projectsQuery = useProjects(workspaceId ?? undefined);
 
   const resolvedProjectId = projectsQuery.data?.find((item) => item.project.slug === slug)?.project
     .id;
@@ -40,7 +35,7 @@ export function ProjectWorkspacePage() {
 
   const activeTab = tabSelection.projectSlug === slug ? tabSelection.tab : "tasks";
 
-  const isResolvingProject = isWorkspaceLoading || projectsQuery.isPending;
+  const isResolvingProject = projectsQuery.isPending;
   const isLoadingDetail = Boolean(resolvedProjectId) && projectDetailQuery.isLoading;
 
   if (isResolvingProject || isLoadingDetail) {
@@ -52,11 +47,6 @@ export function ProjectWorkspacePage() {
   }
 
   const handleRetry = () => {
-    if (isWorkspaceError) {
-      refetchWorkspace();
-      return;
-    }
-
     if (projectsQuery.isError) {
       projectsQuery.refetch();
       return;
@@ -65,7 +55,7 @@ export function ProjectWorkspacePage() {
     projectDetailQuery.refetch();
   };
 
-  if (isWorkspaceError || projectsQuery.isError || projectDetailQuery.isError) {
+  if (projectsQuery.isError || projectDetailQuery.isError) {
     return (
       <PageError>
         <ErrorState

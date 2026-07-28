@@ -25,13 +25,8 @@ interface UseMyTasksResult {
  */
 export function useMyTasks(): UseMyTasksResult {
   const { user } = useAuth();
-  const {
-    activeWorkspaceId,
-    isLoading: isWorkspaceLoading,
-    isError: isWorkspaceError,
-    refetch: refetchWorkspace,
-  } = useActiveWorkspace();
-  const tasksQuery = useTasks(activeWorkspaceId ?? undefined);
+  const { workspaceId } = useActiveWorkspace();
+  const tasksQuery = useTasks(workspaceId ?? undefined);
 
   const data = useMemo<TaskListItem[]>(() => {
     if (!user) {
@@ -43,11 +38,10 @@ export function useMyTasks(): UseMyTasksResult {
     );
   }, [tasksQuery.tasks, user]);
 
-  const isLoading = isWorkspaceLoading || (Boolean(activeWorkspaceId) && tasksQuery.isLoading);
-  const isError = isWorkspaceError || Boolean(tasksQuery.error);
+  const isLoading = tasksQuery.isLoading;
+  const isError = Boolean(tasksQuery.error);
 
   const refetch = () => {
-    refetchWorkspace();
     tasksQuery.refetch();
   };
 

@@ -12,24 +12,13 @@ import { useActiveWorkspace } from "../hooks/use-active-workspace";
 import { useWorkspace } from "../hooks/use-workspace";
 
 export function WorkspaceSettingsPage() {
-  const {
-    activeWorkspaceId,
-    isLoading: isActiveWorkspaceLoading,
-    isError: isActiveWorkspaceError,
-    refetch: refetchActiveWorkspace,
-  } = useActiveWorkspace();
-  const workspaceQuery = useWorkspace(activeWorkspaceId ?? undefined);
+  const { workspaceId } = useActiveWorkspace();
+  const workspaceQuery = useWorkspace(workspaceId ?? undefined);
 
-  const isPending =
-    isActiveWorkspaceLoading || (Boolean(activeWorkspaceId) && workspaceQuery.isPending);
-  const isError = isActiveWorkspaceError || workspaceQuery.isError;
+  const isPending = workspaceQuery.isPending;
+  const isError = workspaceQuery.isError;
 
   function handleRetry() {
-    if (isActiveWorkspaceError) {
-      refetchActiveWorkspace();
-      return;
-    }
-
     workspaceQuery.refetch();
   }
 

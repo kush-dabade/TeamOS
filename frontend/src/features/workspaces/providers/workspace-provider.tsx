@@ -66,19 +66,27 @@ export function WorkspaceProvider({ children }: PropsWithChildren) {
     return storedWorkspaceIsValid ? storedWorkspaceId : workspaces[0].id;
   }, [workspaces, storedWorkspaceId]);
 
+  // Self-heal the in-memory preference the moment it disagrees with the
+  // reconciled id (invalid/missing `storedWorkspaceId`, case 1 or 3 above).
+  // Setting it here — during render, like `activeWorkspaceId` above — rather
+  // than in an effect means it settles within the same render pass instead
+  // of an extra commit+effect round trip, and it's what keeps this state
+  // from ever pointing at a now-stale id that could become valid again on a
+  // later workspace-list refresh.
+  if (activeWorkspaceId && activeWorkspaceId !== storedWorkspaceId) {
+    setStoredWorkspaceId(activeWorkspaceId);
+  }
+
   const activeWorkspace = useMemo(
     () => workspaces.find((workspace) => workspace.id === activeWorkspaceId) ?? null,
     [workspaces, activeWorkspaceId],
   );
 
   // --- Self-heal persistence -------------------------------------------
-  // The derivation above never writes to storage — it just tolerates a bad
-  // `storedWorkspaceId` on every render. This effect is what actually fixes
-  // storage, exactly once, the first time the resolved ID disagrees with
-  // what's on disk (case 1 or 3 above). It's a plain side effect syncing an
-  // external system (localStorage) from already-resolved render state, not
-  // a state correction, so it doesn't trigger a second render pass the way
-  // a `setState` here would.
+  // Local Storage is an external system, so it's corrected here in an
+  // effect rather than during render — mirrors the in-memory heal above,
+  // exactly once, the first time the resolved id disagrees with what's on
+  // disk.
   useEffect(() => {
     if (activeWorkspaceId && activeWorkspaceId !== storedWorkspaceId) {
       setStoredActiveWorkspaceId(activeWorkspaceId);

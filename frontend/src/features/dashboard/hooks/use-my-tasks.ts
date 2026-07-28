@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { useAuth } from "@/features/auth";
 import { useTasks } from "@/features/tasks";
 import type { TaskListItem } from "@/features/tasks/types";
-import { useCurrentWorkspace } from "@/features/workspaces";
+import { useActiveWorkspace } from "@/features/workspaces";
 
 interface UseMyTasksResult {
   data: TaskListItem[];
@@ -25,8 +25,8 @@ interface UseMyTasksResult {
  */
 export function useMyTasks(): UseMyTasksResult {
   const { user } = useAuth();
-  const workspaceQuery = useCurrentWorkspace();
-  const tasksQuery = useTasks(workspaceQuery.data?.id);
+  const { workspaceId } = useActiveWorkspace();
+  const tasksQuery = useTasks(workspaceId ?? undefined);
 
   const data = useMemo<TaskListItem[]>(() => {
     if (!user) {
@@ -38,12 +38,10 @@ export function useMyTasks(): UseMyTasksResult {
     );
   }, [tasksQuery.tasks, user]);
 
-  const isLoading =
-    workspaceQuery.isLoading || (Boolean(workspaceQuery.data) && tasksQuery.isLoading);
-  const isError = workspaceQuery.isError || Boolean(tasksQuery.error);
+  const isLoading = tasksQuery.isLoading;
+  const isError = Boolean(tasksQuery.error);
 
   const refetch = () => {
-    workspaceQuery.refetch();
     tasksQuery.refetch();
   };
 

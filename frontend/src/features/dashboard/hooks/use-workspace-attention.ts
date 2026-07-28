@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 
 import { useTasks } from "@/features/tasks";
-import { useCurrentWorkspace } from "@/features/workspaces";
+import { useActiveWorkspace } from "@/features/workspaces";
 
 import type { WorkspaceAttentionItem } from "../types";
 
@@ -22,8 +22,8 @@ interface UseWorkspaceAttentionResult {
  * more urgent signal, so a task is never double-counted.
  */
 export function useWorkspaceAttention(): UseWorkspaceAttentionResult {
-  const workspaceQuery = useCurrentWorkspace();
-  const tasksQuery = useTasks(workspaceQuery.data?.id);
+  const { workspaceId } = useActiveWorkspace();
+  const tasksQuery = useTasks(workspaceId ?? undefined);
 
   // Captured once per mount rather than read fresh on every render - the
   // purpose is "is this overdue as of when the panel loaded", not a live
@@ -37,7 +37,9 @@ export function useWorkspaceAttention(): UseWorkspaceAttentionResult {
 
     for (const { task, project } of tasksQuery.tasks) {
       const isOverdue =
-        task.status !== "DONE" && Boolean(task.dueDate) && new Date(task.dueDate as string).getTime() < now;
+        task.status !== "DONE" &&
+        Boolean(task.dueDate) &&
+        new Date(task.dueDate as string).getTime() < now;
 
       if (isOverdue) {
         overdue.push({
@@ -66,17 +68,17 @@ export function useWorkspaceAttention(): UseWorkspaceAttentionResult {
     }
 
     overdue.sort((a, b) => new Date(a.occurredAt).getTime() - new Date(b.occurredAt).getTime());
-    pendingReview.sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime());
+    pendingReview.sort(
+      (a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime(),
+    );
 
     return [...overdue, ...pendingReview];
   }, [tasksQuery.tasks, now]);
 
-  const isLoading =
-    workspaceQuery.isLoading || (Boolean(workspaceQuery.data) && tasksQuery.isLoading);
-  const isError = workspaceQuery.isError || Boolean(tasksQuery.error);
+  const isLoading = tasksQuery.isLoading;
+  const isError = Boolean(tasksQuery.error);
 
   const refetch = () => {
-    workspaceQuery.refetch();
     tasksQuery.refetch();
   };
 

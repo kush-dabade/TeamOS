@@ -1,11 +1,23 @@
-import { AlertCircle, ChevronDown } from "lucide-react";
+import { AlertCircle, Check, ChevronDown } from "lucide-react";
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
-import { useCurrentWorkspace } from "@/features/workspaces";
+import { useActiveWorkspace, useWorkspaceResolution } from "@/features/workspaces";
 
 export function WorkspaceSwitcher() {
-  const { data: workspace, isLoading, isError, refetch } = useCurrentWorkspace();
+  const {
+    workspace,
+    workspaceId: activeWorkspaceId,
+    workspaces,
+    switchWorkspace,
+  } = useActiveWorkspace();
+  const { isLoading, isError, refetch } = useWorkspaceResolution();
 
   if (isLoading) {
     return (
@@ -51,21 +63,39 @@ export function WorkspaceSwitcher() {
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <SidebarMenuButton size="lg" className="h-14 rounded-lg transition-colors">
-          <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted font-semibold">
-            {name.charAt(0)}
-          </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuButton size="lg" className="h-14 rounded-lg transition-colors">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted font-semibold">
+                {name.charAt(0)}
+              </div>
 
-          <div className="flex min-w-0 flex-1 flex-col text-left group-data-[collapsible=icon]:hidden">
-            <span className="truncate text-sm font-medium">{name}</span>
+              <div className="flex min-w-0 flex-1 flex-col text-left group-data-[collapsible=icon]:hidden">
+                <span className="truncate text-sm font-medium">{name}</span>
 
-            <span className="text-muted-foreground truncate text-xs">
-              {workspace?.role ?? ""}
-            </span>
-          </div>
+                <span className="text-muted-foreground truncate text-xs">
+                  {workspace?.role ?? ""}
+                </span>
+              </div>
 
-          <ChevronDown className="text-muted-foreground size-4 transition-transform group-data-[collapsible=icon]:hidden" />
-        </SidebarMenuButton>
+              <ChevronDown className="text-muted-foreground size-4 transition-transform group-data-[collapsible=icon]:hidden" />
+            </SidebarMenuButton>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent align="start">
+            {workspaces.map((item) => (
+              <DropdownMenuItem key={item.id} onSelect={() => switchWorkspace(item.id)}>
+                <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold">
+                  {item.name.charAt(0)}
+                </div>
+
+                <span className="min-w-0 flex-1 truncate">{item.name}</span>
+
+                {item.id === activeWorkspaceId && <Check className="size-4 shrink-0" />}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </SidebarMenuItem>
     </SidebarMenu>
   );

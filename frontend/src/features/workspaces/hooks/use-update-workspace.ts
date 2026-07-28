@@ -19,7 +19,7 @@ export function useUpdateWorkspace(workspaceId: string) {
       });
 
       await queryClient.invalidateQueries({
-        queryKey: workspaceKeys.current(),
+        queryKey: workspaceKeys.list(),
         refetchType: "all",
       });
     },

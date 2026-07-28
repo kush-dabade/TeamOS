@@ -5,7 +5,7 @@ import { SearchX, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui";
 import { PageLayout } from "@/components/layout";
 import { ErrorState, PageError } from "@/components/ux";
-import { useCurrentWorkspace } from "@/features/workspaces";
+import { useActiveWorkspace } from "@/features/workspaces";
 
 import { useProjectWithTaskCounts } from "../hooks/use-project-with-task-counts";
 import { useProjects } from "../hooks/use-projects";
@@ -17,12 +17,11 @@ import type { ProjectFormData } from "../validation/project";
 
 export function ProjectWorkspacePage() {
   const { slug } = useParams();
-  const workspaceQuery = useCurrentWorkspace();
-  const projectsQuery = useProjects(workspaceQuery.data?.id);
+  const { workspaceId } = useActiveWorkspace();
+  const projectsQuery = useProjects(workspaceId ?? undefined);
 
-  const resolvedProjectId = projectsQuery.data?.find(
-    (item) => item.project.slug === slug,
-  )?.project.id;
+  const resolvedProjectId = projectsQuery.data?.find((item) => item.project.slug === slug)?.project
+    .id;
 
   const projectDetailQuery = useProjectWithTaskCounts(resolvedProjectId);
   const updateProject = useUpdateProject();
@@ -36,7 +35,7 @@ export function ProjectWorkspacePage() {
 
   const activeTab = tabSelection.projectSlug === slug ? tabSelection.tab : "tasks";
 
-  const isResolvingProject = workspaceQuery.isPending || projectsQuery.isPending;
+  const isResolvingProject = projectsQuery.isPending;
   const isLoadingDetail = Boolean(resolvedProjectId) && projectDetailQuery.isLoading;
 
   if (isResolvingProject || isLoadingDetail) {
@@ -48,11 +47,6 @@ export function ProjectWorkspacePage() {
   }
 
   const handleRetry = () => {
-    if (workspaceQuery.isError) {
-      workspaceQuery.refetch();
-      return;
-    }
-
     if (projectsQuery.isError) {
       projectsQuery.refetch();
       return;
@@ -61,7 +55,7 @@ export function ProjectWorkspacePage() {
     projectDetailQuery.refetch();
   };
 
-  if (workspaceQuery.isError || projectsQuery.isError || projectDetailQuery.isError) {
+  if (projectsQuery.isError || projectDetailQuery.isError) {
     return (
       <PageError>
         <ErrorState

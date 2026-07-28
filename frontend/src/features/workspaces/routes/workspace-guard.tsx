@@ -3,12 +3,17 @@ import { Navigate, Outlet } from "react-router-dom";
 import { FullPageError } from "@/components/full-page-error";
 import { FullPageLoader } from "@/components/full-page-loader";
 
-import { useCurrentWorkspace } from "../hooks/use-current-workspace";
+import { useWorkspaceResolution } from "../hooks/use-workspace-resolution";
 
+/**
+ * Sole owner of workspace loading/error/onboarding-redirect. Reads
+ * useWorkspaceResolution (not the narrowed useActiveWorkspace) because it's
+ * the one place in the app allowed to know workspaces are still resolving.
+ */
 export function WorkspaceGuard() {
-  const { data: workspace, isPending, isError, refetch } = useCurrentWorkspace();
+  const { workspaces, isLoading, isError, refetch } = useWorkspaceResolution();
 
-  if (isPending) {
+  if (isLoading) {
     return <FullPageLoader />;
   }
 
@@ -22,7 +27,7 @@ export function WorkspaceGuard() {
     );
   }
 
-  if (!workspace) {
+  if (workspaces.length === 0) {
     return <Navigate to="/onboarding" replace />;
   }
 

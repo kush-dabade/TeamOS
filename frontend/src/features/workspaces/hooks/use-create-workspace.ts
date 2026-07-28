@@ -15,7 +15,7 @@ export function useCreateWorkspace() {
       // Awaited (and forced via refetchType) so the cache already holds the
       // new workspace by the time WorkspaceGuard re-evaluates on navigation.
       await queryClient.invalidateQueries({
-        queryKey: workspaceKeys.current(),
+        queryKey: workspaceKeys.list(),
         refetchType: "all",
       });
     },

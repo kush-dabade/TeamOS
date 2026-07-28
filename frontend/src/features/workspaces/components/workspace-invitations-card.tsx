@@ -9,7 +9,6 @@ import type { Workspace } from "../types";
 
 import { WorkspaceInvitationRow } from "./workspace-invitation-row";
 import { WorkspaceInvitationsCardSkeleton } from "./workspace-invitations-card-skeleton";
-import { WorkspaceInviteForm } from "./workspace-invite-form";
 
 interface WorkspaceInvitationsCardProps {
   workspace: Workspace;
@@ -30,68 +29,60 @@ export function WorkspaceInvitationsCard({ workspace }: WorkspaceInvitationsCard
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Invitations</CardTitle>
+        <CardTitle>Pending Invitations</CardTitle>
       </CardHeader>
 
-      <CardContent>
-        <div className="flex flex-col gap-6">
-          <WorkspaceInviteForm workspaceId={workspace.id} actorRole={workspace.role} />
-
-          <div className="flex flex-col gap-3 border-t pt-6">
-            <h3 className="text-xs font-medium text-muted-foreground">Pending Invitations</h3>
-
-            {invitationsQuery.isError ? (
-              <ErrorState
-                icon={TriangleAlert}
-                title="Unable to load invitations"
-                description="Something went wrong while loading pending invitations. Check your connection and try again."
-                action={
-                  <Button type="button" variant="outline" onClick={() => invitationsQuery.refetch()}>
-                    Retry
-                  </Button>
-                }
-              />
-            ) : invitationsQuery.data.length === 0 ? (
-              <div className="rounded-lg border border-dashed py-6 text-center text-sm text-muted-foreground">
-                No pending invitations.
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[560px] border-collapse text-sm">
-                  <caption className="sr-only">Pending workspace invitations</caption>
-                  <thead className="text-left text-xs font-medium text-muted-foreground">
-                    <tr>
-                      <th scope="col" className="px-3 py-2 font-medium">
-                        Email
-                      </th>
-                      <th scope="col" className="px-3 py-2 font-medium">
-                        Role
-                      </th>
-                      <th scope="col" className="px-3 py-2 font-medium">
-                        Status
-                      </th>
-                      <th scope="col" className="px-3 py-2 font-medium">
-                        Expires
-                      </th>
-                      <th scope="col" className="px-3 py-2 text-right font-medium">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {invitationsQuery.data.map((invitation) => (
-                      <WorkspaceInvitationRow
-                        key={invitation.id}
-                        workspaceId={workspace.id}
-                        invitation={invitation}
-                      />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+      <CardContent className="flex min-h-48 flex-col">
+        {invitationsQuery.isError ? (
+          <ErrorState
+            icon={TriangleAlert}
+            title="Unable to load invitations"
+            description="Something went wrong while loading pending invitations. Check your connection and try again."
+            action={
+              <Button type="button" variant="outline" onClick={() => invitationsQuery.refetch()}>
+                Retry
+              </Button>
+            }
+          />
+        ) : invitationsQuery.data.length === 0 ? (
+          <div className="flex flex-1 flex-col items-center justify-center rounded-lg border border-dashed text-center text-sm text-muted-foreground">
+            No pending invitations.
           </div>
-        </div>
+        ) : (
+          <div className="flex flex-1 flex-col overflow-x-auto">
+            <table className="w-full table-fixed border-collapse text-sm">
+              <caption className="sr-only">Pending workspace invitations</caption>
+              <thead className="text-left text-xs font-medium text-muted-foreground">
+                <tr>
+                  <th scope="col" className="truncate px-3 py-2 font-medium">
+                    Email
+                  </th>
+                  <th scope="col" className="w-24 truncate px-3 py-2 font-medium">
+                    Role
+                  </th>
+                  <th scope="col" className="w-24 truncate px-3 py-2 font-medium">
+                    Status
+                  </th>
+                  <th scope="col" className="w-28 truncate px-3 py-2 font-medium">
+                    Expires
+                  </th>
+                  <th scope="col" className="w-20 truncate px-3 py-2 text-right font-medium">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {invitationsQuery.data.map((invitation) => (
+                  <WorkspaceInvitationRow
+                    key={invitation.id}
+                    workspaceId={workspace.id}
+                    invitation={invitation}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

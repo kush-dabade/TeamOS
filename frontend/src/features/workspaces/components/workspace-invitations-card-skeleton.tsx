@@ -10,24 +10,17 @@ export function WorkspaceInvitationsCardSkeleton() {
         <Skeleton className="h-5 w-28" />
       </CardHeader>
 
-      <CardContent>
-        <div className="flex flex-col gap-6">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-            <Skeleton className="h-8 sm:flex-1" />
-            <Skeleton className="h-8 sm:w-40" />
-            <Skeleton className="h-8 w-full sm:w-20" />
-          </div>
-
-          <div className="flex flex-col gap-4">
-            {skeletonRows.map((row) => (
-              <div key={row} className="flex items-center justify-between gap-4">
-                <Skeleton className="h-4 w-40" />
-                <Skeleton className="h-7 w-20 rounded-full" />
-                <Skeleton className="h-7 w-16 rounded-full" />
-                <Skeleton className="h-4 w-24" />
-              </div>
-            ))}
-          </div>
+      <CardContent className="flex min-h-48 flex-col">
+        <div className="flex flex-1 flex-col gap-4">
+          {skeletonRows.map((row) => (
+            <div key={row} className="flex items-center justify-between gap-4">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-5 w-16 rounded-full" />
+              <Skeleton className="h-5 w-20 rounded-full" />
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="size-7 rounded-md" />
+            </div>
+          ))}
         </div>
       </CardContent>
     </Card>

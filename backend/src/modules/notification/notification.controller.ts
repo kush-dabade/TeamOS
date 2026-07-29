@@ -4,6 +4,7 @@ import {
   listNotifications,
   markNotificationAsRead,
   markAllNotificationsAsRead,
+  getUnreadNotificationCount,
 } from "./notification.service.js";
 
 import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
@@ -73,6 +74,32 @@ export async function markNotificationReadHandler(req: Request, res: Response) {
     }
 
     console.error("Mark notification read error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "An internal error occurred",
+      },
+    });
+  }
+}
+
+export async function getUnreadNotificationCountHandler(
+  req: Request,
+  res: Response,
+) {
+  try {
+    const count = await getUnreadNotificationCount(req.user!.id);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        count,
+      },
+    });
+  } catch (error) {
+    console.error("Get unread notification count error:", error);
 
     return res.status(500).json({
       success: false,

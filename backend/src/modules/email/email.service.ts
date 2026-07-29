@@ -42,11 +42,5 @@ export async function sendWorkspaceInvitation(
     expiresText,
   });
 
-  try {
-    await sendEmail(data.recipientEmail, email);
-  } catch (error) {
-    console.error("Failed to send workspace invitation email", {
-      message: error instanceof Error ? error.message : String(error),
-    });
-  }
-} 
+  await sendEmail(data.recipientEmail, email);
+}

@@ -41,7 +41,7 @@ export function WorkspaceSwitcher() {
         <SidebarMenuItem>
           <SidebarMenuButton
             size="lg"
-            className="h-14 rounded-lg text-destructive transition-colors"
+            className="h-14 rounded-lg text-destructive transition-colors group-data-[collapsible=icon]:justify-center"
             onClick={() => refetch()}
           >
             <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted">
@@ -65,7 +65,10 @@ export function WorkspaceSwitcher() {
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <SidebarMenuButton size="lg" className="h-14 rounded-lg transition-colors">
+            <SidebarMenuButton
+              size="lg"
+              className="h-14 rounded-lg transition-colors group-data-[collapsible=icon]:justify-center"
+            >
               <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted font-semibold">
                 {name.charAt(0)}
               </div>

@@ -7,7 +7,7 @@ export function workspaceInvitationTemplate(
   data: WorkspaceInvitationTemplateData,
 ): EmailTemplate {
   const subject = `You've been invited to join ${data.workspaceName}`;
-  const heading = "You've been invited to TeamOS";
+  const eyebrow = "You've been invited to join";
   const buttonText = "Accept Invitation";
 
   function escapeHtml(value: string): string {
@@ -19,6 +19,7 @@ export function workspaceInvitationTemplate(
       .replace(/'/g, "&#39;");
   }
 
+  const titleText = escapeHtml(subject);
   const workspaceName = escapeHtml(data.workspaceName);
   const invitedByName = escapeHtml(data.invitedByName);
   const role = escapeHtml(data.role);
@@ -26,19 +27,17 @@ export function workspaceInvitationTemplate(
   const expiresText = escapeHtml(data.expiresText);
 
   const text = `
-${heading}
+${eyebrow}
+${data.workspaceName}
 
-${data.invitedByName} has invited you to collaborate in the workspace "${data.workspaceName}" as a ${data.role}.
+${data.invitedByName} invited you to join as ${data.role}. Collaborate with your team on projects, tasks, and discussions in one place.
 
 Accept your invitation:
 ${data.invitationUrl}
 
 ${data.expiresText}
 
-If you weren't expecting this invitation, you can safely ignore this email. No changes will be made to your account unless you choose to accept the invitation.
-
-—
-TeamOS
+You received this email because ${data.invitedByName} invited you to join ${data.workspaceName} on TeamOS. If you weren't expecting this, you can safely ignore it.
 `.trim();
 
   const html = `
@@ -47,7 +46,33 @@ TeamOS
       <head>
           <meta charset="UTF-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-          <title>${subject}</title>
+          <meta name="color-scheme" content="light" />
+          <meta name="supported-color-schemes" content="light" />
+          <title>${titleText}</title>
+          <style>
+            @media screen and (max-width: 600px) {
+              .tos-card-padding {
+                padding-left: 24px !important;
+                padding-right: 24px !important;
+              }
+              .tos-header-padding {
+                padding: 32px 24px 24px !important;
+              }
+              .tos-workspace-name {
+                font-size: 24px !important;
+                line-height: 30px !important;
+              }
+              .tos-button {
+                display: block !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+                text-align: center !important;
+              }
+              .tos-button-cell {
+                width: 100% !important;
+              }
+            }
+          </style>
       </head>
       <body
           style="
@@ -74,165 +99,86 @@ TeamOS
                       cellspacing="0"
                       border="0"
                       style="
-                      max-width:600px;
+                      max-width:560px;
                       background:#ffffff;
                       border:1px solid #e4e4e7;
-                      border-radius:16px;
+                      border-radius:12px;
                       overflow:hidden;
                       "
                       >
                       <tr>
                         <td
                             align="center"
+                            class="tos-header-padding"
                             style="
-                            padding:48px 48px 32px;
+                            padding:36px 48px 28px;
                             border-bottom:1px solid #f4f4f5;
                             "
                             >
-                            <h1
+                            <span
                               style="
-                              margin:0;
-                              font-size:32px;
+                              font-size:20px;
                               font-weight:700;
-                              letter-spacing:-0.03em;
+                              letter-spacing:-0.02em;
                               color:#18181b;
                               "
                               >
                               TeamOS
-                            </h1>
-                            <div
-                              style="
-                              width:48px;
-                              height:4px;
-                              border-radius:999px;
-                              background:#2563eb;
-                              margin:20px auto 0;
-                              "
-                              ></div>
+                            </span>
                         </td>
                       </tr>
                       <tr>
-                        <td style="padding:48px;">
-                            <h2
+                        <td class="tos-card-padding" style="padding:44px 48px;">
+                            <p
                               style="
                               margin:0;
+                              font-size:15px;
+                              line-height:22px;
+                              font-weight:600;
+                              color:#71717a;
+                              "
+                              >
+                              ${eyebrow}
+                            </p>
+                            <h1
+                              class="tos-workspace-name"
+                              style="
+                              margin:6px 0 0;
                               font-size:28px;
-                              line-height:36px;
+                              line-height:34px;
                               font-weight:700;
+                              letter-spacing:-0.02em;
                               color:#18181b;
                               "
                               >
-                              ${heading}
-                            </h2>
+                              ${workspaceName}
+                            </h1>
                             <p
                               style="
-                              margin:24px 0 0;
+                              margin:20px 0 0;
                               font-size:16px;
-                              line-height:28px;
+                              line-height:26px;
                               color:#3f3f46;
                               "
                               >
                               <strong>${invitedByName}</strong>
-                              has invited you to collaborate in the workspace
-                              <strong>${workspaceName}</strong>
-                              as a
+                              invited you to join as
                               <strong>${role}</strong>.
+                              Collaborate with your team on projects, tasks, and discussions in one place.
                             </p>
-                            <p
-                              style="
-                              margin:20px 0 36px;
-                              font-size:16px;
-                              line-height:28px;
-                              color:#3f3f46;
-                              "
-                              >
-                              Click the button below to accept your invitation and start collaborating with your team.
-                            </p>
-                            <table
-                              role="presentation"
-                              width="100%"
-                              cellpadding="0"
-                              cellspacing="0"
-                              border="0"
-                              style="
-                              border:1px solid #e4e4e7;
-                              border-radius:12px;
-                              background:#fafafa;
-                              margin-bottom:36px;
-                              "
-                              >
-                              <tr>
-                                  <td style="padding:28px;">
-                                    <p
-                                        style="
-                                        margin:0;
-                                        font-size:13px;
-                                        font-weight:600;
-                                        text-transform:uppercase;
-                                        letter-spacing:0.08em;
-                                        color:#71717a;
-                                        "
-                                        >
-                                        Workspace
-                                    </p>
-                                    <p
-                                        style="
-                                        margin:8px 0 28px;
-                                        font-size:22px;
-                                        font-weight:700;
-                                        color:#18181b;
-                                        "
-                                        >
-                                        ${workspaceName}
-                                    </p>
-                                    <p
-                                        style="
-                                        margin:0;
-                                        font-size:13px;
-                                        font-weight:600;
-                                        text-transform:uppercase;
-                                        letter-spacing:0.08em;
-                                        color:#71717a;
-                                        "
-                                        >
-                                        Your Role
-                                    </p>
-                                    <table
-                                        role="presentation"
-                                        cellpadding="0"
-                                        cellspacing="0"
-                                        >
-                                        <tr>
-                                          <td
-                                              style="
-                                              background:#dbeafe;
-                                              color:#1d4ed8;
-                                              border:1px solid #bfdbfe;
-                                              border-radius:999px;
-                                              padding:8px 16px;
-                                              font-size:14px;
-                                              font-weight:600;
-                                              "
-                                              >
-                                              ${role}
-                                          </td>
-                                        </tr>
-                                    </table>
-                                  </td>
-                              </tr>
-                            </table>
                             <table
                               role="presentation"
                               cellpadding="0"
                               cellspacing="0"
                               border="0"
-                              style="margin-bottom:40px;"
+                              style="margin:32px 0 0;"
                               >
                               <tr>
                                   <td
-                                    bgcolor="#1d4ed8"
+                                    class="tos-button-cell"
+                                    bgcolor="#18181b"
                                     style="
-                                    border-radius:10px;
+                                    border-radius:8px;
                                     "
                                     >
                                     <a
@@ -240,9 +186,10 @@ TeamOS
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         role="button"
+                                        class="tos-button"
                                         style="
                                         display:inline-block;
-                                        padding:16px 34px;
+                                        padding:14px 32px;
                                         color:#ffffff;
                                         text-decoration:none;
                                         font-size:16px;
@@ -257,123 +204,55 @@ TeamOS
                             </table>
                             <p
                               style="
-                              margin:0 0 10px;
+                              margin:24px 0 0;
                               color:#71717a;
-                              font-size:14px;
-                              line-height:22px;
+                              font-size:13px;
+                              line-height:20px;
                               "
                               >
                               If the button doesn't work, copy and paste this link into your browser:
                             </p>
                             <p
                               style="
-                              margin:0;
+                              margin:6px 0 0;
                               word-break:break-all;
                               color:#2563eb;
-                              font-size:14px;
-                              line-height:22px;
+                              font-size:13px;
+                              line-height:20px;
                               "
                               >
                               ${invitationUrl}
                             </p>
-                            <table
-                              role="presentation"
-                              width="100%"
-                              cellpadding="0"
-                              cellspacing="0"
-                              border="0"
-                              style="margin:40px 0 24px;"
-                              >
-                              <tr>
-                                  <td
-                                    style="
-                                    border-top:1px solid #e4e4e7;
-                                    "
-                                    ></td>
-                              </tr>
-                            </table>
                             <p
                               style="
-                              margin:0;
+                              margin:24px 0 0;
                               font-size:14px;
-                              line-height:24px;
+                              line-height:22px;
                               color:#52525b;
                               "
                               >
-                              <strong>${expiresText}</strong>
+                              ${expiresText}
                             </p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td
+                            class="tos-card-padding"
+                            style="
+                            padding:24px 48px 32px;
+                            border-top:1px solid #f4f4f5;
+                            "
+                            >
                             <p
                               style="
-                              margin:16px 0 0;
-                              font-size:14px;
-                              line-height:24px;
-                              color:#71717a;
+                              margin:0;
+                              font-size:13px;
+                              line-height:20px;
+                              color:#a1a1aa;
                               "
                               >
-                              If you weren't expecting this invitation, you can safely ignore this email. No changes will be made to your account unless you choose to accept the invitation.
+                              You received this email because <strong style="color:#71717a;">${invitedByName}</strong> invited you to join <strong style="color:#71717a;">${workspaceName}</strong> on TeamOS. If you weren't expecting this, you can safely ignore it.
                             </p>
-                            <table
-                              role="presentation"
-                              width="100%"
-                              cellpadding="0"
-                              cellspacing="0"
-                              border="0"
-                              style="margin:40px 0 0;"
-                              >
-                              <tr>
-                                  <td
-                                    style="
-                                    border-top:1px solid #e4e4e7;
-                                    "
-                                    ></td>
-                              </tr>
-                            </table>
-                            <table
-                              role="presentation"
-                              width="100%"
-                              cellpadding="0"
-                              cellspacing="0"
-                              border="0"
-                              >
-                              <tr>
-                                  <td
-                                    align="center"
-                                    style="
-                                    padding-top:28px;
-                                    "
-                                    >
-                                    <p
-                                        style="
-                                        margin:0;
-                                        font-size:14px;
-                                        font-weight:600;
-                                        color:#18181b;
-                                        "
-                                        >
-                                        TeamOS
-                                    </p>
-                                    <p
-                                        style="
-                                        margin:10px 0 0;
-                                        font-size:13px;
-                                        line-height:22px;
-                                        color:#71717a;
-                                        "
-                                        >
-                                        Built with ❤️ by TeamOS
-                                    </p>
-                                    <p
-                                        style="
-                                        margin:20px 0 0;
-                                        font-size:12px;
-                                        color:#a1a1aa;
-                                        "
-                                        >
-                                        This is an automated transactional email.
-                                    </p>
-                                  </td>
-                              </tr>
-                            </table>
                         </td>
                       </tr>
                   </table>

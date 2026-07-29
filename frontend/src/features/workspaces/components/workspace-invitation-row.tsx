@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -9,8 +10,14 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { formatDate } from "@/utils/formatDate";
 
 import { useCancelInvitation } from "../hooks/use-cancel-invitation";
@@ -51,7 +58,7 @@ export function WorkspaceInvitationRow({ workspaceId, invitation }: WorkspaceInv
 
   return (
     <tr className="border-b last:border-b-0">
-      <td className="px-3 py-2">
+      <td className="truncate px-3 py-2">
         <span className="text-sm">{invitation.email}</span>
       </td>
 
@@ -68,44 +75,63 @@ export function WorkspaceInvitationRow({ workspaceId, invitation }: WorkspaceInv
       </td>
 
       <td className="px-3 py-2 text-right">
-        <div className="flex items-center justify-end gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={handleResend}
-            disabled={resendInvitation.isPending}
-          >
-            {resendInvitation.isPending ? "Resending..." : "Resend"}
-          </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Actions for invitation to ${invitation.email}`}
+            >
+              <MoreHorizontal />
+            </Button>
+          </DropdownMenuTrigger>
 
-          <Dialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
-            <DialogTrigger asChild>
-              <Button type="button" variant="ghost" size="sm">
-                Cancel
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              disabled={resendInvitation.isPending}
+              onSelect={() => {
+                void handleResend();
+              }}
+            >
+              {resendInvitation.isPending ? "Resending..." : "Resend"}
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={(event) => {
+                event.preventDefault();
+                setIsCancelDialogOpen(true);
+              }}
+            >
+              Cancel invitation
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <Dialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Cancel invitation to {invitation.email}?</DialogTitle>
+              <DialogDescription>
+                They will no longer be able to join this workspace with this invitation. This
+                cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter showCloseButton>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleConfirmCancel}
+                disabled={cancelInvitation.isPending}
+              >
+                {cancelInvitation.isPending ? "Cancelling..." : "Cancel Invitation"}
               </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Cancel invitation to {invitation.email}?</DialogTitle>
-                <DialogDescription>
-                  They will no longer be able to join this workspace with this invitation. This
-                  cannot be undone.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter showCloseButton>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={handleConfirmCancel}
-                  disabled={cancelInvitation.isPending}
-                >
-                  {cancelInvitation.isPending ? "Cancelling..." : "Cancel Invitation"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </td>
     </tr>
   );

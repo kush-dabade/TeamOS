@@ -19,6 +19,7 @@ export function workspaceInvitationTemplate(
       .replace(/'/g, "&#39;");
   }
 
+  const titleText = escapeHtml(subject);
   const workspaceName = escapeHtml(data.workspaceName);
   const invitedByName = escapeHtml(data.invitedByName);
   const role = escapeHtml(data.role);
@@ -47,7 +48,7 @@ You received this email because ${data.invitedByName} invited you to join ${data
           <meta name="viewport" content="width=device-width, initial-scale=1.0" />
           <meta name="color-scheme" content="light" />
           <meta name="supported-color-schemes" content="light" />
-          <title>${subject}</title>
+          <title>${titleText}</title>
           <style>
             @media screen and (max-width: 600px) {
               .tos-card-padding {

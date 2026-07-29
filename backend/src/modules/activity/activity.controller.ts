@@ -18,6 +18,9 @@ export async function listWorkspaceActivitiesHandler(
 
       page: query.page,
       limit: query.limit,
+
+      ...(query.entityType !== undefined && { entityType: query.entityType }),
+      ...(query.entityId !== undefined && { entityId: query.entityId }),
     });
 
     return res.status(200).json({

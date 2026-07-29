@@ -111,17 +111,23 @@ export async function listWorkspaceActivities(
 
   const skip = (options.page - 1) * options.limit;
 
+  const where = {
+    workspaceId: options.workspaceId,
+
+    ...(options.entityType &&
+      options.entityId && {
+        entityType: options.entityType,
+        entityId: options.entityId,
+      }),
+  };
+
   const [total, activities] = await Promise.all([
     prisma.activity.count({
-      where: {
-        workspaceId: options.workspaceId,
-      },
+      where,
     }),
 
     prisma.activity.findMany({
-      where: {
-        workspaceId: options.workspaceId,
-      },
+      where,
 
       include: {
         actor: {

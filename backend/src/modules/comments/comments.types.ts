@@ -20,3 +20,12 @@ export interface CreateCommentData {
 export interface ListCommentsOptions {
   taskId: string;
 }
+
+export interface UpdateCommentData {
+  commentId: string;
+  content: string;
+}
+
+export interface DeleteCommentOptions {
+  commentId: string;
+}

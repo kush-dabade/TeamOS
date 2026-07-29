@@ -1,4 +1,7 @@
 import type { Request, Response } from "express";
+import { ZodError } from "zod";
+
+import { notificationParamsSchema } from "./notification.schema.js";
 
 import {
   listNotifications,
@@ -43,9 +46,11 @@ export async function listNotificationsHandler(req: Request, res: Response) {
 
 export async function markNotificationReadHandler(req: Request, res: Response) {
   try {
+    const params = notificationParamsSchema.parse(req.params);
+
     const notification = await markNotificationAsRead(
       req.user!.id,
-      req.params.notificationId as string,
+      params.notificationId,
     );
 
     return res.status(200).json({
@@ -53,6 +58,16 @@ export async function markNotificationReadHandler(req: Request, res: Response) {
       data: notification,
     });
   } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: error.issues[0]?.message ?? "Invalid request",
+        },
+      });
+    }
+
     if (error instanceof NotFoundError) {
       return res.status(404).json({
         success: false,

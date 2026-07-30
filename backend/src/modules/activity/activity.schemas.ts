@@ -10,7 +10,7 @@ export const listActivitiesQuerySchema = z
 
     entityType: z.nativeEnum(ActivityEntityType).optional(),
 
-    entityId: z.uuid().optional(),
+    entityId: z.string().min(1).optional(),
   })
   .strict()
   .refine(

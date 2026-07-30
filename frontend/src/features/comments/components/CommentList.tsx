@@ -1,7 +1,7 @@
 import { MessageSquare } from "lucide-react";
 
-import { Button, Skeleton } from "@/components/ui";
-import { EmptyState } from "@/components/ux";
+import { Skeleton } from "@/components/ui";
+import { EmptyState, ListErrorState } from "@/components/ux";
 import { cn } from "@/utils";
 
 import { CommentItem } from "./CommentItem";
@@ -43,15 +43,11 @@ export function CommentList({
 }: CommentListProps) {
   if (isError) {
     return (
-      <div className="flex flex-col items-center gap-1 py-4 text-center">
-        <p className="text-sm font-medium">Couldn&apos;t load comments</p>
-        <p className="text-sm text-muted-foreground">
-          Something went wrong while loading comments.
-        </p>
-        <Button type="button" variant="outline" size="sm" className="mt-2" onClick={onRetry}>
-          Try again
-        </Button>
-      </div>
+      <ListErrorState
+        title="Couldn't load comments"
+        description="Something went wrong while loading comments."
+        onRetry={onRetry}
+      />
     );
   }
 

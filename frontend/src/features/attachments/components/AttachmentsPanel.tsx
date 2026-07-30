@@ -38,6 +38,7 @@ export function AttachmentsPanel({ taskId }: AttachmentsPanelProps) {
           isError={attachmentsQuery.isError}
           onRetry={() => attachmentsQuery.refetch()}
           onDelete={handleDelete}
+          className="max-h-64 overflow-y-auto pr-1"
         />
 
         <AttachmentUpload onUpload={handleUpload} isUploading={uploadAttachment.isPending} />

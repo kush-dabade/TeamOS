@@ -1,7 +1,7 @@
 import { Bell } from "lucide-react";
 
-import { Button, Skeleton } from "@/components/ui";
-import { EmptyState } from "@/components/ux";
+import { Skeleton } from "@/components/ui";
+import { EmptyState, ListErrorState } from "@/components/ux";
 
 import { NotificationItem } from "./NotificationItem";
 import type { Notification } from "../types";
@@ -29,15 +29,11 @@ export function NotificationList({
 }: NotificationListProps) {
   if (isError) {
     return (
-      <div className="flex flex-col items-center gap-1 py-4 text-center">
-        <p className="text-sm font-medium">Couldn&apos;t load notifications</p>
-        <p className="text-sm text-muted-foreground">
-          Something went wrong while loading notifications.
-        </p>
-        <Button type="button" variant="outline" size="sm" className="mt-2" onClick={onRetry}>
-          Try again
-        </Button>
-      </div>
+      <ListErrorState
+        title="Couldn't load notifications"
+        description="Something went wrong while loading notifications."
+        onRetry={onRetry}
+      />
     );
   }
 
@@ -46,7 +42,7 @@ export function NotificationList({
       <div className="space-y-3">
         {skeletonRows.map((row) => (
           <div key={row} className="flex items-start gap-3 p-1.5">
-            <Skeleton className="size-8 shrink-0 rounded-full" />
+            <Skeleton className="size-6 shrink-0 rounded-full" />
             <div className="flex-1 space-y-1.5">
               <Skeleton className="h-4 w-40" />
               <Skeleton className="h-3 w-full" />
@@ -60,13 +56,11 @@ export function NotificationList({
 
   if (notifications.length === 0) {
     return (
-      <div className="py-6">
-        <EmptyState
-          icon={Bell}
-          title="No notifications yet."
-          description="Notifications will appear here in the future."
-        />
-      </div>
+      <EmptyState
+        icon={Bell}
+        title="No notifications yet"
+        description="Notifications will appear here."
+      />
     );
   }
 

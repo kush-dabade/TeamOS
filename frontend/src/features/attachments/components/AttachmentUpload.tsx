@@ -44,7 +44,6 @@ export function AttachmentUpload({ onUpload, isUploading }: AttachmentUploadProp
       />
       <Button
         type="button"
-        variant="outline"
         size="sm"
         disabled={isUploading}
         onClick={() => inputRef.current?.click()}

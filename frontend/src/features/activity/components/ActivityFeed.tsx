@@ -1,7 +1,7 @@
 import { Activity as ActivityIcon } from "lucide-react";
 
-import { Button, Skeleton } from "@/components/ui";
-import { EmptyState } from "@/components/ux";
+import { Skeleton } from "@/components/ui";
+import { EmptyState, ListErrorState } from "@/components/ux";
 import { cn } from "@/utils";
 
 import { ActivityItem } from "./ActivityItem";
@@ -33,15 +33,11 @@ export function ActivityFeed({
 }: ActivityFeedProps) {
   if (isError) {
     return (
-      <div className="flex flex-col items-center gap-1 py-4 text-center">
-        <p className="text-sm font-medium">Couldn&apos;t load activity</p>
-        <p className="text-sm text-muted-foreground">
-          Something went wrong while loading this section.
-        </p>
-        <Button type="button" variant="outline" size="sm" className="mt-2" onClick={onRetry}>
-          Try again
-        </Button>
-      </div>
+      <ListErrorState
+        title="Couldn't load activity"
+        description="Something went wrong while loading this section."
+        onRetry={onRetry}
+      />
     );
   }
 

@@ -19,6 +19,7 @@ export function NotificationItem({ notification, onMarkRead }: NotificationItemP
   return (
     <button
       type="button"
+      disabled={notification.isRead}
       onClick={notification.isRead ? undefined : onMarkRead}
       aria-label={notification.isRead ? undefined : "Mark as read"}
       className={cn(
@@ -28,11 +29,11 @@ export function NotificationItem({ notification, onMarkRead }: NotificationItemP
     >
       <div
         className={cn(
-          "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground",
+          "flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground",
           !notification.isRead && "bg-primary/10 text-primary",
         )}
       >
-        <Icon className="size-4" aria-hidden="true" />
+        <Icon className="size-3" aria-hidden="true" />
       </div>
 
       <div className="min-w-0 flex-1">

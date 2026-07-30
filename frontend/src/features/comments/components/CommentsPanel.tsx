@@ -40,12 +40,20 @@ export function CommentsPanel({ taskId }: CommentsPanelProps) {
     deleteComment.mutate({ commentId, taskId });
   };
 
+  const count = commentsQuery.data?.length ?? 0;
+
   return (
-    <Card size="sm">
+    <Card className="[--card-spacing:1.375rem]">
       <CardHeader>
-        <h3 className="text-sm font-medium">Comments</h3>
+        <h3 className="flex items-center gap-2 text-sm font-medium">
+          Comments
+          <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+            {count}
+          </span>
+        </h3>
       </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+
+      <CardContent>
         <CommentList
           comments={commentsQuery.data ?? []}
           isLoading={commentsQuery.isLoading}
@@ -57,13 +65,15 @@ export function CommentsPanel({ taskId }: CommentsPanelProps) {
           onCancelEdit={() => setEditingCommentId(null)}
           onEditSubmit={handleEditSubmit}
           onDelete={handleDelete}
-          className="max-h-64 overflow-y-auto pr-1"
+          className="max-h-[20rem] overflow-y-auto pr-1"
         />
+      </CardContent>
 
+      <CardContent>
         <CommentForm
           mode="create"
           placeholder="Add a comment..."
-          submitLabel="Comment"
+          submitLabel="Post"
           onSubmit={handleCreate}
         />
       </CardContent>

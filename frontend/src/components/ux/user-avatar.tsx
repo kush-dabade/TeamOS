@@ -5,6 +5,7 @@ interface UserAvatarProps {
   name: string;
   image?: string | null;
   size?: "sm" | "default" | "lg";
+  shape?: "circle" | "square";
   className?: string;
 }
 
@@ -12,9 +13,15 @@ interface UserAvatarProps {
 // etc). Wraps the shadcn/ui Avatar primitive with the one piece of
 // TeamOS-specific behavior it needs: falling back to initials when there is
 // no image, or when the image fails to load.
-export function UserAvatar({ name, image, size = "default", className }: UserAvatarProps) {
+export function UserAvatar({
+  name,
+  image,
+  size = "default",
+  shape = "circle",
+  className,
+}: UserAvatarProps) {
   return (
-    <Avatar size={size} className={className}>
+    <Avatar size={size} shape={shape} className={className}>
       {image ? <AvatarImage src={image} alt="" /> : null}
       <AvatarFallback>{getInitials(name)}</AvatarFallback>
     </Avatar>

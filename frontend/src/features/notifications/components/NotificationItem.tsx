@@ -21,7 +21,7 @@ export function NotificationItem({ notification, onMarkRead }: NotificationItemP
       type="button"
       disabled={notification.isRead}
       onClick={notification.isRead ? undefined : onMarkRead}
-      aria-label={notification.isRead ? undefined : "Mark as read"}
+      aria-label={notification.isRead ? undefined : `Mark "${notification.title}" as read`}
       className={cn(
         "flex w-full items-start gap-3 rounded-md p-1.5 text-left transition-colors",
         !notification.isRead && "cursor-pointer bg-primary/5 hover:bg-primary/10",

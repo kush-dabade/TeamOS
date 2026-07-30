@@ -103,7 +103,7 @@ export function CommentItem({
                     <AlertDialogHeader>
                       <AlertDialogTitle>Delete comment?</AlertDialogTitle>
                       <AlertDialogDescription>
-                        This will permanently delete your comment. This action cannot be undone.
+                        This will remove your comment from the task.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

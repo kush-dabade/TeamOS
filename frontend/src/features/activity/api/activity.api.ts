@@ -35,12 +35,17 @@ interface ActivityListResponse {
   pagination: ActivityPagination;
 }
 
-export interface ListActivitiesParams {
+// entityType/entityId only make sense as a pair (the backend's own query
+// schema rejects a partial pair with a validation error) - this union keeps
+// callers from constructing one at the type level instead of only at runtime.
+type ActivityEntityFilter =
+  | { entityType: ActivityEntityType; entityId: string }
+  | { entityType?: never; entityId?: never };
+
+export type ListActivitiesParams = {
   page?: number;
   limit?: number;
-  entityType?: ActivityEntityType;
-  entityId?: string;
-}
+} & ActivityEntityFilter;
 
 export interface ListActivitiesResult {
   activities: Activity[];

@@ -5,3 +5,4 @@ export { useComments } from "./hooks/use-comments";
 export { useCreateComment } from "./hooks/use-create-comment";
 export { useUpdateComment } from "./hooks/use-update-comment";
 export { useDeleteComment } from "./hooks/use-delete-comment";
+export { CommentsPanel } from "./components/CommentsPanel";

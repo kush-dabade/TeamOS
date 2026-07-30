@@ -1,0 +1,72 @@
+import { useState } from "react";
+
+import { Card, CardContent, CardHeader } from "@/components/ui";
+import { useAuth } from "@/features/auth";
+
+import { CommentForm } from "./CommentForm";
+import { CommentList } from "./CommentList";
+import { useComments } from "../hooks/use-comments";
+import { useCreateComment } from "../hooks/use-create-comment";
+import { useDeleteComment } from "../hooks/use-delete-comment";
+import { useUpdateComment } from "../hooks/use-update-comment";
+
+interface CommentsPanelProps {
+  taskId: string;
+}
+
+// The only stateful comments component. Owns the list query, all three
+// mutations, and which comment (if any) is currently being edited.
+// CommentList/CommentItem/CommentForm are presentational - none of them
+// call a hook from ../hooks or ../api directly.
+export function CommentsPanel({ taskId }: CommentsPanelProps) {
+  const { user } = useAuth();
+  const commentsQuery = useComments(taskId);
+  const createComment = useCreateComment();
+  const updateComment = useUpdateComment();
+  const deleteComment = useDeleteComment();
+
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+
+  const handleCreate = async (content: string) => {
+    await createComment.mutateAsync({ taskId, input: { content } });
+  };
+
+  const handleEditSubmit = async (commentId: string, content: string) => {
+    await updateComment.mutateAsync({ commentId, taskId, input: { content } });
+    setEditingCommentId(null);
+  };
+
+  const handleDelete = (commentId: string) => {
+    deleteComment.mutate({ commentId, taskId });
+  };
+
+  return (
+    <Card size="sm">
+      <CardHeader>
+        <h3 className="text-sm font-medium">Comments</h3>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <CommentList
+          comments={commentsQuery.data ?? []}
+          isLoading={commentsQuery.isLoading}
+          isError={commentsQuery.isError}
+          onRetry={() => commentsQuery.refetch()}
+          currentUserId={user?.id}
+          editingCommentId={editingCommentId}
+          onStartEdit={setEditingCommentId}
+          onCancelEdit={() => setEditingCommentId(null)}
+          onEditSubmit={handleEditSubmit}
+          onDelete={handleDelete}
+          className="max-h-64 overflow-y-auto pr-1"
+        />
+
+        <CommentForm
+          mode="create"
+          placeholder="Add a comment..."
+          submitLabel="Comment"
+          onSubmit={handleCreate}
+        />
+      </CardContent>
+    </Card>
+  );
+}

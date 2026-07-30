@@ -6,11 +6,18 @@ import {
   listNotificationsHandler,
   markNotificationReadHandler,
   markAllNotificationsReadHandler,
+  getUnreadNotificationCountHandler,
 } from "./notification.controller.js";
 
 const router = Router();
 
 router.get("/", requireAuth, listNotificationsHandler);
+
+router.get(
+  "/unread-count",
+  requireAuth,
+  getUnreadNotificationCountHandler,
+);
 
 router.patch(
   "/read-all",

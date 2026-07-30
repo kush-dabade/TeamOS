@@ -1,9 +1,13 @@
 import type { Request, Response } from "express";
+import { ZodError } from "zod";
+
+import { notificationParamsSchema } from "./notification.schema.js";
 
 import {
   listNotifications,
   markNotificationAsRead,
   markAllNotificationsAsRead,
+  getUnreadNotificationCount,
 } from "./notification.service.js";
 
 import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
@@ -42,9 +46,11 @@ export async function listNotificationsHandler(req: Request, res: Response) {
 
 export async function markNotificationReadHandler(req: Request, res: Response) {
   try {
+    const params = notificationParamsSchema.parse(req.params);
+
     const notification = await markNotificationAsRead(
       req.user!.id,
-      req.params.notificationId as string,
+      params.notificationId,
     );
 
     return res.status(200).json({
@@ -52,6 +58,16 @@ export async function markNotificationReadHandler(req: Request, res: Response) {
       data: notification,
     });
   } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: error.issues[0]?.message ?? "Invalid request",
+        },
+      });
+    }
+
     if (error instanceof NotFoundError) {
       return res.status(404).json({
         success: false,
@@ -73,6 +89,32 @@ export async function markNotificationReadHandler(req: Request, res: Response) {
     }
 
     console.error("Mark notification read error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "An internal error occurred",
+      },
+    });
+  }
+}
+
+export async function getUnreadNotificationCountHandler(
+  req: Request,
+  res: Response,
+) {
+  try {
+    const count = await getUnreadNotificationCount(req.user!.id);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        count,
+      },
+    });
+  } catch (error) {
+    console.error("Get unread notification count error:", error);
 
     return res.status(500).json({
       success: false,

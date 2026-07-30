@@ -46,6 +46,9 @@ export interface ListActivitiesOptions {
 
   page: number;
   limit: number;
+
+  entityType?: ActivityEntityType;
+  entityId?: string;
 }
 
 type ActivityWithActor = {

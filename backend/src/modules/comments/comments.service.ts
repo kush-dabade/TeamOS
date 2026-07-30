@@ -3,7 +3,9 @@ import { prisma } from "../../lib/prisma.js";
 import type {
   CommentResponse,
   CreateCommentData,
+  DeleteCommentOptions,
   ListCommentsOptions,
+  UpdateCommentData,
 } from "./comments.types.js";
 
 import { emitToWorkspace } from "../../realtime/realtime.emitter.js";
@@ -196,4 +198,174 @@ export async function listComments(
   });
 
   return comments.map(toCommentResponse);
+}
+
+export async function updateComment(
+  actorId: string,
+  data: UpdateCommentData,
+): Promise<CommentResponse> {
+  const comment = await prisma.comment.findFirst({
+    where: {
+      id: data.commentId,
+      deletedAt: null,
+    },
+    include: {
+      task: {
+        select: {
+          projectId: true,
+        },
+      },
+    },
+  });
+
+  if (!comment) {
+    throw new Error("Comment not found");
+  }
+
+  const membership = await getWorkspaceMembership(comment.workspaceId, actorId);
+
+  if (!membership) {
+    throw new Error("You are not a member of this workspace");
+  }
+
+  if (membership.role === "GUEST") {
+    throw new Error("Guests cannot edit comments");
+  }
+
+  const project = await prisma.project.findUnique({
+    where: {
+      id: comment.task.projectId,
+    },
+  });
+
+  if (project?.status === "ARCHIVED") {
+    throw new Error("Archived projects cannot be modified");
+  }
+
+  if (comment.authorId !== actorId) {
+    throw new Error("You can only edit your own comments");
+  }
+
+  const updated = await prisma.comment.update({
+    where: {
+      id: comment.id,
+    },
+    data: {
+      content: data.content,
+    },
+    include: {
+      author: {
+        select: {
+          id: true,
+          name: true,
+          image: true,
+        },
+      },
+    },
+  });
+
+  await createActivity({
+    workspaceId: comment.workspaceId,
+    actorId,
+
+    type: ActivityType.COMMENT_UPDATED,
+
+    entityType: ActivityEntityType.COMMENT,
+    entityId: comment.id,
+
+    metadata: {
+      taskId: comment.taskId,
+    },
+  });
+
+  const response = toCommentResponse(updated);
+
+  emitToWorkspace(comment.workspaceId, REALTIME_EVENTS.COMMENT_UPDATED, {
+    workspaceId: comment.workspaceId,
+    taskId: comment.taskId,
+    comment: response,
+  });
+
+  return response;
+}
+
+export async function deleteComment(
+  actorId: string,
+  options: DeleteCommentOptions,
+): Promise<void> {
+  const comment = await prisma.comment.findFirst({
+    where: {
+      id: options.commentId,
+      deletedAt: null,
+    },
+    include: {
+      task: {
+        select: {
+          projectId: true,
+        },
+      },
+    },
+  });
+
+  if (!comment) {
+    throw new Error("Comment not found");
+  }
+
+  const membership = await getWorkspaceMembership(comment.workspaceId, actorId);
+
+  if (!membership) {
+    throw new Error("You are not a member of this workspace");
+  }
+
+  if (membership.role === "GUEST") {
+    throw new Error("Guests cannot delete comments");
+  }
+
+  const project = await prisma.project.findUnique({
+    where: {
+      id: comment.task.projectId,
+    },
+  });
+
+  if (project?.status === "ARCHIVED") {
+    throw new Error("Archived projects cannot be modified");
+  }
+
+  const canDelete =
+    comment.authorId === actorId ||
+    membership.role === "ADMIN" ||
+    membership.role === "OWNER";
+
+  if (!canDelete) {
+    throw new Error("You do not have permission to delete this comment");
+  }
+
+  await prisma.comment.update({
+    where: {
+      id: comment.id,
+    },
+    data: {
+      deletedAt: new Date(),
+    },
+  });
+
+  await createActivity({
+    workspaceId: comment.workspaceId,
+    actorId,
+
+    type: ActivityType.COMMENT_DELETED,
+
+    entityType: ActivityEntityType.COMMENT,
+    entityId: comment.id,
+
+    metadata: {
+      taskId: comment.taskId,
+    },
+  });
+
+  emitToWorkspace(comment.workspaceId, REALTIME_EVENTS.COMMENT_DELETED, {
+    workspaceId: comment.workspaceId,
+    taskId: comment.taskId,
+    commentId: comment.id,
+  });
 }

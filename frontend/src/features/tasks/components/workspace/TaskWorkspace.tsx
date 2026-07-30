@@ -33,7 +33,7 @@ export function TaskWorkspace({ taskItem, createdBy }: TaskWorkspaceProps) {
           </Card>
         </section>
 
-        <TaskFutureSections />
+        <TaskFutureSections workspaceId={taskItem.task.workspaceId} taskId={taskItem.task.id} />
     </div>
   );
 }

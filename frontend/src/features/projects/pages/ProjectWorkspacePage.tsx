@@ -127,7 +127,7 @@ export function ProjectWorkspacePage() {
         activeTab={activeTab}
         onTabChange={(tab) => setTabSelection({ projectSlug: slug, tab })}
       />
-      <WorkspaceContent project={project} activeTab={activeTab} />
+      <WorkspaceContent project={project} workspaceId={workspaceId ?? ""} activeTab={activeTab} />
 
       <ProjectFormPanel
         mode="edit"

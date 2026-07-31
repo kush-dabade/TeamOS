@@ -38,5 +38,9 @@ export function formatCompactTime(date: Date | string): string {
     return `${days}d`;
   }
 
+  if (value.getFullYear() !== now.getFullYear()) {
+    return formatDate(value, "MMM d, yyyy");
+  }
+
   return formatDate(value, "MMM d");
 }

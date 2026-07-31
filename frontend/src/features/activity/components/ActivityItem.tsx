@@ -1,5 +1,5 @@
 import { UserAvatar } from "@/components/ux";
-import { cn, formatRelativeDate } from "@/utils";
+import { formatRelativeDate } from "@/utils";
 
 import { describeActivity } from "../lib/describe-activity";
 import type { Activity } from "../types";
@@ -13,15 +13,10 @@ interface ActivityItemProps {
 // consuming feature - this only renders what an activity entry looks like.
 // Read-only, so the row gets a hover highlight for scannability but no
 // cursor-pointer/click affordance - there is nothing to click through to yet.
+// The entity name is plain text (no link styling) until real navigation
+// exists for it.
 export function ActivityItem({ activity }: ActivityItemProps) {
   const { action, entity } = describeActivity(activity);
-
-  // Only task entities are ever routable in this app today (see
-  // RecentActivityPanel's resolveActivityHref - project routing needs a slug
-  // the Activity contract doesn't expose yet), so only task entities get the
-  // "this looks like a link" treatment. No href/onClick is wired up here -
-  // this is presentational only, matching the future-navigation shape.
-  const isEntityLinkable = entity !== null && activity.entityType === "TASK";
 
   return (
     <div className="flex items-start gap-3 rounded-md px-2 py-2.5 transition-colors duration-150 hover:bg-muted/40">
@@ -40,15 +35,7 @@ export function ActivityItem({ activity }: ActivityItemProps) {
         <div className="flex items-center gap-1.5 text-xs">
           {entity ? (
             <>
-              <span
-                className={cn(
-                  "truncate text-muted-foreground",
-                  isEntityLinkable &&
-                    "cursor-pointer underline-offset-2 transition-colors duration-150 hover:text-foreground hover:underline",
-                )}
-              >
-                {entity}
-              </span>
+              <span className="truncate text-muted-foreground">{entity}</span>
               <span className="select-none text-muted-foreground/50">&middot;</span>
             </>
           ) : null}

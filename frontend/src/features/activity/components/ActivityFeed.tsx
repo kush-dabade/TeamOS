@@ -33,17 +33,19 @@ export function ActivityFeed({
 }: ActivityFeedProps) {
   if (isError) {
     return (
-      <ListErrorState
-        title="Couldn't load activity"
-        description="Something went wrong while loading this section."
-        onRetry={onRetry}
-      />
+      <div className={cn("flex items-center justify-center", className)}>
+        <ListErrorState
+          title="Couldn't load activity"
+          description="Something went wrong while loading this section."
+          onRetry={onRetry}
+        />
+      </div>
     );
   }
 
   if (isLoading) {
     return (
-      <div className="space-y-0.5">
+      <div className={cn("space-y-0.5", className)}>
         {skeletonRows.map((row) => (
           <div key={row} className="flex items-start gap-3 px-2 py-2.5">
             <Skeleton className="size-6 shrink-0 rounded-md" />
@@ -60,7 +62,7 @@ export function ActivityFeed({
 
   if (activities.length === 0) {
     return (
-      <div className="flex min-h-48 items-center justify-center">
+      <div className={cn("flex min-h-48 items-center justify-center", className)}>
         <EmptyState
           icon={ActivityIcon}
           title={emptyTitle}

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowRight, BellIcon } from "lucide-react";
+import { BellIcon } from "lucide-react";
 
 import { Button, Popover, PopoverContent, PopoverTrigger } from "@/components/ui";
 
@@ -59,19 +59,6 @@ export function NotificationsPopover() {
             onRetry={() => notificationsQuery.refetch()}
             onMarkRead={(notificationId) => markReadMutation.mutate(notificationId)}
           />
-        </div>
-
-        <div className="border-t border-border/50 p-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled
-            className="w-full justify-center gap-1.5 text-muted-foreground"
-          >
-            View all notifications
-            <ArrowRight className="size-3.5" />
-          </Button>
         </div>
       </PopoverContent>
     </Popover>

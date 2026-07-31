@@ -108,7 +108,7 @@ export function CommentForm({
       <form
         onSubmit={form.handleSubmit(handleValid)}
         noValidate
-        className="rounded-lg bg-card ring-1 ring-foreground/10"
+        className="rounded-lg bg-card ring-1 ring-foreground/10 transition-shadow focus-within:ring-3 focus-within:ring-ring/50 has-[textarea[aria-invalid=true]]:ring-3 has-[textarea[aria-invalid=true]]:ring-destructive/20 dark:has-[textarea[aria-invalid=true]]:ring-destructive/40"
       >
         <div className="px-3.5 pt-3.5">{textarea}</div>
 

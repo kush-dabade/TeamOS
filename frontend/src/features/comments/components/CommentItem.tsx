@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MoreHorizontal } from "lucide-react";
 
 import {
@@ -53,11 +53,24 @@ export function CommentItem({
 }: CommentItemProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const deleteTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (deleteTimeoutRef.current !== null) {
+        window.clearTimeout(deleteTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleConfirmDelete = () => {
+    if (isDeleting) {
+      return;
+    }
+
     setIsDeleteDialogOpen(false);
     setIsDeleting(true);
-    window.setTimeout(onDelete, DELETE_COLLAPSE_MS);
+    deleteTimeoutRef.current = window.setTimeout(onDelete, DELETE_COLLAPSE_MS);
   };
 
   return (

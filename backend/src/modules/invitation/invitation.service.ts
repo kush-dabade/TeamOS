@@ -615,16 +615,10 @@ export async function acceptInvitationByToken(
   return acceptResolvedInvitation(invitation, userId, email);
 }
 
-export async function declineInvitation(
-  invitationId: string,
+async function declineResolvedInvitation(
+  invitation: InvitationEntity,
   email: string,
 ): Promise<InvitationResponse> {
-  const invitation = await findInvitationById(invitationId);
-
-  if (!invitation) {
-    throw new NotFoundError("Invitation not found");
-  }
-
   if (invitation.status !== InvitationStatus.PENDING) {
     throw new ValidationError("Invitation is no longer pending");
   }
@@ -691,6 +685,32 @@ export async function declineInvitation(
   );
 
   return response;
+}
+
+export async function declineInvitation(
+  invitationId: string,
+  email: string,
+): Promise<InvitationResponse> {
+  const invitation = await findInvitationById(invitationId);
+
+  if (!invitation) {
+    throw new NotFoundError("Invitation not found");
+  }
+
+  return declineResolvedInvitation(invitation, email);
+}
+
+export async function declineInvitationByToken(
+  token: string,
+  email: string,
+): Promise<InvitationResponse> {
+  const invitation = await findInvitationByToken(token);
+
+  if (!invitation) {
+    throw new NotFoundError("Invitation not found");
+  }
+
+  return declineResolvedInvitation(invitation, email);
 }
 
 export { findInvitationById, findInvitationByToken };

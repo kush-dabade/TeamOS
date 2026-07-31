@@ -6,12 +6,19 @@ import {
   listUserInvitationsHandler,
   getInvitationPreviewHandler,
   acceptInvitationHandler,
+  acceptInvitationByTokenHandler,
   declineInvitationHandler,
 } from "./invitation.controller.js";
 
 const router = Router();
 
 router.get("/token/:token", getInvitationPreviewHandler);
+
+router.post(
+  "/token/:token/accept",
+  requireAuth,
+  acceptInvitationByTokenHandler,
+);
 
 router.get(
   "/",

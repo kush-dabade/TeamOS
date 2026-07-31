@@ -493,17 +493,11 @@ export async function getInvitationPreview(
   };
 }
 
-export async function acceptInvitation(
-  invitationId: string,
+async function acceptResolvedInvitation(
+  invitation: InvitationEntity,
   userId: string,
   email: string,
 ): Promise<InvitationResponse> {
-  const invitation = await findInvitationById(invitationId);
-
-  if (!invitation) {
-    throw new NotFoundError("Invitation not found");
-  }
-
   if (invitation.status !== InvitationStatus.PENDING) {
     throw new ValidationError("Invitation is no longer pending");
   }
@@ -591,6 +585,34 @@ export async function acceptInvitation(
   );
 
   return response;
+}
+
+export async function acceptInvitation(
+  invitationId: string,
+  userId: string,
+  email: string,
+): Promise<InvitationResponse> {
+  const invitation = await findInvitationById(invitationId);
+
+  if (!invitation) {
+    throw new NotFoundError("Invitation not found");
+  }
+
+  return acceptResolvedInvitation(invitation, userId, email);
+}
+
+export async function acceptInvitationByToken(
+  token: string,
+  userId: string,
+  email: string,
+): Promise<InvitationResponse> {
+  const invitation = await findInvitationByToken(token);
+
+  if (!invitation) {
+    throw new NotFoundError("Invitation not found");
+  }
+
+  return acceptResolvedInvitation(invitation, userId, email);
 }
 
 export async function declineInvitation(

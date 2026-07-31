@@ -439,6 +439,7 @@ export async function declineInvitationHandler(
   try {
     const invitation = await declineInvitation(
       req.params.invitationId as string,
+      req.user!.id,
       req.user!.email,
     );
 
@@ -498,6 +499,7 @@ export async function declineInvitationByTokenHandler(
 
     const invitation = await declineInvitationByToken(
       params.token,
+      req.user!.id,
       req.user!.email,
     );
 

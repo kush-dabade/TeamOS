@@ -617,6 +617,7 @@ export async function acceptInvitationByToken(
 
 async function declineResolvedInvitation(
   invitation: InvitationEntity,
+  userId: string,
   email: string,
 ): Promise<InvitationResponse> {
   if (invitation.status !== InvitationStatus.PENDING) {
@@ -653,25 +654,21 @@ async function declineResolvedInvitation(
     throw error;
   }
 
-  const user = await findUserByEmail(normalizedEmail);
+  await createActivity({
+    workspaceId: invitation.workspaceId,
 
-  if (user) {
-    await createActivity({
-      workspaceId: invitation.workspaceId,
+    actorId: userId,
 
-      actorId: user.id,
+    type: ActivityType.INVITATION_DECLINED,
 
-      type: ActivityType.INVITATION_DECLINED,
+    entityType: ActivityEntityType.INVITATION,
+    entityId: invitation.id,
 
-      entityType: ActivityEntityType.INVITATION,
-      entityId: invitation.id,
-
-      metadata: {
-        invitedEmail: invitation.email,
-        role: invitation.role,
-      },
-    });
-  }
+    metadata: {
+      invitedEmail: invitation.email,
+      role: invitation.role,
+    },
+  });
 
   const response = toInvitationResponse(updatedInvitation);
 
@@ -689,6 +686,7 @@ async function declineResolvedInvitation(
 
 export async function declineInvitation(
   invitationId: string,
+  userId: string,
   email: string,
 ): Promise<InvitationResponse> {
   const invitation = await findInvitationById(invitationId);
@@ -697,11 +695,12 @@ export async function declineInvitation(
     throw new NotFoundError("Invitation not found");
   }
 
-  return declineResolvedInvitation(invitation, email);
+  return declineResolvedInvitation(invitation, userId, email);
 }
 
 export async function declineInvitationByToken(
   token: string,
+  userId: string,
   email: string,
 ): Promise<InvitationResponse> {
   const invitation = await findInvitationByToken(token);
@@ -710,7 +709,5 @@ export async function declineInvitationByToken(
     throw new NotFoundError("Invitation not found");
   }
 
-  return declineResolvedInvitation(invitation, email);
+  return declineResolvedInvitation(invitation, userId, email);
 }
-
-export { findInvitationById, findInvitationByToken };

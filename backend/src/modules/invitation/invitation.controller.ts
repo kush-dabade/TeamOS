@@ -1,14 +1,20 @@
 import type { Request, Response } from "express";
 import { ZodError } from "zod";
 
-import { createInvitationSchema } from "./invitation.schema.js";
+import {
+  createInvitationSchema,
+  invitationTokenParamSchema,
+} from "./invitation.schema.js";
 
 import {
   createInvitation,
   listWorkspaceInvitations,
   listUserInvitations,
+  getInvitationPreview,
   acceptInvitation,
+  acceptInvitationByToken,
   declineInvitation,
+  declineInvitationByToken,
   cancelInvitation,
   resendInvitation,
 } from "./invitation.service.js";
@@ -252,6 +258,52 @@ export async function listUserInvitationsHandler(req: Request, res: Response) {
   }
 }
 
+export async function getInvitationPreviewHandler(
+  req: Request,
+  res: Response,
+) {
+  try {
+    const params = invitationTokenParamSchema.parse(req.params);
+
+    const preview = await getInvitationPreview(params.token);
+
+    return res.status(200).json({
+      success: true,
+      data: preview,
+    });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: error.issues[0]?.message ?? "Invalid request",
+        },
+      });
+    }
+
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: "INVITATION_NOT_FOUND",
+          message: error.message,
+        },
+      });
+    }
+
+    console.error("Get invitation preview error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "An internal error occurred",
+      },
+    });
+  }
+}
+
 export async function acceptInvitationHandler(
   req: Request,
   res: Response,
@@ -310,6 +362,76 @@ export async function acceptInvitationHandler(
   }
 }
 
+export async function acceptInvitationByTokenHandler(
+  req: Request,
+  res: Response,
+) {
+  try {
+    const params = invitationTokenParamSchema.parse(req.params);
+
+    const invitation = await acceptInvitationByToken(
+      params.token,
+      req.user!.id,
+      req.user!.email,
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: invitation,
+    });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: error.issues[0]?.message ?? "Invalid request",
+        },
+      });
+    }
+
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: "INVITATION_NOT_FOUND",
+          message: error.message,
+        },
+      });
+    }
+
+    if (error instanceof ForbiddenError) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: error.message,
+        },
+      });
+    }
+
+    if (error instanceof ValidationError) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: error.message,
+        },
+      });
+    }
+
+    console.error("Accept invitation by token error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "An internal error occurred",
+      },
+    });
+  }
+}
+
 export async function declineInvitationHandler(
   req: Request,
   res: Response,
@@ -317,6 +439,7 @@ export async function declineInvitationHandler(
   try {
     const invitation = await declineInvitation(
       req.params.invitationId as string,
+      req.user!.id,
       req.user!.email,
     );
 
@@ -356,6 +479,76 @@ export async function declineInvitationHandler(
     }
 
     console.error("Decline invitation error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "An internal error occurred",
+      },
+    });
+  }
+}
+
+export async function declineInvitationByTokenHandler(
+  req: Request,
+  res: Response,
+) {
+  try {
+    const params = invitationTokenParamSchema.parse(req.params);
+
+    const invitation = await declineInvitationByToken(
+      params.token,
+      req.user!.id,
+      req.user!.email,
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: invitation,
+    });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: error.issues[0]?.message ?? "Invalid request",
+        },
+      });
+    }
+
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: "INVITATION_NOT_FOUND",
+          message: error.message,
+        },
+      });
+    }
+
+    if (error instanceof ForbiddenError) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: error.message,
+        },
+      });
+    }
+
+    if (error instanceof ValidationError) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: error.message,
+        },
+      });
+    }
+
+    console.error("Decline invitation by token error:", error);
 
     return res.status(500).json({
       success: false,

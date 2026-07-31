@@ -12,3 +12,11 @@ export const createInvitationSchema = z.object({
 });
 
 export type CreateInvitationInput = z.infer<typeof createInvitationSchema>;
+
+export const invitationTokenParamSchema = z.object({
+  token: z.string().trim().min(1, "Invitation token is required"),
+});
+
+export type InvitationTokenParamInput = z.infer<
+  typeof invitationTokenParamSchema
+>;

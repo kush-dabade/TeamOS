@@ -30,3 +30,17 @@ export interface CreateInvitationData {
 
   invitedById: string;
 }
+
+export type InvitationPreviewResponse = {
+  workspaceName: string;
+
+  invitedByName: string;
+
+  email: string;
+
+  role: WorkspaceRole;
+
+  status: InvitationStatus;
+
+  expiresAt: Date;
+};

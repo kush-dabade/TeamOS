@@ -4,11 +4,14 @@ import { requireAuth } from "../../middleware/require-auth.js";
 
 import {
   listUserInvitationsHandler,
+  getInvitationPreviewHandler,
   acceptInvitationHandler,
   declineInvitationHandler,
 } from "./invitation.controller.js";
 
 const router = Router();
+
+router.get("/token/:token", getInvitationPreviewHandler);
 
 router.get(
   "/",

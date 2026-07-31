@@ -1,12 +1,16 @@
 import type { Request, Response } from "express";
 import { ZodError } from "zod";
 
-import { createInvitationSchema } from "./invitation.schema.js";
+import {
+  createInvitationSchema,
+  invitationTokenParamSchema,
+} from "./invitation.schema.js";
 
 import {
   createInvitation,
   listWorkspaceInvitations,
   listUserInvitations,
+  getInvitationPreview,
   acceptInvitation,
   declineInvitation,
   cancelInvitation,
@@ -241,6 +245,52 @@ export async function listUserInvitationsHandler(req: Request, res: Response) {
     });
   } catch (error) {
     console.error("List user invitations error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "An internal error occurred",
+      },
+    });
+  }
+}
+
+export async function getInvitationPreviewHandler(
+  req: Request,
+  res: Response,
+) {
+  try {
+    const params = invitationTokenParamSchema.parse(req.params);
+
+    const preview = await getInvitationPreview(params.token);
+
+    return res.status(200).json({
+      success: true,
+      data: preview,
+    });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: error.issues[0]?.message ?? "Invalid request",
+        },
+      });
+    }
+
+    if (error instanceof NotFoundError) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: "INVITATION_NOT_FOUND",
+          message: error.message,
+        },
+      });
+    }
+
+    console.error("Get invitation preview error:", error);
 
     return res.status(500).json({
       success: false,

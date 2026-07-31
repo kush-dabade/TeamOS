@@ -24,6 +24,7 @@ import { ValidationError } from "../../shared/errors/validation-error.js";
 
 import type {
   CreateInvitationData,
+  InvitationPreviewResponse,
   InvitationResponse,
 } from "./invitation.types.js";
 
@@ -70,6 +71,26 @@ async function findInvitationByToken(token: string) {
   return prisma.workspaceInvitation.findUnique({
     where: {
       token,
+    },
+  });
+}
+
+async function findInvitationPreviewByToken(token: string) {
+  return prisma.workspaceInvitation.findUnique({
+    where: {
+      token,
+    },
+    include: {
+      workspace: {
+        select: {
+          name: true,
+        },
+      },
+      invitedBy: {
+        select: {
+          name: true,
+        },
+      },
     },
   });
 }
@@ -451,6 +472,25 @@ export async function listUserInvitations(
   });
 
   return invitations.map(toInvitationResponse);
+}
+
+export async function getInvitationPreview(
+  token: string,
+): Promise<InvitationPreviewResponse> {
+  const invitation = await findInvitationPreviewByToken(token);
+
+  if (!invitation) {
+    throw new NotFoundError("Invitation not found");
+  }
+
+  return {
+    workspaceName: invitation.workspace.name,
+    invitedByName: invitation.invitedBy.name,
+    email: invitation.email,
+    role: invitation.role,
+    status: invitation.status,
+    expiresAt: invitation.expiresAt,
+  };
 }
 
 export async function acceptInvitation(

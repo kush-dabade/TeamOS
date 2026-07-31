@@ -5,35 +5,66 @@ interface ActivityDescription {
   entity: string | null;
 }
 
-// Frontend-generated description for the activity types the UI explicitly
-// knows how to phrase. Every other type gets a neutral fallback so a new
-// backend enum value never breaks a feed.
+function getString(metadata: Record<string, unknown>, key: string): string | null {
+  const value = metadata[key];
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+// Frontend-generated description for every backend `ActivityType`. Wording is
+// kept short (verb + noun, e.g. "created task") so a row reads as a scannable
+// label rather than a sentence - anything not explicitly mapped here falls
+// back to a neutral phrase so a new backend enum value never breaks a feed.
 export function describeActivity(activity: Activity): ActivityDescription {
   const metadata = activity.metadata ?? {};
-  const taskTitle = typeof metadata.taskTitle === "string" ? metadata.taskTitle : null;
-  const projectName = typeof metadata.projectName === "string" ? metadata.projectName : null;
+  const taskTitle = getString(metadata, "taskTitle");
+  const projectName = getString(metadata, "projectName");
+  const sprintName = getString(metadata, "sprintName") ?? getString(metadata, "newName");
+  const attachmentName = getString(metadata, "attachmentName");
+  const invitedEmail = getString(metadata, "invitedEmail");
 
   switch (activity.type) {
     case "TASK_CREATED":
-      return { action: "created a task", entity: taskTitle };
+      return { action: "created task", entity: taskTitle };
     case "TASK_STATUS_CHANGED":
-      return { action: "updated a task", entity: taskTitle };
+      return { action: "updated status", entity: taskTitle };
     case "TASK_COMPLETED":
-      return { action: "completed a task", entity: taskTitle };
+      return { action: "completed task", entity: taskTitle };
     case "TASK_DELETED":
-      return { action: "deleted a task", entity: taskTitle };
+      return { action: "deleted task", entity: taskTitle };
+    case "TASK_ASSIGNED_TO_SPRINT":
+      return { action: "added to sprint", entity: taskTitle };
+    case "TASK_REMOVED_FROM_SPRINT":
+      return { action: "removed from sprint", entity: taskTitle };
     case "PROJECT_CREATED":
-      return { action: "created a project", entity: projectName };
+      return { action: "created project", entity: projectName };
     case "PROJECT_UPDATED":
-      return { action: "updated a project", entity: projectName };
+      return { action: "updated project", entity: projectName };
     case "PROJECT_ARCHIVED":
-      return { action: "archived a project", entity: projectName };
+      return { action: "archived project", entity: projectName };
     case "COMMENT_CREATED":
-      return { action: "left a comment", entity: null };
+      return { action: "commented", entity: null };
     case "COMMENT_UPDATED":
-      return { action: "edited a comment", entity: null };
+      return { action: "edited comment", entity: null };
     case "COMMENT_DELETED":
-      return { action: "deleted a comment", entity: null };
+      return { action: "deleted comment", entity: null };
+    case "ATTACHMENT_UPLOADED":
+      return { action: "added attachment", entity: attachmentName };
+    case "ATTACHMENT_DELETED":
+      return { action: "deleted attachment", entity: attachmentName };
+    case "USER_INVITED":
+      return { action: "invited member", entity: invitedEmail };
+    case "INVITATION_ACCEPTED":
+      return { action: "accepted invitation", entity: invitedEmail };
+    case "INVITATION_DECLINED":
+      return { action: "declined invitation", entity: invitedEmail };
+    case "SPRINT_CREATED":
+      return { action: "created sprint", entity: sprintName };
+    case "SPRINT_UPDATED":
+      return { action: "updated sprint", entity: sprintName };
+    case "SPRINT_STARTED":
+      return { action: "started sprint", entity: sprintName };
+    case "SPRINT_COMPLETED":
+      return { action: "completed sprint", entity: sprintName };
     default:
       return { action: "updated an item", entity: null };
   }

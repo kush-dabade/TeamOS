@@ -39,12 +39,12 @@ export function NotificationList({
 
   if (isLoading) {
     return (
-      <div className="space-y-3">
+      <div className="space-y-0.5 px-2 py-1">
         {skeletonRows.map((row) => (
-          <div key={row} className="flex items-start gap-3 p-1.5">
-            <Skeleton className="size-6 shrink-0 rounded-full" />
+          <div key={row} className="flex items-start gap-3 px-2 py-2.5">
+            <Skeleton className="size-9 shrink-0 rounded-md" />
             <div className="flex-1 space-y-1.5">
-              <Skeleton className="h-4 w-40" />
+              <Skeleton className="h-3.5 w-32" />
               <Skeleton className="h-3 w-full" />
               <Skeleton className="h-3 w-16" />
             </div>
@@ -56,16 +56,19 @@ export function NotificationList({
 
   if (notifications.length === 0) {
     return (
-      <EmptyState
-        icon={Bell}
-        title="No notifications yet"
-        description="Notifications will appear here."
-      />
+      <div className="flex min-h-48 items-center justify-center">
+        <EmptyState
+          icon={Bell}
+          title="No notifications yet"
+          description="You're all caught up."
+          iconClassName="size-12"
+        />
+      </div>
     );
   }
 
   return (
-    <div className="max-h-96 space-y-1 overflow-y-auto">
+    <div className="max-h-96 space-y-0.5 overflow-y-auto p-2">
       {notifications.map((notification) => (
         <NotificationItem
           key={notification.id}

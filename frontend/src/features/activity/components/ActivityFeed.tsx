@@ -43,13 +43,14 @@ export function ActivityFeed({
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-0.5">
         {skeletonRows.map((row) => (
-          <div key={row} className="flex items-start gap-3">
-            <Skeleton className="size-6 shrink-0 rounded-full" />
-            <div className="flex-1 space-y-1.5">
-              <Skeleton className="h-4 w-40" />
+          <div key={row} className="flex items-start gap-3 px-2 py-2.5">
+            <Skeleton className="size-6 shrink-0 rounded-md" />
+            <div className="flex-1 space-y-1">
               <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-3.5 w-32" />
+              <Skeleton className="h-3 w-20" />
             </div>
           </div>
         ))}
@@ -58,11 +59,20 @@ export function ActivityFeed({
   }
 
   if (activities.length === 0) {
-    return <EmptyState icon={ActivityIcon} title={emptyTitle} description={emptyDescription} />;
+    return (
+      <div className="flex min-h-48 items-center justify-center">
+        <EmptyState
+          icon={ActivityIcon}
+          title={emptyTitle}
+          description={emptyDescription}
+          iconClassName="size-12"
+        />
+      </div>
+    );
   }
 
   return (
-    <div className={cn("space-y-4", className)}>
+    <div className={cn("space-y-0.5", className)}>
       {activities.map((activity) => (
         <ActivityItem key={activity.id} activity={activity} />
       ))}

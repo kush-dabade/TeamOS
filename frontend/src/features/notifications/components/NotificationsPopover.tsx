@@ -1,14 +1,7 @@
 import { useState } from "react";
 import { BellIcon } from "lucide-react";
 
-import {
-  Button,
-  Popover,
-  PopoverContent,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from "@/components/ui";
+import { Button, Popover, PopoverContent, PopoverTrigger } from "@/components/ui";
 
 import { useMarkNotificationRead } from "../hooks/use-mark-notification-read";
 import { useNotifications } from "../hooks/use-notifications";
@@ -48,18 +41,25 @@ export function NotificationsPopover() {
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent align="end" className="w-80">
-        <PopoverHeader>
-          <PopoverTitle>Notifications</PopoverTitle>
-        </PopoverHeader>
+      <PopoverContent align="end" className="w-96 gap-0 p-0">
+        <div className="flex items-center justify-between gap-2 px-3 py-2.5">
+          <h2 className="text-sm font-medium">Notifications</h2>
+          {unreadCount > 0 ? (
+            <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+              {unreadCount}
+            </span>
+          ) : null}
+        </div>
 
-        <NotificationList
-          notifications={notificationsQuery.data ?? []}
-          isLoading={notificationsQuery.isLoading}
-          isError={notificationsQuery.isError}
-          onRetry={() => notificationsQuery.refetch()}
-          onMarkRead={(notificationId) => markReadMutation.mutate(notificationId)}
-        />
+        <div className="border-t border-border/50">
+          <NotificationList
+            notifications={notificationsQuery.data ?? []}
+            isLoading={notificationsQuery.isLoading}
+            isError={notificationsQuery.isError}
+            onRetry={() => notificationsQuery.refetch()}
+            onMarkRead={(notificationId) => markReadMutation.mutate(notificationId)}
+          />
+        </div>
       </PopoverContent>
     </Popover>
   );

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Download, Trash2 } from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 
 import {
   AlertDialog,
@@ -11,10 +11,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
 } from "@/components/ui";
 import { formatFileSize, formatRelativeDate } from "@/utils";
 
-import { ATTACHMENT_ICONS, DEFAULT_ATTACHMENT_ICON } from "../lib/attachment-icon";
+import { ATTACHMENT_FILE_TYPES, DEFAULT_ATTACHMENT_FILE_TYPE } from "../lib/attachment-file-type";
 import { getAttachmentDownloadUrl } from "../lib/attachment-url";
 import type { Attachment } from "../types";
 
@@ -28,7 +32,7 @@ interface AttachmentItemProps {
 // enforces membership/guest restrictions, so this never gates on ownership.
 export function AttachmentItem({ attachment, onDelete }: AttachmentItemProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const Icon = ATTACHMENT_ICONS[attachment.mimeType] ?? DEFAULT_ATTACHMENT_ICON;
+  const { icon: Icon, label } = ATTACHMENT_FILE_TYPES[attachment.mimeType] ?? DEFAULT_ATTACHMENT_FILE_TYPE;
 
   const handleConfirmDelete = () => {
     onDelete();
@@ -36,42 +40,51 @@ export function AttachmentItem({ attachment, onDelete }: AttachmentItemProps) {
   };
 
   return (
-    <div className="flex items-start gap-3">
-      <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-        <Icon className="size-3" aria-hidden="true" />
+    <div
+      className="group/attachment relative flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 transition-colors duration-150 hover:bg-muted/40"
+      title={formatRelativeDate(attachment.createdAt)}
+    >
+      <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+        <Icon className="size-4" aria-hidden="true" />
       </div>
 
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 pr-7">
         <p className="truncate text-sm font-medium">{attachment.originalName}</p>
-        <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-          <span>{formatFileSize(attachment.size)}</span>
-          <span aria-hidden="true">&middot;</span>
-          <time>{formatRelativeDate(attachment.createdAt)}</time>
-        </div>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {label} &middot; {formatFileSize(attachment.size)}
+        </p>
       </div>
 
-      <div className="flex shrink-0 items-center gap-1">
-        <Button
-          asChild
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          aria-label={`Download ${attachment.originalName}`}
-        >
-          <a href={getAttachmentDownloadUrl(attachment.id)} download={attachment.originalName}>
-            <Download />
-          </a>
-        </Button>
+      <div className="absolute top-1/2 right-1 -translate-y-1/2 opacity-0 transition-opacity duration-150 group-hover/attachment:opacity-100 group-focus-within/attachment:opacity-100 data-[state=open]:opacity-100">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label={`Actions for ${attachment.originalName}`}
+            >
+              <MoreHorizontal />
+            </Button>
+          </DropdownMenuTrigger>
 
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          aria-label={`Delete ${attachment.originalName}`}
-          onClick={() => setIsDeleteDialogOpen(true)}
-        >
-          <Trash2 />
-        </Button>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem asChild>
+              <a href={getAttachmentDownloadUrl(attachment.id)} download={attachment.originalName}>
+                Download
+              </a>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={(event) => {
+                event.preventDefault();
+                setIsDeleteDialogOpen(true);
+              }}
+            >
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
           <AlertDialogContent size="sm">

@@ -53,12 +53,12 @@ export function CommentList({
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-3">
         {skeletonRows.map((row) => (
-          <div key={row} className="flex items-start gap-3">
-            <Skeleton className="size-6 shrink-0 rounded-full" />
-            <div className="flex-1 space-y-1.5">
-              <Skeleton className="h-4 w-32" />
+          <div key={row} className="flex items-start gap-2.5 rounded-md bg-muted/25 px-3 py-2.5">
+            <Skeleton className="size-6 shrink-0 rounded-md" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-3.5 w-24" />
               <Skeleton className="h-3 w-full" />
             </div>
           </div>
@@ -72,13 +72,18 @@ export function CommentList({
       <EmptyState
         icon={MessageSquare}
         title="No comments yet"
-        description="Be the first to comment on this task."
+        description="Start the conversation about this task."
       />
     );
   }
 
   return (
-    <div className={cn("space-y-4", className)}>
+    <div
+      className={cn(
+        "space-y-3 [scrollbar-color:var(--border)_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-track]:bg-transparent",
+        className,
+      )}
+    >
       {comments.map((comment) => (
         <CommentItem
           key={comment.id}

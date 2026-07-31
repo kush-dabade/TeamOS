@@ -151,6 +151,23 @@ function isInvitationExpired(invitation: { expiresAt: Date }) {
   return invitation.expiresAt < new Date();
 }
 
+function assertInvitationEligible(
+  invitation: InvitationEntity,
+  email: string,
+): void {
+  if (invitation.status !== InvitationStatus.PENDING) {
+    throw new ValidationError("Invitation is no longer pending");
+  }
+
+  if (isInvitationExpired(invitation)) {
+    throw new ValidationError("Invitation has expired");
+  }
+
+  if (invitation.email !== email.toLowerCase()) {
+    throw new ForbiddenError("You do not have access to this invitation");
+  }
+}
+
 function isRecordNotFoundError(
   error: unknown,
 ): error is Prisma.PrismaClientKnownRequestError {
@@ -498,19 +515,7 @@ async function acceptResolvedInvitation(
   userId: string,
   email: string,
 ): Promise<InvitationResponse> {
-  if (invitation.status !== InvitationStatus.PENDING) {
-    throw new ValidationError("Invitation is no longer pending");
-  }
-
-  if (isInvitationExpired(invitation)) {
-    throw new ValidationError("Invitation has expired");
-  }
-
-  const normalizedEmail = email.toLowerCase();
-
-  if (invitation.email !== normalizedEmail) {
-    throw new ForbiddenError("You do not have access to this invitation");
-  }
+  assertInvitationEligible(invitation, email);
 
   const existingMembership = await prisma.workspaceMember.findUnique({
     where: {
@@ -525,37 +530,35 @@ async function acceptResolvedInvitation(
     throw new ValidationError("You are already a member of this workspace");
   }
 
-  let updatedInvitation;
-
-  try {
-    updatedInvitation = await prisma.$transaction(
-      async (tx: Prisma.TransactionClient) => {
-        await tx.workspaceMember.create({
-          data: {
-            workspaceId: invitation.workspaceId,
-            userId,
-            role: invitation.role,
-          },
-        });
-
-        return tx.workspaceInvitation.update({
-          where: {
-            id: invitation.id,
-          },
-
-          data: {
-            status: InvitationStatus.ACCEPTED,
-          },
-        });
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    const { count } = await tx.workspaceInvitation.updateMany({
+      where: {
+        id: invitation.id,
+        status: InvitationStatus.PENDING,
       },
-    );
-  } catch (error) {
-    if (isRecordNotFoundError(error)) {
-      throw new NotFoundError("Invitation not found");
+
+      data: {
+        status: InvitationStatus.ACCEPTED,
+      },
+    });
+
+    if (count === 0) {
+      throw new ValidationError("Invitation is no longer pending");
     }
 
-    throw error;
-  }
+    await tx.workspaceMember.create({
+      data: {
+        workspaceId: invitation.workspaceId,
+        userId,
+        role: invitation.role,
+      },
+    });
+  });
+
+  const updatedInvitation: InvitationEntity = {
+    ...invitation,
+    status: InvitationStatus.ACCEPTED,
+  };
 
   await createActivity({
     workspaceId: invitation.workspaceId,
@@ -620,39 +623,27 @@ async function declineResolvedInvitation(
   userId: string,
   email: string,
 ): Promise<InvitationResponse> {
-  if (invitation.status !== InvitationStatus.PENDING) {
+  assertInvitationEligible(invitation, email);
+
+  const { count } = await prisma.workspaceInvitation.updateMany({
+    where: {
+      id: invitation.id,
+      status: InvitationStatus.PENDING,
+    },
+
+    data: {
+      status: InvitationStatus.DECLINED,
+    },
+  });
+
+  if (count === 0) {
     throw new ValidationError("Invitation is no longer pending");
   }
 
-  if (isInvitationExpired(invitation)) {
-    throw new ValidationError("Invitation has expired");
-  }
-
-  const normalizedEmail = email.toLowerCase();
-
-  if (invitation.email !== normalizedEmail) {
-    throw new ForbiddenError("You do not have access to this invitation");
-  }
-
-  let updatedInvitation;
-
-  try {
-    updatedInvitation = await prisma.workspaceInvitation.update({
-      where: {
-        id: invitation.id,
-      },
-
-      data: {
-        status: InvitationStatus.DECLINED,
-      },
-    });
-  } catch (error) {
-    if (isRecordNotFoundError(error)) {
-      throw new NotFoundError("Invitation not found");
-    }
-
-    throw error;
-  }
+  const updatedInvitation: InvitationEntity = {
+    ...invitation,
+    status: InvitationStatus.DECLINED,
+  };
 
   await createActivity({
     workspaceId: invitation.workspaceId,

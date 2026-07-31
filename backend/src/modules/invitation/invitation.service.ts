@@ -66,6 +66,14 @@ async function findInvitationById(invitationId: string) {
   });
 }
 
+async function findInvitationByToken(token: string) {
+  return prisma.workspaceInvitation.findUnique({
+    where: {
+      token,
+    },
+  });
+}
+
 async function getWorkspaceInvitationById(
   workspaceId: string,
   invitationId: string,
@@ -623,4 +631,4 @@ export async function declineInvitation(
   return response;
 }
 
-export { findInvitationById };
+export { findInvitationById, findInvitationByToken };

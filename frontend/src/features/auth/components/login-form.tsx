@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { login } from "../api/auth.api";
+import { getPostAuthRedirect } from "../lib/redirect";
 import { loginSchema, type LoginFormData } from "../validation/login";
 
 import { Button } from "@/components/ui/button";
@@ -31,10 +32,7 @@ export function LoginForm() {
 
       toast.success("Welcome back!");
 
-      const from =
-        (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? "/dashboard";
-
-      navigate(from, { replace: true });
+      navigate(getPostAuthRedirect(location), { replace: true });
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Something went wrong. Please try again.",
@@ -96,6 +94,7 @@ export function LoginForm() {
             Don't have an account?{" "}
             <Link
               to="/register"
+              state={location.state}
               className="font-medium text-primary underline-offset-4 transition-colors hover:underline"
             >
               Create one

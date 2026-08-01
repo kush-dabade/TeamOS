@@ -19,6 +19,7 @@ export function useAcceptInvitation() {
       queryClient.invalidateQueries({ queryKey: invitationKeys.preview(token) });
       queryClient.invalidateQueries({ queryKey: workspaceKeys.list() });
       queryClient.invalidateQueries({ queryKey: workspaceKeys.members(invitation.workspaceId) });
+      toast.success("Invitation accepted.");
     },
     onError: (error) => {
       toast.error(error.message);

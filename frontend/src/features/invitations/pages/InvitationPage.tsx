@@ -1,19 +1,49 @@
 import { Layers3, MailX } from "lucide-react";
-import { Link, useLocation, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ux";
 import { useAuth } from "@/features/auth";
 
+import { useAcceptInvitation } from "../hooks/use-accept-invitation";
+import { useDeclineInvitation } from "../hooks/use-decline-invitation";
 import { useInvitationPreview } from "../hooks/use-invitation-preview";
 import { InvitationPreviewCard } from "../components/invitation-preview-card";
 import { InvitationPreviewCardSkeleton } from "../components/invitation-preview-card-skeleton";
 
 export function InvitationPage() {
   const { token } = useParams<{ token: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const invitationQuery = useInvitationPreview(token);
   const { isAuthenticated, isPending: isAuthPending } = useAuth();
-  const location = useLocation();
+
+  const acceptInvitation = useAcceptInvitation();
+  const declineInvitation = useDeclineInvitation();
+
+  const isProcessing = acceptInvitation.isPending || declineInvitation.isPending;
+
+  async function handleAccept() {
+    if (!token) return;
+
+    try {
+      await acceptInvitation.mutateAsync(token);
+      navigate("/dashboard", { replace: true });
+    } catch {
+      // Failure feedback is already surfaced via the mutation's onError toast.
+    }
+  }
+
+  async function handleDecline() {
+    if (!token) return;
+
+    try {
+      await declineInvitation.mutateAsync(token);
+    } catch {
+      // Failure feedback is already surfaced via the mutation's onError toast.
+    }
+  }
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background p-6">
@@ -62,6 +92,29 @@ export function InvitationPage() {
                   </Link>
                 </Button>
               </div>
+            ) : null}
+
+            {!isAuthPending && isAuthenticated ? (
+              declineInvitation.isSuccess ? (
+                <p className="text-center text-sm text-muted-foreground">
+                  You declined this invitation.
+                </p>
+              ) : (
+                <div className="flex gap-3">
+                  <Button className="flex-1" disabled={isProcessing} onClick={handleAccept}>
+                    {acceptInvitation.isPending ? "Accepting..." : "Accept Invitation"}
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    disabled={isProcessing}
+                    onClick={handleDecline}
+                  >
+                    {declineInvitation.isPending ? "Declining..." : "Decline Invitation"}
+                  </Button>
+                </div>
+              )
             ) : null}
           </div>
         )}

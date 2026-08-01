@@ -16,6 +16,7 @@ export function useDeclineInvitation() {
       // Declining does not change workspace membership, so only the
       // invitation's own preview cache needs to be refreshed.
       queryClient.invalidateQueries({ queryKey: invitationKeys.preview(token) });
+      toast.success("Invitation declined.");
     },
     onError: (error) => {
       toast.error(error.message);

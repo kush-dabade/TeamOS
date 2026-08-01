@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Layers3, MailX } from "lucide-react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 
@@ -22,23 +22,37 @@ export function InvitationPage() {
 
   const acceptInvitation = useAcceptInvitation();
   const declineInvitation = useDeclineInvitation();
+  const { reset: resetAcceptInvitation } = acceptInvitation;
   const { reset: resetDeclineInvitation } = declineInvitation;
 
   const isProcessing = acceptInvitation.isPending || declineInvitation.isPending;
 
-  // The route only swaps `:token`, so the page (and this mutation's state)
-  // stays mounted across invitations — reset it so a decline on one
+  // Tracks the token currently on screen so an in-flight accept from a
+  // previous invitation can tell it's no longer the one being viewed.
+  const currentTokenRef = useRef(token);
+
+  // The route only swaps `:token`, so the page (and these mutations' state)
+  // stays mounted across invitations — reset them so accepting/declining one
   // invitation can't leak into the next.
   useEffect(() => {
+    currentTokenRef.current = token;
+    resetAcceptInvitation();
     resetDeclineInvitation();
-  }, [token, resetDeclineInvitation]);
+  }, [token, resetAcceptInvitation, resetDeclineInvitation]);
 
   async function handleAccept() {
     if (!token) return;
 
+    const acceptedToken = token;
+
     try {
-      await acceptInvitation.mutateAsync(token);
-      navigate("/dashboard", { replace: true });
+      await acceptInvitation.mutateAsync(acceptedToken);
+
+      // The user may have navigated to a different invitation while this
+      // was in flight — only redirect if they're still viewing this one.
+      if (currentTokenRef.current === acceptedToken) {
+        navigate("/dashboard", { replace: true });
+      }
     } catch {
       // Failure feedback is already surfaced via the mutation's onError toast.
     }

@@ -1,9 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { register } from "../api/auth.api";
+import { getPostAuthRedirect } from "../lib/redirect";
 import { registerSchema, type RegisterFormData } from "../validation/register";
 
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import { Input } from "@/components/ui/input";
 
 export function RegisterForm() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const form = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
@@ -36,7 +38,7 @@ export function RegisterForm() {
 
       toast.success("Account created successfully!");
 
-      navigate("/dashboard", { replace: true });
+      navigate(getPostAuthRedirect(location), { replace: true });
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Something went wrong. Please try again.",

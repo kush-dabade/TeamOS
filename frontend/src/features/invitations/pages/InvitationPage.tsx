@@ -1,8 +1,9 @@
 import { Layers3, MailX } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ux";
+import { useAuth } from "@/features/auth";
 
 import { useInvitationPreview } from "../hooks/use-invitation-preview";
 import { InvitationPreviewCard } from "../components/invitation-preview-card";
@@ -11,6 +12,8 @@ import { InvitationPreviewCardSkeleton } from "../components/invitation-preview-
 export function InvitationPage() {
   const { token } = useParams<{ token: string }>();
   const invitationQuery = useInvitationPreview(token);
+  const { isAuthenticated, isPending: isAuthPending } = useAuth();
+  const location = useLocation();
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background p-6">
@@ -42,7 +45,25 @@ export function InvitationPage() {
             }
           />
         ) : (
-          <InvitationPreviewCard invitation={invitationQuery.data} />
+          <div className="flex flex-col gap-4">
+            <InvitationPreviewCard invitation={invitationQuery.data} />
+
+            {!isAuthPending && !isAuthenticated ? (
+              <div className="flex gap-3">
+                <Button asChild className="flex-1">
+                  <Link to="/login" state={{ from: location }}>
+                    Log in
+                  </Link>
+                </Button>
+
+                <Button asChild variant="outline" className="flex-1">
+                  <Link to="/register" state={{ from: location }}>
+                    Create account
+                  </Link>
+                </Button>
+              </div>
+            ) : null}
+          </div>
         )}
       </div>
     </main>

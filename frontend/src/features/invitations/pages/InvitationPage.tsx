@@ -47,17 +47,17 @@ export function InvitationPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background p-6">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 flex flex-col items-center text-center">
-          <div className="mb-4 flex items-center gap-2">
+      <div className="w-full max-w-md">
+        <div className="mb-10 flex flex-col items-center text-center">
+          <div className="mb-5 flex items-center gap-2">
             <Layers3 className="size-6 text-foreground" />
-            <span className="text-lg font-bold tracking-tight">TeamOS</span>
+            <span className="text-lg font-semibold tracking-tight">TeamOS</span>
           </div>
 
           <h1 className="text-2xl font-semibold tracking-tight">You're invited</h1>
 
-          <p className="mt-2 text-sm text-muted-foreground">
-            Review the details of your workspace invitation below.
+          <p className="mt-3 text-sm text-muted-foreground">
+            You've been invited to join a workspace on TeamOS.
           </p>
         </div>
 
@@ -96,22 +96,27 @@ export function InvitationPage() {
 
             {!isAuthPending && isAuthenticated ? (
               declineInvitation.isSuccess ? (
-                <p className="text-center text-sm text-muted-foreground">
+                <p className="animate-in fade-in duration-200 text-center text-sm text-muted-foreground">
                   You declined this invitation.
                 </p>
               ) : (
-                <div className="flex gap-3">
-                  <Button className="flex-1" disabled={isProcessing} onClick={handleAccept}>
+                <div className="flex flex-col gap-2">
+                  <Button
+                    size="lg"
+                    className="w-full"
+                    disabled={isProcessing}
+                    onClick={handleAccept}
+                  >
                     {acceptInvitation.isPending ? "Accepting..." : "Accept Invitation"}
                   </Button>
 
                   <Button
-                    variant="outline"
-                    className="flex-1"
+                    variant="ghost"
+                    className="w-full text-muted-foreground"
                     disabled={isProcessing}
                     onClick={handleDecline}
                   >
-                    {declineInvitation.isPending ? "Declining..." : "Decline Invitation"}
+                    {declineInvitation.isPending ? "Declining..." : "Decline"}
                   </Button>
                 </div>
               )

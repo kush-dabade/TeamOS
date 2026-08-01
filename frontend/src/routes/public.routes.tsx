@@ -1,6 +1,7 @@
 import type { RouteObject } from "react-router-dom";
 
 import { GuestRoute } from "@/features/auth";
+import { InvitationPage } from "@/features/invitations";
 import PublicLayout from "@/layouts/PublicLayout";
 import HomePage from "@/pages/HomePage";
 import LoginPage from "@/pages/LoginPage";
@@ -12,6 +13,10 @@ export const publicRoutes: RouteObject[] = [
   {
     path: "/",
     element: <HomePage />,
+  },
+  {
+    path: "/invitations/:token",
+    element: <InvitationPage />,
   },
   {
     path: "*",

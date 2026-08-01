@@ -3,3 +3,4 @@ export { fetchInvitationPreview, acceptInvitation, declineInvitation } from "./a
 export { useInvitationPreview } from "./hooks/use-invitation-preview";
 export { useAcceptInvitation } from "./hooks/use-accept-invitation";
 export { useDeclineInvitation } from "./hooks/use-decline-invitation";
+export { InvitationPage } from "./pages/InvitationPage";

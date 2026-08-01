@@ -141,6 +141,7 @@ export function RegisterForm() {
             Already have an account?{" "}
             <Link
               to="/login"
+              state={location.state}
               className="font-medium text-primary underline-offset-4 transition-colors hover:underline"
             >
               Sign in

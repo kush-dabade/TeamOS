@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Layers3, MailX } from "lucide-react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 
@@ -21,8 +22,16 @@ export function InvitationPage() {
 
   const acceptInvitation = useAcceptInvitation();
   const declineInvitation = useDeclineInvitation();
+  const { reset: resetDeclineInvitation } = declineInvitation;
 
   const isProcessing = acceptInvitation.isPending || declineInvitation.isPending;
+
+  // The route only swaps `:token`, so the page (and this mutation's state)
+  // stays mounted across invitations — reset it so a decline on one
+  // invitation can't leak into the next.
+  useEffect(() => {
+    resetDeclineInvitation();
+  }, [token, resetDeclineInvitation]);
 
   async function handleAccept() {
     if (!token) return;

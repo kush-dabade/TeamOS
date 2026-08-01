@@ -94,6 +94,7 @@ export function LoginForm() {
             Don't have an account?{" "}
             <Link
               to="/register"
+              state={location.state}
               className="font-medium text-primary underline-offset-4 transition-colors hover:underline"
             >
               Create one

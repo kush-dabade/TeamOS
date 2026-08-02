@@ -8,6 +8,7 @@ import {
   listWorkspaceMembersHandler,
   updateWorkspaceMemberRoleHandler,
   removeWorkspaceMemberHandler,
+  leaveWorkspaceHandler,
 } from "./workspace.controller.js";
 
 const router = Router();
@@ -29,5 +30,7 @@ router.delete(
   requireAuth,
   removeWorkspaceMemberHandler,
 );
+
+router.post("/:workspaceId/leave", requireAuth, leaveWorkspaceHandler);
 
 export default router;

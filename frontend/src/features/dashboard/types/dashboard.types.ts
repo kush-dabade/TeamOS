@@ -33,6 +33,7 @@ export type ActivityType =
   | "USER_INVITED"
   | "INVITATION_ACCEPTED"
   | "INVITATION_DECLINED"
+  | "MEMBER_LEFT"
   | "SPRINT_CREATED"
   | "SPRINT_UPDATED"
   | "SPRINT_STARTED"
@@ -40,7 +41,7 @@ export type ActivityType =
 
 // Mirrors the backend `ActivityEntityType` enum.
 export type ActivityEntityType =
-  "PROJECT" | "TASK" | "COMMENT" | "ATTACHMENT" | "SPRINT" | "INVITATION";
+  "PROJECT" | "TASK" | "COMMENT" | "ATTACHMENT" | "SPRINT" | "INVITATION" | "MEMBER";
 
 export interface ActivityActor {
   id: string;

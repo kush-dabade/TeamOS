@@ -6,6 +6,7 @@ import { useWorkspaceMembers } from "../hooks/use-workspace-members";
 import type { Workspace } from "../types";
 
 import { EditWorkspaceDialog } from "./edit-workspace-dialog";
+import { LeaveWorkspaceDialog } from "./leave-workspace-dialog";
 import { WorkspaceAvatar } from "./workspace-avatar";
 import { WorkspaceRoleBadge } from "./workspace-role-badge";
 
@@ -32,11 +33,13 @@ export function WorkspaceDetailsCard({ workspace }: WorkspaceDetailsCardProps) {
           </div>
         </div>
 
-        {isOwner ? (
-          <div className="shrink-0">
+        <div className="shrink-0">
+          {isOwner ? (
             <EditWorkspaceDialog workspace={workspace} />
-          </div>
-        ) : null}
+          ) : (
+            <LeaveWorkspaceDialog workspaceId={workspace.id} workspaceName={workspace.name} />
+          )}
+        </div>
       </CardHeader>
 
       <CardContent>

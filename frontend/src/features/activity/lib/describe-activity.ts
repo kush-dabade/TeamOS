@@ -21,6 +21,7 @@ export function describeActivity(activity: Activity): ActivityDescription {
   const sprintName = getString(metadata, "sprintName") ?? getString(metadata, "newName");
   const attachmentName = getString(metadata, "attachmentName");
   const invitedEmail = getString(metadata, "invitedEmail");
+  const workspaceName = getString(metadata, "workspaceName");
 
   switch (activity.type) {
     case "TASK_CREATED":
@@ -57,6 +58,8 @@ export function describeActivity(activity: Activity): ActivityDescription {
       return { action: "accepted invitation", entity: invitedEmail };
     case "INVITATION_DECLINED":
       return { action: "declined invitation", entity: invitedEmail };
+    case "MEMBER_LEFT":
+      return { action: "left workspace", entity: workspaceName };
     case "SPRINT_CREATED":
       return { action: "created sprint", entity: sprintName };
     case "SPRINT_UPDATED":

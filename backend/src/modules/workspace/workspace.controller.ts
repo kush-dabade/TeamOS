@@ -387,10 +387,13 @@ export async function transferWorkspaceOwnershipHandler(
     }
 
     if (error instanceof NotFoundError) {
+      // NotFoundError here can originate from either the workspace lookup
+      // or the target member lookup (see transferWorkspaceOwnership), so
+      // the code stays generic rather than assuming it's always the member.
       return res.status(404).json({
         success: false,
         error: {
-          code: "MEMBER_NOT_FOUND",
+          code: "RESOURCE_NOT_FOUND",
           message: error.message,
         },
       });

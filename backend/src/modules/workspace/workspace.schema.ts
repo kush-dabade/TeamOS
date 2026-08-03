@@ -22,7 +22,7 @@ export const updateWorkspaceMemberRoleSchema = z.object({
 });
 
 export const transferWorkspaceOwnershipSchema = z.object({
-  memberId: z.string().cuid("Invalid member ID"),
+  memberId: z.cuid("Invalid member ID"),
 });
 
 export type CreateWorkspaceInput = z.infer<typeof createWorkspaceSchema>;

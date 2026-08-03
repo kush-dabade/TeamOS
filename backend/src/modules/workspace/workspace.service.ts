@@ -385,12 +385,32 @@ export async function transferWorkspaceOwnership(
 
   const { transferredWorkspace, newOwnerMembership } =
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const transferredWorkspace = await tx.workspace.update({
+      // Compare-and-set: only proceed if `actorId` is still the owner of
+      // record at the moment this transaction runs. Every check above was
+      // read outside the transaction, so a second concurrent transfer for
+      // this workspace could otherwise have already committed by the time
+      // this one reaches the transaction - blindly updating here would let
+      // both "succeed" and leave two WorkspaceMember rows marked OWNER while
+      // Workspace.ownerId reflects only whichever transaction ran last.
+      const ownershipUpdate = await tx.workspace.updateMany({
         where: {
           id: workspaceId,
+          ownerId: actorId,
         },
         data: {
           ownerId: targetMember.userId,
+        },
+      });
+
+      if (ownershipUpdate.count === 0) {
+        throw new ValidationError(
+          "Ownership was already transferred by another request",
+        );
+      }
+
+      const transferredWorkspace = await tx.workspace.findUniqueOrThrow({
+        where: {
+          id: workspaceId,
         },
       });
 

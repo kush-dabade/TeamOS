@@ -350,9 +350,71 @@ export async function transferOwnership(
   workspaceId: string,
   memberId: string,
 ) {
-  // TODO(PR #56 Commit 2): implement ownership transfer logic (transaction,
-  // activity logging, notifications, realtime emission).
-  throw new ValidationError("transferOwnership is not implemented yet");
+  const actorMembership = await getWorkspaceMembership(workspaceId, actorId);
+
+  const workspace = await getWorkspaceById(workspaceId);
+
+  if (workspace.ownerId !== actorId) {
+    throw new ForbiddenError("Only the workspace owner can transfer ownership");
+  }
+
+  if (actorMembership.role !== WorkspaceRole.OWNER) {
+    // Workspace.ownerId and WorkspaceMember.role are two sources of truth for
+    // ownership that are kept in sync manually. They should never drift, but
+    // if they do, fail closed instead of transferring ownership from a
+    // membership that doesn't actually hold the OWNER role.
+    throw new ValidationError(
+      "Workspace ownership data is inconsistent and ownership cannot be transferred",
+    );
+  }
+
+  const targetMember = await getWorkspaceMemberById(workspaceId, memberId);
+
+  if (targetMember.userId === workspace.ownerId) {
+    throw new ValidationError("Cannot transfer ownership to the current owner");
+  }
+
+  // TODO(PR #56 Commit 3): activity logging, notifications, realtime emission.
+  const { transferredWorkspace, newOwnerMembership } =
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const transferredWorkspace = await tx.workspace.update({
+        where: {
+          id: workspaceId,
+        },
+        data: {
+          ownerId: targetMember.userId,
+        },
+      });
+
+      await tx.workspaceMember.update({
+        where: {
+          id: actorMembership.id,
+        },
+        data: {
+          role: WorkspaceRole.ADMIN,
+        },
+      });
+
+      const newOwnerMembership = await tx.workspaceMember.update({
+        where: {
+          id: targetMember.id,
+        },
+        data: {
+          role: WorkspaceRole.OWNER,
+        },
+      });
+
+      return { transferredWorkspace, newOwnerMembership };
+    });
+
+  return {
+    workspaceId: transferredWorkspace.id,
+    workspaceName: transferredWorkspace.name,
+    previousOwnerId: actorId,
+    newOwnerId: newOwnerMembership.userId,
+    newOwnerName: targetMember.user.name,
+    newOwnerEmail: targetMember.user.email,
+  };
 }
 
 export async function leaveWorkspace(actorId: string, workspaceId: string) {

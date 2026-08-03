@@ -345,6 +345,16 @@ export async function removeWorkspaceMember(
   };
 }
 
+export async function transferOwnership(
+  actorId: string,
+  workspaceId: string,
+  memberId: string,
+) {
+  // TODO(PR #56 Commit 2): implement ownership transfer logic (transaction,
+  // activity logging, notifications, realtime emission).
+  throw new ValidationError("transferOwnership is not implemented yet");
+}
+
 export async function leaveWorkspace(actorId: string, workspaceId: string) {
   const membership = await getWorkspaceMembership(workspaceId, actorId);
 

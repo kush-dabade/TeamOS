@@ -21,8 +21,15 @@ export const updateWorkspaceMemberRoleSchema = z.object({
   role: z.nativeEnum(WorkspaceRole),
 });
 
+export const transferWorkspaceOwnershipSchema = z.object({
+  memberId: z.string().cuid("Invalid member ID"),
+});
+
 export type CreateWorkspaceInput = z.infer<typeof createWorkspaceSchema>;
 export type UpdateWorkspaceInput = z.infer<typeof updateWorkspaceSchema>;
 export type UpdateWorkspaceMemberRoleInput = z.infer<
   typeof updateWorkspaceMemberRoleSchema
+>;
+export type TransferWorkspaceOwnershipInput = z.infer<
+  typeof transferWorkspaceOwnershipSchema
 >;

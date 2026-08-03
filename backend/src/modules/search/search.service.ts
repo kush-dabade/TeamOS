@@ -12,6 +12,7 @@ import type { SearchQuery } from "./search.schema.js";
 
 interface SearchProjectRow {
   id: string;
+  slug: string;
   name: string;
   description: string | null;
 }
@@ -33,6 +34,7 @@ async function searchProjects(
   return prisma.$queryRaw<SearchProjectRow[]>(Prisma.sql`
 SELECT
   id,
+  slug,
   name,
   description
 FROM "Project"

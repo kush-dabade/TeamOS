@@ -2,6 +2,7 @@ import { TaskPriority, TaskStatus } from "../../generated/prisma/enums.js";
 
 export interface SearchProjectResult {
   id: string;
+  slug: string;
   name: string;
   description: string | null;
 }

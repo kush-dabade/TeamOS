@@ -76,6 +76,22 @@ export function SearchCommand() {
 
   return (
     <>
+      {/* Ctrl/Cmd+K requires a keyboard, so below `md` (no room for the wide
+          bar, and the primary input method is touch) search needs its own
+          reachable entry point - an icon button, matching how the other two
+          header actions (notifications, create) are always visible rather
+          than hidden below a breakpoint. */}
+      <Button
+        type="button"
+        size="icon-lg"
+        variant="secondary"
+        aria-label="Search"
+        onClick={() => setOpen(true)}
+        className="md:hidden"
+      >
+        <SearchIcon className="size-4" />
+      </Button>
+
       <Button
         type="button"
         variant="ghost"
@@ -98,6 +114,7 @@ export function SearchCommand() {
         onOpenChange={handleOpenChange}
         title="Search workspace"
         description="Find projects and tasks by name."
+        className="sm:max-w-lg"
       >
         <SearchCommandContent
           key={sessionId}

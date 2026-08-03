@@ -84,6 +84,22 @@ export function SearchCommandContent({
     setSelectedValue(firstResultValue);
   }
 
+  // cmdk doesn't expose an aria-live region of its own (verified against its
+  // source - there isn't one anywhere in the package), so a screen reader
+  // user who isn't actively arrowing through results gets no signal that a
+  // search resolved, failed, or came back empty. This announces exactly the
+  // same state renderEmptyState() already branches on, once per settled
+  // state rather than per keystroke, since it's derived from `debouncedQuery`
+  // and query status rather than the raw input.
+  const resultCount = projects.length + tasks.length;
+  const statusMessage = !isQueryReady
+    ? ""
+    : searchQuery.isError
+      ? "Couldn't load results."
+      : searchQuery.isLoading
+        ? "Searching..."
+        : `${resultCount} ${resultCount === 1 ? "result" : "results"} found.`;
+
   function renderEmptyState() {
     if (!isQueryReady) {
       return (
@@ -107,11 +123,14 @@ export function SearchCommandContent({
 
     if (searchQuery.isLoading) {
       return (
-        <div className="space-y-1 px-2 py-1">
+        <div className="space-y-1 py-1">
           {loadingRows.map((row) => (
-            <div key={row} className="flex items-center gap-2.5 px-2 py-1.5">
-              <Skeleton className="size-4 shrink-0 rounded" />
-              <Skeleton className="h-4 flex-1" />
+            <div key={row} className="flex items-start gap-2.5 px-2 py-2">
+              <Skeleton className="mt-0.5 size-4 shrink-0 rounded" />
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <Skeleton className="h-3.5 w-2/5" />
+                <Skeleton className="h-3 w-4/5" />
+              </div>
             </div>
           ))}
         </div>
@@ -128,54 +147,60 @@ export function SearchCommandContent({
   }
 
   return (
-    <Command
-      shouldFilter={false}
-      vimBindings={false}
-      label="Search projects and tasks"
-      value={selectedValue}
-      onValueChange={setSelectedValue}
-    >
-      <CommandInput
-        value={query}
-        onValueChange={setQuery}
-        placeholder="Search projects and tasks..."
-      />
+    <>
+      <div role="status" aria-live="polite" className="sr-only">
+        {statusMessage}
+      </div>
 
-      <CommandList>
-        <CommandEmpty>{renderEmptyState()}</CommandEmpty>
+      <Command
+        shouldFilter={false}
+        vimBindings={false}
+        label="Search projects and tasks"
+        value={selectedValue}
+        onValueChange={setSelectedValue}
+      >
+        <CommandInput
+          value={query}
+          onValueChange={setQuery}
+          placeholder="Search projects and tasks..."
+        />
 
-        {hasProjectResults ? (
-          <CommandGroup heading="Projects">
-            {projects.map((project) => (
-              <SearchResultItem
-                key={project.id}
-                value={`project-${project.id}`}
-                icon={FolderIcon}
-                title={project.name}
-                description={project.description}
-                onSelect={() => onSelectProject(project.slug)}
-              />
-            ))}
-          </CommandGroup>
-        ) : null}
+        <CommandList>
+          <CommandEmpty>{renderEmptyState()}</CommandEmpty>
 
-        {hasProjectResults && hasTaskResults ? <CommandSeparator /> : null}
+          {hasProjectResults ? (
+            <CommandGroup heading="Projects">
+              {projects.map((project) => (
+                <SearchResultItem
+                  key={project.id}
+                  value={`project-${project.id}`}
+                  icon={FolderIcon}
+                  title={project.name}
+                  description={project.description}
+                  onSelect={() => onSelectProject(project.slug)}
+                />
+              ))}
+            </CommandGroup>
+          ) : null}
 
-        {hasTaskResults ? (
-          <CommandGroup heading="Tasks">
-            {tasks.map((task) => (
-              <SearchResultItem
-                key={task.id}
-                value={`task-${task.id}`}
-                icon={ListTodoIcon}
-                title={task.title}
-                description={task.description}
-                onSelect={() => onSelectTask(task.id)}
-              />
-            ))}
-          </CommandGroup>
-        ) : null}
-      </CommandList>
-    </Command>
+          {hasProjectResults && hasTaskResults ? <CommandSeparator /> : null}
+
+          {hasTaskResults ? (
+            <CommandGroup heading="Tasks">
+              {tasks.map((task) => (
+                <SearchResultItem
+                  key={task.id}
+                  value={`task-${task.id}`}
+                  icon={ListTodoIcon}
+                  title={task.title}
+                  description={task.description}
+                  onSelect={() => onSelectTask(task.id)}
+                />
+              ))}
+            </CommandGroup>
+          ) : null}
+        </CommandList>
+      </Command>
+    </>
   );
 }

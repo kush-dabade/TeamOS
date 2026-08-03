@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { MoreHorizontal } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -22,25 +23,41 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { useRemoveWorkspaceMember } from "../hooks/use-remove-workspace-member";
+import { useTransferWorkspaceOwnership } from "../hooks/use-transfer-workspace-ownership";
 import { useUpdateWorkspaceMemberRole } from "../hooks/use-update-workspace-member-role";
-import { ROLE_LABELS, canManageMember, getAssignableRoles } from "../lib/workspace-roles";
+import {
+  ROLE_LABELS,
+  canManageMember,
+  getAssignableRoles,
+  isEligibleOwnershipTransferTarget,
+} from "../lib/workspace-roles";
 import type { WorkspaceMember, WorkspaceRole } from "../types";
 
 import { WorkspaceRoleBadge } from "./workspace-role-badge";
 
 interface WorkspaceMemberRowProps {
   workspaceId: string;
+  workspaceName: string;
   member: WorkspaceMember;
   actorRole: WorkspaceRole;
 }
 
-export function WorkspaceMemberRow({ workspaceId, member, actorRole }: WorkspaceMemberRowProps) {
+export function WorkspaceMemberRow({
+  workspaceId,
+  workspaceName,
+  member,
+  actorRole,
+}: WorkspaceMemberRowProps) {
   const [isRemoveDialogOpen, setIsRemoveDialogOpen] = useState(false);
+  const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
 
   const updateRole = useUpdateWorkspaceMemberRole(workspaceId);
   const removeMember = useRemoveWorkspaceMember(workspaceId);
+  const transferOwnership = useTransferWorkspaceOwnership(workspaceId);
 
   const canManage = canManageMember(actorRole, member.role);
+  const canTransferOwnership =
+    actorRole === "OWNER" && isEligibleOwnershipTransferTarget(member.role);
   const assignableRoles = getAssignableRoles(actorRole);
 
   async function handleRoleChange(role: WorkspaceRole) {
@@ -59,6 +76,16 @@ export function WorkspaceMemberRow({ workspaceId, member, actorRole }: Workspace
     try {
       await removeMember.mutateAsync(member.id);
       setIsRemoveDialogOpen(false);
+    } catch {
+      // Failure feedback is already surfaced via the mutation's onError toast.
+    }
+  }
+
+  async function handleConfirmTransfer() {
+    try {
+      await transferOwnership.mutateAsync(member.id);
+      toast.success(`Ownership transferred to ${member.name}.`);
+      setIsTransferDialogOpen(false);
     } catch {
       // Failure feedback is already surfaced via the mutation's onError toast.
     }
@@ -99,17 +126,24 @@ export function WorkspaceMemberRow({ workspaceId, member, actorRole }: Workspace
                   onValueChange={(value) => handleRoleChange(value as WorkspaceRole)}
                 >
                   {assignableRoles.map((role) => (
-                    <DropdownMenuRadioItem
-                      key={role}
-                      value={role}
-                      disabled={updateRole.isPending}
-                    >
+                    <DropdownMenuRadioItem key={role} value={role} disabled={updateRole.isPending}>
                       {ROLE_LABELS[role]}
                     </DropdownMenuRadioItem>
                   ))}
                 </DropdownMenuRadioGroup>
 
                 <DropdownMenuSeparator />
+
+                {canTransferOwnership ? (
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      setIsTransferDialogOpen(true);
+                    }}
+                  >
+                    Transfer ownership
+                  </DropdownMenuItem>
+                ) : null}
 
                 <DropdownMenuItem
                   variant="destructive"
@@ -143,6 +177,29 @@ export function WorkspaceMemberRow({ workspaceId, member, actorRole }: Workspace
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+
+            {canTransferOwnership ? (
+              <Dialog open={isTransferDialogOpen} onOpenChange={setIsTransferDialogOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Transfer ownership of {workspaceName}?</DialogTitle>
+                    <DialogDescription>
+                      {member.name} will become the owner of {workspaceName} and you will become an
+                      admin. This change is immediate and cannot be undone.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter showCloseButton>
+                    <Button
+                      type="button"
+                      onClick={handleConfirmTransfer}
+                      disabled={transferOwnership.isPending}
+                    >
+                      {transferOwnership.isPending ? "Transferring..." : "Transfer ownership"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            ) : null}
           </>
         ) : null}
       </td>

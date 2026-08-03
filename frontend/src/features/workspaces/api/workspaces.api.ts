@@ -5,6 +5,7 @@ import type {
   Workspace,
   WorkspaceInvitation,
   WorkspaceMember,
+  WorkspaceOwnershipTransfer,
   WorkspaceRole,
 } from "../types";
 
@@ -93,9 +94,7 @@ export async function createWorkspace(input: CreateWorkspaceInput): Promise<void
 }
 
 export async function fetchWorkspace(workspaceId: string): Promise<Workspace> {
-  const response = await apiClient.get<ApiSuccess<BackendWorkspace>>(
-    `/workspaces/${workspaceId}`,
-  );
+  const response = await apiClient.get<ApiSuccess<BackendWorkspace>>(`/workspaces/${workspaceId}`);
 
   return toWorkspace(response.data.data);
 }
@@ -135,6 +134,40 @@ export async function removeWorkspaceMember(workspaceId: string, memberId: strin
 
 export async function leaveWorkspace(workspaceId: string): Promise<void> {
   await apiClient.post(`/workspaces/${workspaceId}/leave`);
+}
+
+interface BackendWorkspaceOwnershipTransfer {
+  workspaceId: string;
+  workspaceName: string;
+  previousOwnerId: string;
+  newOwnerId: string;
+  newOwnerName: string;
+  newOwnerEmail: string;
+}
+
+function toWorkspaceOwnershipTransfer(
+  transfer: BackendWorkspaceOwnershipTransfer,
+): WorkspaceOwnershipTransfer {
+  return {
+    workspaceId: transfer.workspaceId,
+    workspaceName: transfer.workspaceName,
+    previousOwnerId: transfer.previousOwnerId,
+    newOwnerId: transfer.newOwnerId,
+    newOwnerName: transfer.newOwnerName,
+    newOwnerEmail: transfer.newOwnerEmail,
+  };
+}
+
+export async function transferWorkspaceOwnership(
+  workspaceId: string,
+  memberId: string,
+): Promise<WorkspaceOwnershipTransfer> {
+  const response = await apiClient.post<ApiSuccess<BackendWorkspaceOwnershipTransfer>>(
+    `/workspaces/${workspaceId}/transfer-ownership`,
+    { memberId },
+  );
+
+  return toWorkspaceOwnershipTransfer(response.data.data);
 }
 
 export async function fetchWorkspaceInvitations(

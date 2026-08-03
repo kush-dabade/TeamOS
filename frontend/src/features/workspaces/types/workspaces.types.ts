@@ -29,3 +29,12 @@ export interface WorkspaceInvitation {
   expiresAt: string;
   createdAt: string;
 }
+
+export interface WorkspaceOwnershipTransfer {
+  workspaceId: string;
+  workspaceName: string;
+  previousOwnerId: string;
+  newOwnerId: string;
+  newOwnerName: string;
+  newOwnerEmail: string;
+}

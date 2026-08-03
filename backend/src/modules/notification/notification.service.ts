@@ -64,13 +64,7 @@ export async function createNotification(
     },
   });
 
-  const response = toNotificationResponse(notification);
-
-  emitToUser(notification.recipientId, REALTIME_EVENTS.NOTIFICATION_CREATED, {
-    notification: response,
-  });
-
-  return response;
+  return toNotificationResponse(notification);
 }
 
 export async function listNotifications(

@@ -16,7 +16,7 @@ import {
   updateWorkspaceMemberRole,
   removeWorkspaceMember,
   leaveWorkspace,
-  transferOwnership,
+  transferWorkspaceOwnership,
 } from "./workspace.service.js";
 import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
 import { NotFoundError } from "../../shared/errors/not-found-error.js";
@@ -358,11 +358,14 @@ export async function removeWorkspaceMemberHandler(
   }
 }
 
-export async function transferOwnershipHandler(req: Request, res: Response) {
+export async function transferWorkspaceOwnershipHandler(
+  req: Request,
+  res: Response,
+) {
   try {
     const body = transferWorkspaceOwnershipSchema.parse(req.body);
 
-    const result = await transferOwnership(
+    const result = await transferWorkspaceOwnership(
       req.user!.id,
       req.params.workspaceId as string,
       body.memberId,

@@ -347,7 +347,7 @@ export async function removeWorkspaceMember(
   };
 }
 
-export async function transferOwnership(
+export async function transferWorkspaceOwnership(
   actorId: string,
   workspaceId: string,
   memberId: string,
@@ -374,6 +374,13 @@ export async function transferOwnership(
 
   if (targetMember.userId === workspace.ownerId) {
     throw new ValidationError("Cannot transfer ownership to the current owner");
+  }
+
+  if (targetMember.role === WorkspaceRole.GUEST) {
+    // Guests have read-only access (docs/architecture/api-specification.md,
+    // RBAC Rules) - ownership grants full access, so a guest is never an
+    // eligible transfer target.
+    throw new ValidationError("Ownership cannot be transferred to a guest");
   }
 
   const { transferredWorkspace, newOwnerMembership } =

@@ -45,9 +45,12 @@ export function SearchCommand() {
         return;
       }
 
-      // Don't hijack the shortcut while the user is typing somewhere else
-      // (a task title, a comment box, ...).
-      if (isEditableElement(document.activeElement)) {
+      // Only guard against hijacking focus when we'd be OPENING the palette
+      // (typing in a task title, a comment box, ...). Once it's already
+      // open, Radix's focus trap guarantees the only editable element that
+      // can be focused is the palette's own CommandInput, and the shortcut
+      // must still be able to close it from there.
+      if (!open && isEditableElement(document.activeElement)) {
         return;
       }
 

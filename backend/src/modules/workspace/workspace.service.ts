@@ -4,6 +4,7 @@ import type { Prisma } from "../../generated/prisma/client.js";
 import {
   ActivityEntityType,
   ActivityType,
+  NotificationType,
   WorkspaceRole,
 } from "../../generated/prisma/enums.js";
 import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
@@ -14,6 +15,7 @@ import type { UpdateWorkspaceInput } from "./workspace.schema.js";
 import { createActivity } from "../activity/activity.service.js";
 import { emitToWorkspace } from "../../realtime/realtime.emitter.js";
 import { REALTIME_EVENTS } from "../../realtime/realtime.constants.js";
+import { enqueueNotification } from "../../queues/notification/index.js";
 
 async function generateUniqueSlug(name: string): Promise<string> {
   const baseSlug = generateSlug(name);
@@ -374,7 +376,6 @@ export async function transferOwnership(
     throw new ValidationError("Cannot transfer ownership to the current owner");
   }
 
-  // TODO(PR #56 Commit 3): activity logging, notifications, realtime emission.
   const { transferredWorkspace, newOwnerMembership } =
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const transferredWorkspace = await tx.workspace.update({
@@ -406,6 +407,65 @@ export async function transferOwnership(
 
       return { transferredWorkspace, newOwnerMembership };
     });
+
+  // Best-effort: ownership has already changed at this point, so a failure
+  // here must not fail the request - unlike a create-mutation's activity log,
+  // a retry can't "transfer again" (the actor is no longer the owner), it
+  // would just surface a confusing "forbidden" error for a transfer that
+  // already succeeded. Each side effect is independent: one failing must not
+  // prevent the others from running.
+  try {
+    await createActivity({
+      workspaceId: transferredWorkspace.id,
+      actorId,
+
+      type: ActivityType.OWNERSHIP_TRANSFERRED,
+
+      entityType: ActivityEntityType.WORKSPACE,
+      entityId: transferredWorkspace.id,
+
+      metadata: {
+        workspaceName: transferredWorkspace.name,
+        newOwnerId: newOwnerMembership.userId,
+        newOwnerName: targetMember.user.name,
+      },
+    });
+  } catch (error) {
+    console.error("Failed to record ownership-transfer activity:", error);
+  }
+
+  try {
+    await enqueueNotification({
+      workspaceId: transferredWorkspace.id,
+      recipientId: newOwnerMembership.userId,
+
+      type: NotificationType.OWNERSHIP_TRANSFERRED,
+
+      title: "Workspace Ownership Transferred",
+      message: `You are now the owner of "${transferredWorkspace.name}".`,
+
+      metadata: {
+        workspaceId: transferredWorkspace.id,
+        previousOwnerId: actorId,
+      },
+    });
+  } catch (error) {
+    console.error("Failed to enqueue ownership-transfer notification:", error);
+  }
+
+  try {
+    emitToWorkspace(
+      transferredWorkspace.id,
+      REALTIME_EVENTS.OWNERSHIP_TRANSFERRED,
+      {
+        workspaceId: transferredWorkspace.id,
+        previousOwnerId: actorId,
+        newOwnerId: newOwnerMembership.userId,
+      },
+    );
+  } catch (error) {
+    console.error("Failed to emit ownership-transfer realtime event:", error);
+  }
 
   return {
     workspaceId: transferredWorkspace.id,

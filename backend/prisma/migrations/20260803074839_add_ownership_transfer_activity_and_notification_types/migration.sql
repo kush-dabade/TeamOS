@@ -1,0 +1,5 @@
+-- AlterEnum
+ALTER TYPE "ActivityType" ADD VALUE 'OWNERSHIP_TRANSFERRED';
+
+-- AlterEnum
+ALTER TYPE "NotificationType" ADD VALUE 'OWNERSHIP_TRANSFERRED';

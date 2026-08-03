@@ -40,6 +40,8 @@ export const REALTIME_EVENTS = {
   INVITATION_DECLINED: "invitation.declined",
 
   MEMBER_LEFT: "member.left",
+
+  OWNERSHIP_TRANSFERRED: "workspace.ownership_transferred",
 } as const;
 
 export type RealtimeEvent =

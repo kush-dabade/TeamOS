@@ -5,6 +5,7 @@ import {
   createWorkspaceSchema,
   updateWorkspaceSchema,
   updateWorkspaceMemberRoleSchema,
+  transferWorkspaceOwnershipSchema,
 } from "./workspace.schema.js";
 import {
   createWorkspace,
@@ -15,6 +16,7 @@ import {
   updateWorkspaceMemberRole,
   removeWorkspaceMember,
   leaveWorkspace,
+  transferWorkspaceOwnership,
 } from "./workspace.service.js";
 import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
 import { NotFoundError } from "../../shared/errors/not-found-error.js";
@@ -345,6 +347,79 @@ export async function removeWorkspaceMemberHandler(
     }
 
     console.error("Remove workspace member error:", error);
+
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "An internal error occurred",
+      },
+    });
+  }
+}
+
+export async function transferWorkspaceOwnershipHandler(
+  req: Request,
+  res: Response,
+) {
+  try {
+    const body = transferWorkspaceOwnershipSchema.parse(req.body);
+
+    const result = await transferWorkspaceOwnership(
+      req.user!.id,
+      req.params.workspaceId as string,
+      body.memberId,
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: error.issues[0]?.message ?? "Invalid request",
+        },
+      });
+    }
+
+    if (error instanceof NotFoundError) {
+      // NotFoundError here can originate from either the workspace lookup
+      // or the target member lookup (see transferWorkspaceOwnership), so
+      // the code stays generic rather than assuming it's always the member.
+      return res.status(404).json({
+        success: false,
+        error: {
+          code: "RESOURCE_NOT_FOUND",
+          message: error.message,
+        },
+      });
+    }
+
+    if (error instanceof ForbiddenError) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: "FORBIDDEN",
+          message: error.message,
+        },
+      });
+    }
+
+    if (error instanceof ValidationError) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: "VALIDATION_ERROR",
+          message: error.message,
+        },
+      });
+    }
+
+    console.error("Transfer workspace ownership error:", error);
 
     return res.status(500).json({
       success: false,

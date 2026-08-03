@@ -15,7 +15,7 @@ export const notificationWorker = new Worker(
       case NOTIFICATION_JOB_NAMES.CREATE_NOTIFICATION: {
         const payload = job.data as CreateNotificationJobData;
 
-        await createNotification({
+        return await createNotification({
           workspaceId: payload.workspaceId,
 
           recipientId: payload.recipientId,
@@ -29,8 +29,6 @@ export const notificationWorker = new Worker(
             metadata: payload.metadata,
           }),
         });
-
-        break;
       }
 
       default:

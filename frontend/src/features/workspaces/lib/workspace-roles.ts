@@ -32,3 +32,11 @@ export function getAssignableRoles(actorRole: WorkspaceRole): WorkspaceRole[] {
 
   return [];
 }
+
+// Mirrors workspace.service.ts (transferWorkspaceOwnership) for UX affordances only; guests have
+// read-only access (docs/architecture/api-specification.md, RBAC Rules), so they're excluded as
+// ownership-transfer targets. The backend re-validates every request and remains the source of
+// truth.
+export function isEligibleOwnershipTransferTarget(targetRole: WorkspaceRole): boolean {
+  return targetRole === "ADMIN" || targetRole === "MEMBER";
+}

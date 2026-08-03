@@ -106,6 +106,7 @@ export function WorkspaceMembersCard({ workspace }: WorkspaceMembersCardProps) {
                     <WorkspaceMemberRow
                       key={member.id}
                       workspaceId={workspace.id}
+                      workspaceName={workspace.name}
                       member={member}
                       actorRole={workspace.role}
                     />

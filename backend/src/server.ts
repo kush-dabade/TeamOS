@@ -3,6 +3,10 @@ import { createServer } from "node:http";
 
 import app from "./app.js";
 import { prisma } from "./lib/prisma.js";
+import {
+  closeNotificationQueueEvents,
+  initializeNotificationQueueEvents,
+} from "./queues/notification/index.js";
 import { closeRealtime, initializeRealtime } from "./realtime/index.js";
 
 const PORT = process.env.PORT || 3000;
@@ -28,6 +32,7 @@ async function shutdown(
 
     try {
       await closeRealtime();
+      await closeNotificationQueueEvents();
       await prisma.$disconnect();
 
       console.log("Shutdown completed successfully.");
@@ -61,6 +66,7 @@ async function start() {
     const server = createServer(app);
 
     initializeRealtime(server);
+    initializeNotificationQueueEvents();
 
     registerShutdownHandlers(server);
 

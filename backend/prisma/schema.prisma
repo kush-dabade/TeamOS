@@ -63,6 +63,8 @@ enum ActivityType {
 
   MEMBER_LEFT
 
+  OWNERSHIP_TRANSFERRED
+
   SPRINT_CREATED
   SPRINT_UPDATED
   SPRINT_STARTED
@@ -77,6 +79,7 @@ enum ActivityEntityType {
   SPRINT
   INVITATION
   MEMBER
+  WORKSPACE
 }
 
 enum SprintStatus {
@@ -92,6 +95,8 @@ enum NotificationType {
   COMMENT_ON_ASSIGNED_TASK
 
   COMMENT_MENTIONED
+
+  OWNERSHIP_TRANSFERRED
 }
 
 enum InvitationStatus {

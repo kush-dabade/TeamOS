@@ -4,6 +4,7 @@ import type { Prisma } from "../../generated/prisma/client.js";
 import {
   ActivityEntityType,
   ActivityType,
+  NotificationType,
   WorkspaceRole,
 } from "../../generated/prisma/enums.js";
 import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
@@ -14,6 +15,7 @@ import type { UpdateWorkspaceInput } from "./workspace.schema.js";
 import { createActivity } from "../activity/activity.service.js";
 import { emitToWorkspace } from "../../realtime/realtime.emitter.js";
 import { REALTIME_EVENTS } from "../../realtime/realtime.constants.js";
+import { enqueueNotification } from "../../queues/notification/index.js";
 
 async function generateUniqueSlug(name: string): Promise<string> {
   const baseSlug = generateSlug(name);
@@ -342,6 +344,163 @@ export async function removeWorkspaceMember(
 
   return {
     success: true,
+  };
+}
+
+export async function transferWorkspaceOwnership(
+  actorId: string,
+  workspaceId: string,
+  memberId: string,
+) {
+  const actorMembership = await getWorkspaceMembership(workspaceId, actorId);
+
+  const workspace = await getWorkspaceById(workspaceId);
+
+  if (workspace.ownerId !== actorId) {
+    throw new ForbiddenError("Only the workspace owner can transfer ownership");
+  }
+
+  if (actorMembership.role !== WorkspaceRole.OWNER) {
+    // Workspace.ownerId and WorkspaceMember.role are two sources of truth for
+    // ownership that are kept in sync manually. They should never drift, but
+    // if they do, fail closed instead of transferring ownership from a
+    // membership that doesn't actually hold the OWNER role.
+    throw new ValidationError(
+      "Workspace ownership data is inconsistent and ownership cannot be transferred",
+    );
+  }
+
+  const targetMember = await getWorkspaceMemberById(workspaceId, memberId);
+
+  if (targetMember.userId === workspace.ownerId) {
+    throw new ValidationError("Cannot transfer ownership to the current owner");
+  }
+
+  if (targetMember.role === WorkspaceRole.GUEST) {
+    // Guests have read-only access (docs/architecture/api-specification.md,
+    // RBAC Rules) - ownership grants full access, so a guest is never an
+    // eligible transfer target.
+    throw new ValidationError("Ownership cannot be transferred to a guest");
+  }
+
+  const { transferredWorkspace, newOwnerMembership } =
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      // Compare-and-set: only proceed if `actorId` is still the owner of
+      // record at the moment this transaction runs. Every check above was
+      // read outside the transaction, so a second concurrent transfer for
+      // this workspace could otherwise have already committed by the time
+      // this one reaches the transaction - blindly updating here would let
+      // both "succeed" and leave two WorkspaceMember rows marked OWNER while
+      // Workspace.ownerId reflects only whichever transaction ran last.
+      const ownershipUpdate = await tx.workspace.updateMany({
+        where: {
+          id: workspaceId,
+          ownerId: actorId,
+        },
+        data: {
+          ownerId: targetMember.userId,
+        },
+      });
+
+      if (ownershipUpdate.count === 0) {
+        throw new ValidationError(
+          "Ownership was already transferred by another request",
+        );
+      }
+
+      const transferredWorkspace = await tx.workspace.findUniqueOrThrow({
+        where: {
+          id: workspaceId,
+        },
+      });
+
+      await tx.workspaceMember.update({
+        where: {
+          id: actorMembership.id,
+        },
+        data: {
+          role: WorkspaceRole.ADMIN,
+        },
+      });
+
+      const newOwnerMembership = await tx.workspaceMember.update({
+        where: {
+          id: targetMember.id,
+        },
+        data: {
+          role: WorkspaceRole.OWNER,
+        },
+      });
+
+      return { transferredWorkspace, newOwnerMembership };
+    });
+
+  // Best-effort: ownership has already changed at this point, so a failure
+  // here must not fail the request - unlike a create-mutation's activity log,
+  // a retry can't "transfer again" (the actor is no longer the owner), it
+  // would just surface a confusing "forbidden" error for a transfer that
+  // already succeeded. Each side effect is independent: one failing must not
+  // prevent the others from running.
+  try {
+    await createActivity({
+      workspaceId: transferredWorkspace.id,
+      actorId,
+
+      type: ActivityType.OWNERSHIP_TRANSFERRED,
+
+      entityType: ActivityEntityType.WORKSPACE,
+      entityId: transferredWorkspace.id,
+
+      metadata: {
+        workspaceName: transferredWorkspace.name,
+        newOwnerId: newOwnerMembership.userId,
+        newOwnerName: targetMember.user.name,
+      },
+    });
+  } catch (error) {
+    console.error("Failed to record ownership-transfer activity:", error);
+  }
+
+  try {
+    await enqueueNotification({
+      workspaceId: transferredWorkspace.id,
+      recipientId: newOwnerMembership.userId,
+
+      type: NotificationType.OWNERSHIP_TRANSFERRED,
+
+      title: "Workspace Ownership Transferred",
+      message: `You are now the owner of "${transferredWorkspace.name}".`,
+
+      metadata: {
+        workspaceId: transferredWorkspace.id,
+        previousOwnerId: actorId,
+      },
+    });
+  } catch (error) {
+    console.error("Failed to enqueue ownership-transfer notification:", error);
+  }
+
+  try {
+    emitToWorkspace(
+      transferredWorkspace.id,
+      REALTIME_EVENTS.OWNERSHIP_TRANSFERRED,
+      {
+        workspaceId: transferredWorkspace.id,
+        previousOwnerId: actorId,
+        newOwnerId: newOwnerMembership.userId,
+      },
+    );
+  } catch (error) {
+    console.error("Failed to emit ownership-transfer realtime event:", error);
+  }
+
+  return {
+    workspaceId: transferredWorkspace.id,
+    workspaceName: transferredWorkspace.name,
+    previousOwnerId: actorId,
+    newOwnerId: newOwnerMembership.userId,
+    newOwnerName: targetMember.user.name,
+    newOwnerEmail: targetMember.user.email,
   };
 }
 

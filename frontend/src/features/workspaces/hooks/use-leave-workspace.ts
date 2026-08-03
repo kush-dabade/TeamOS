@@ -12,18 +12,13 @@ export function useLeaveWorkspace(workspaceId: string) {
   return useMutation<void, AppError, void>({
     mutationFn: () => leaveWorkspace(workspaceId),
     onSuccess: async () => {
+      // Only the workspace list is invalidated: leaving revokes access to
+      // this workspace's own members/detail queries, so eagerly refetching
+      // them would just hit a guaranteed 403 for no benefit (mirrors how
+      // useAcceptInvitation/useDeclineInvitation scope invalidation to only
+      // what the actor's relationship to the workspace actually changed).
       await queryClient.invalidateQueries({
         queryKey: workspaceKeys.list(),
-        refetchType: "all",
-      });
-
-      await queryClient.invalidateQueries({
-        queryKey: workspaceKeys.members(workspaceId),
-        refetchType: "all",
-      });
-
-      await queryClient.invalidateQueries({
-        queryKey: workspaceKeys.detail(workspaceId),
         refetchType: "all",
       });
     },

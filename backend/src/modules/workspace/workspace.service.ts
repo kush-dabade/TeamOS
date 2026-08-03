@@ -362,25 +362,33 @@ export async function leaveWorkspace(actorId: string, workspaceId: string) {
     },
   });
 
-  await createActivity({
-    workspaceId,
-    actorId,
+  // Best-effort: the membership is already gone at this point, so a failure
+  // here must not fail the request - unlike a create-mutation's activity log,
+  // a retry can't "leave again," it would just surface a confusing
+  // "not a member" error for a leave that already succeeded.
+  try {
+    await createActivity({
+      workspaceId,
+      actorId,
 
-    type: ActivityType.MEMBER_LEFT,
+      type: ActivityType.MEMBER_LEFT,
 
-    entityType: ActivityEntityType.MEMBER,
-    entityId: membership.id,
+      entityType: ActivityEntityType.MEMBER,
+      entityId: membership.id,
 
-    metadata: {
-      workspaceName: workspace.name,
-    },
-  });
+      metadata: {
+        workspaceName: workspace.name,
+      },
+    });
 
-  emitToWorkspace(workspaceId, REALTIME_EVENTS.MEMBER_LEFT, {
-    workspaceId,
-    userId: actorId,
-    memberId: membership.id,
-  });
+    emitToWorkspace(workspaceId, REALTIME_EVENTS.MEMBER_LEFT, {
+      workspaceId,
+      userId: actorId,
+      memberId: membership.id,
+    });
+  } catch (error) {
+    console.error("Failed to record leave-workspace activity:", error);
+  }
 
   return {
     success: true,

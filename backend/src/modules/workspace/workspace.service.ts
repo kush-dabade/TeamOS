@@ -1,12 +1,19 @@
 import { prisma } from "../../lib/prisma.js";
 import { generateSlug } from "../../lib/slug.js";
 import type { Prisma } from "../../generated/prisma/client.js";
-import { WorkspaceRole } from "../../generated/prisma/enums.js";
+import {
+  ActivityEntityType,
+  ActivityType,
+  WorkspaceRole,
+} from "../../generated/prisma/enums.js";
 import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
 import { NotFoundError } from "../../shared/errors/not-found-error.js";
 import { ValidationError } from "../../shared/errors/validation-error.js";
 import type { CreateWorkspaceData } from "./workspace.types.js";
 import type { UpdateWorkspaceInput } from "./workspace.schema.js";
+import { createActivity } from "../activity/activity.service.js";
+import { emitToWorkspace } from "../../realtime/realtime.emitter.js";
+import { REALTIME_EVENTS } from "../../realtime/realtime.constants.js";
 
 async function generateUniqueSlug(name: string): Promise<string> {
   const baseSlug = generateSlug(name);
@@ -332,6 +339,56 @@ export async function removeWorkspaceMember(
       id: memberId,
     },
   });
+
+  return {
+    success: true,
+  };
+}
+
+export async function leaveWorkspace(actorId: string, workspaceId: string) {
+  const membership = await getWorkspaceMembership(workspaceId, actorId);
+
+  const workspace = await getWorkspaceById(workspaceId);
+
+  if (membership.userId === workspace.ownerId) {
+    throw new ValidationError(
+      "Workspace owners cannot leave. Transfer ownership to another member before leaving.",
+    );
+  }
+
+  await prisma.workspaceMember.delete({
+    where: {
+      id: membership.id,
+    },
+  });
+
+  // Best-effort: the membership is already gone at this point, so a failure
+  // here must not fail the request - unlike a create-mutation's activity log,
+  // a retry can't "leave again," it would just surface a confusing
+  // "not a member" error for a leave that already succeeded.
+  try {
+    await createActivity({
+      workspaceId,
+      actorId,
+
+      type: ActivityType.MEMBER_LEFT,
+
+      entityType: ActivityEntityType.MEMBER,
+      entityId: membership.id,
+
+      metadata: {
+        workspaceName: workspace.name,
+      },
+    });
+
+    emitToWorkspace(workspaceId, REALTIME_EVENTS.MEMBER_LEFT, {
+      workspaceId,
+      userId: actorId,
+      memberId: membership.id,
+    });
+  } catch (error) {
+    console.error("Failed to record leave-workspace activity:", error);
+  }
 
   return {
     success: true,

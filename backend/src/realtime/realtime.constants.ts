@@ -38,6 +38,8 @@ export const REALTIME_EVENTS = {
   INVITATION_CREATED: "invitation.created",
   INVITATION_ACCEPTED: "invitation.accepted",
   INVITATION_DECLINED: "invitation.declined",
+
+  MEMBER_LEFT: "member.left",
 } as const;
 
 export type RealtimeEvent =

@@ -6,6 +6,7 @@ import {
   ActivityEntityType,
   ActivityType,
   InvitationStatus,
+  NotificationType,
   WorkspaceRole,
 } from "../../generated/prisma/enums.js";
 
@@ -16,6 +17,7 @@ import { prisma } from "../../lib/prisma.js";
 
 import { createActivity } from "../activity/activity.service.js";
 
+import { enqueueNotification } from "../../queues/notification/index.js";
 import { enqueueWorkspaceInvitationEmail } from "../../queues/email/index.js";
 
 import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
@@ -313,6 +315,25 @@ export async function createInvitation(
       role: invitation.role,
     },
   });
+
+  if (existingUser) {
+    try {
+      await enqueueNotification({
+        workspaceId: invitation.workspaceId,
+        recipientId: existingUser.id,
+        type: NotificationType.INVITATION_RECEIVED,
+        title: "Workspace Invitation",
+        message: `${actor.name} invited you to join "${workspace.name}".`,
+        metadata: {
+          invitationId: invitation.id,
+          workspaceName: workspace.name,
+          role: invitation.role,
+        },
+      });
+    } catch (error) {
+      console.error("Failed to create invitation notification:", error);
+    }
+  }
 
   await enqueueWorkspaceInvitationEmail({
     invitationId: invitation.id,

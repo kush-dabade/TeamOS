@@ -133,6 +133,10 @@ export async function removeWorkspaceMember(workspaceId: string, memberId: strin
   await apiClient.delete(`/workspaces/${workspaceId}/members/${memberId}`);
 }
 
+export async function leaveWorkspace(workspaceId: string): Promise<void> {
+  await apiClient.post(`/workspaces/${workspaceId}/leave`);
+}
+
 export async function fetchWorkspaceInvitations(
   workspaceId: string,
 ): Promise<WorkspaceInvitation[]> {

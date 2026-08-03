@@ -61,6 +61,8 @@ enum ActivityType {
 
   INVITATION_DECLINED
 
+  MEMBER_LEFT
+
   SPRINT_CREATED
   SPRINT_UPDATED
   SPRINT_STARTED
@@ -74,6 +76,7 @@ enum ActivityEntityType {
   ATTACHMENT
   SPRINT
   INVITATION
+  MEMBER
 }
 
 enum SprintStatus {

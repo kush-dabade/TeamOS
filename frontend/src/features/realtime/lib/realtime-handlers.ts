@@ -5,6 +5,9 @@ import { commentKeys } from "@/features/comments";
 import { attachmentKeys } from "@/features/attachments";
 import { activityKeys } from "@/features/activity";
 import type { ActivityEntityType } from "@/features/activity";
+import { taskKeys } from "@/features/tasks";
+import { projectKeys } from "@/features/projects";
+import { workspaceKeys } from "@/features/workspaces";
 
 import { REALTIME_EVENTS, type RealtimeEvent } from "./realtime-events";
 
@@ -62,6 +65,57 @@ interface ActivityCreatedPayload {
   };
 }
 
+// Task payload shapes, per backend/src/modules/task/task.service.ts. All four
+// carry the full task (workspaceId + task), so projectId/id are always
+// available without a second lookup.
+interface TaskEventPayload {
+  task: { id: string; projectId: string };
+}
+
+function invalidateTask(taskId: string, projectId: string, queryClient: QueryClient): void {
+  queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
+  queryClient.invalidateQueries({ queryKey: taskKeys.list(projectId) });
+}
+
+// task.assigned_to_sprint/removed_from_sprint, per
+// backend/src/modules/sprint-task/sprint-task.service.ts, carry projectId at
+// the payload's top level (not nested under task) plus a partial task object
+// with just id/sprintId. There is currently no dedicated Sprints frontend
+// feature/query-key factory (Sprints has no route or feature module yet —
+// confirmed absent from frontend/src/features), so these two events only
+// invalidate the Task queries that actually exist and actually show
+// sprintId (TaskWorkspacePage, TasksPage) — there is nothing sprint-specific
+// to invalidate today. Revisit once a Sprints feature module exists.
+interface SprintTaskEventPayload {
+  projectId: string;
+  task: { id: string };
+}
+
+// Project payload shapes, per backend/src/modules/project/project.service.ts.
+interface ProjectEventPayload {
+  project: { id: string };
+}
+
+// projectKeys.list(workspaceId, status?) always appends a concrete status
+// segment ("ALL" when status is omitted — see project-keys.ts), so it is
+// never a safe prefix for "every status-filtered list in this workspace."
+// projectKeys.lists() is the narrowest key that is still guaranteed to match
+// whichever status-filtered variant a component actually has mounted (e.g.
+// use-projects-with-task-counts.ts queries with a specific status) — a
+// project being created or archived can move it in or out of any of those
+// filtered buckets, so this is a required invalidation, not just a
+// defensive/broad one.
+function invalidateProjectLists(queryClient: QueryClient): void {
+  queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
+}
+
+// Workspace/invitation payload shapes, per
+// backend/src/modules/workspace/workspace.service.ts and
+// backend/src/modules/invitation/invitation.service.ts.
+interface WorkspaceScopedPayload {
+  workspaceId: string;
+}
+
 /**
  * The single place every realtime-reactive feature plugs into.
  * RealtimeProvider iterates this table and registers exactly one
@@ -114,5 +168,88 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
     queryClient.invalidateQueries({
       queryKey: activityKeys.list(workspaceId, activity.entityType, activity.entityId),
     });
+  },
+
+  [REALTIME_EVENTS.TASK_CREATED]: (payload, queryClient) => {
+    const { task } = payload as TaskEventPayload;
+    queryClient.invalidateQueries({ queryKey: taskKeys.list(task.projectId) });
+  },
+
+  [REALTIME_EVENTS.TASK_UPDATED]: (payload, queryClient) => {
+    const { task } = payload as TaskEventPayload;
+    invalidateTask(task.id, task.projectId, queryClient);
+  },
+
+  [REALTIME_EVENTS.TASK_COMPLETED]: (payload, queryClient) => {
+    const { task } = payload as TaskEventPayload;
+    invalidateTask(task.id, task.projectId, queryClient);
+  },
+
+  [REALTIME_EVENTS.TASK_DELETED]: (payload, queryClient) => {
+    const { task } = payload as TaskEventPayload;
+    invalidateTask(task.id, task.projectId, queryClient);
+  },
+
+  [REALTIME_EVENTS.TASK_ASSIGNED_TO_SPRINT]: (payload, queryClient) => {
+    const { projectId, task } = payload as SprintTaskEventPayload;
+    invalidateTask(task.id, projectId, queryClient);
+  },
+
+  [REALTIME_EVENTS.TASK_REMOVED_FROM_SPRINT]: (payload, queryClient) => {
+    const { projectId, task } = payload as SprintTaskEventPayload;
+    invalidateTask(task.id, projectId, queryClient);
+  },
+
+  [REALTIME_EVENTS.PROJECT_CREATED]: (_payload, queryClient) => {
+    invalidateProjectLists(queryClient);
+  },
+
+  [REALTIME_EVENTS.PROJECT_UPDATED]: (payload, queryClient) => {
+    const { project } = payload as ProjectEventPayload;
+    queryClient.invalidateQueries({ queryKey: projectKeys.detail(project.id) });
+    invalidateProjectLists(queryClient);
+  },
+
+  [REALTIME_EVENTS.PROJECT_ARCHIVED]: (payload, queryClient) => {
+    const { project } = payload as ProjectEventPayload;
+    queryClient.invalidateQueries({ queryKey: projectKeys.detail(project.id) });
+    invalidateProjectLists(queryClient);
+  },
+
+  // project.restored is declared in REALTIME_EVENTS but is never emitted —
+  // no restore/un-archive function exists in project.service.ts — so there is
+  // deliberately no handler for it here; adding one would wire up an event
+  // that structurally cannot fire.
+
+  [REALTIME_EVENTS.MEMBER_LEFT]: (payload, queryClient) => {
+    const { workspaceId } = payload as WorkspaceScopedPayload;
+    queryClient.invalidateQueries({ queryKey: workspaceKeys.members(workspaceId) });
+  },
+
+  [REALTIME_EVENTS.OWNERSHIP_TRANSFERRED]: (payload, queryClient) => {
+    const { workspaceId } = payload as WorkspaceScopedPayload;
+    // Unlike member.left, this changes what the *current user's own* role is
+    // for the two members involved (Workspace.role in workspace-keys' list()/
+    // detail() reflects "my role in this workspace") — so, alongside the
+    // member list, both are invalidated too.
+    queryClient.invalidateQueries({ queryKey: workspaceKeys.members(workspaceId) });
+    queryClient.invalidateQueries({ queryKey: workspaceKeys.detail(workspaceId) });
+    queryClient.invalidateQueries({ queryKey: workspaceKeys.list() });
+  },
+
+  [REALTIME_EVENTS.INVITATION_CREATED]: (payload, queryClient) => {
+    const { workspaceId } = payload as WorkspaceScopedPayload;
+    queryClient.invalidateQueries({ queryKey: workspaceKeys.invitations(workspaceId) });
+  },
+
+  [REALTIME_EVENTS.INVITATION_ACCEPTED]: (payload, queryClient) => {
+    const { workspaceId } = payload as WorkspaceScopedPayload;
+    queryClient.invalidateQueries({ queryKey: workspaceKeys.invitations(workspaceId) });
+    queryClient.invalidateQueries({ queryKey: workspaceKeys.members(workspaceId) });
+  },
+
+  [REALTIME_EVENTS.INVITATION_DECLINED]: (payload, queryClient) => {
+    const { workspaceId } = payload as WorkspaceScopedPayload;
+    queryClient.invalidateQueries({ queryKey: workspaceKeys.invitations(workspaceId) });
   },
 };

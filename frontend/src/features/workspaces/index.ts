@@ -1,3 +1,4 @@
+export { workspaceKeys } from "./lib/workspace-keys";
 export { useActiveWorkspace } from "./hooks/use-active-workspace";
 export { useWorkspaceResolution } from "./hooks/use-workspace-resolution";
 export { useWorkspaceMembers } from "./hooks/use-workspace-members";

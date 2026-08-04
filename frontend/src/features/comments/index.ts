@@ -1,4 +1,5 @@
 export * from "./types";
+export { commentKeys } from "./lib/comment-keys";
 export { fetchTaskComments } from "./api/comments.api";
 export type { CreateCommentInput, UpdateCommentInput } from "./api/comments.api";
 export { useComments } from "./hooks/use-comments";

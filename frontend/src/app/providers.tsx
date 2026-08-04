@@ -2,6 +2,7 @@ import type { PropsWithChildren } from "react";
 import { Toaster } from "sonner";
 
 import { AuthProvider } from "@/features/auth";
+import { RealtimeProvider } from "@/features/realtime";
 import { QueryProvider } from "@/providers/query-provider";
 import { ThemeProvider, useTheme } from "@/providers/theme-provider";
 
@@ -16,8 +17,10 @@ export function AppProviders({ children }: PropsWithChildren) {
     <ThemeProvider>
       <QueryProvider>
         <AuthProvider>
-          {children}
-          <ThemedToaster />
+          <RealtimeProvider>
+            {children}
+            <ThemedToaster />
+          </RealtimeProvider>
         </AuthProvider>
       </QueryProvider>
     </ThemeProvider>

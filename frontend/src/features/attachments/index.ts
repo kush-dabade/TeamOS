@@ -1,4 +1,5 @@
 export * from "./types";
+export { attachmentKeys } from "./lib/attachment-keys";
 export { fetchTaskAttachments } from "./api/attachments.api";
 export { getAttachmentDownloadUrl } from "./lib/attachment-url";
 export { useTaskAttachments } from "./hooks/use-task-attachments";

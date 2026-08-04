@@ -1,8 +1,11 @@
 import { createContext, useEffect, useMemo, useState, type PropsWithChildren } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { useAuth } from "@/features/auth";
 
 import { createSocket } from "../lib/socket-client";
+import { realtimeHandlers } from "../lib/realtime-handlers";
+import type { RealtimeEvent } from "../lib/realtime-events";
 import type { RealtimeConnectionStatus, RealtimeContextValue } from "../types";
 
 const RealtimeContext = createContext<RealtimeContextValue | undefined>(undefined);
@@ -19,6 +22,7 @@ const RealtimeContext = createContext<RealtimeContextValue | undefined>(undefine
  */
 export function RealtimeProvider({ children }: PropsWithChildren) {
   const { isAuthenticated } = useAuth();
+  const queryClient = useQueryClient();
 
   // Raw signal from the socket itself, updated only from inside its own
   // event callbacks (never set synchronously in the effect body — that
@@ -40,6 +44,30 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
     socket.on("disconnect", handleDisconnect);
     socket.on("connect_error", handleDisconnect);
 
+    // Centralized handler registry: one socket.on(...) per entry, registered
+    // here and nowhere else in the app. `realtimeHandlers` is empty as of
+    // this commit — feature wiring lands in later commits, each adding one
+    // entry rather than a new socket.on(...) call site. The same socket
+    // instance survives Socket.IO's own reconnects internally, so these
+    // registrations don't need to be redone on reconnect.
+    //
+    // Object.entries widens a Partial<Record<K, V>>'s values to `V`, since it
+    // can't express "only present keys are included" — the cast back to
+    // RealtimeEvent/RealtimeHandler pairs is safe because Object.entries only
+    // ever yields keys that are actually present in the object.
+    const registeredHandlers = (
+      Object.entries(realtimeHandlers) as [
+        RealtimeEvent,
+        (typeof realtimeHandlers)[RealtimeEvent],
+      ][]
+    ).map(([event, handler]) => {
+      const listener = (payload: unknown) => handler?.(payload, queryClient);
+
+      socket.on(event, listener);
+
+      return { event, listener };
+    });
+
     socket.connect();
 
     return () => {
@@ -52,8 +80,12 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
       socket.off("connect_error", handleDisconnect);
+
+      registeredHandlers.forEach(({ event, listener }) => {
+        socket.off(event, listener);
+      });
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, queryClient]);
 
   const status = useMemo<RealtimeConnectionStatus>(() => {
     if (!isAuthenticated) {

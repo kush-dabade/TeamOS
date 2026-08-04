@@ -35,6 +35,32 @@ interface CommentDeletedPayload {
   taskId: string;
 }
 
+// Payloads arrive over the network as `unknown` — a future backend release
+// could rename/omit a field, and a bare `payload as X` cast would let a
+// nested property access (e.g. `task.projectId`) throw inside the socket
+// listener. Each guard below checks only the fields that handler actually
+// reads; a malformed payload just makes the handler return early and skip
+// that one invalidation, rather than crashing the listener.
+function isCommentCreatedOrUpdatedPayload(
+  payload: unknown,
+): payload is CommentCreatedOrUpdatedPayload {
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    "taskId" in payload &&
+    typeof payload.taskId === "string"
+  );
+}
+
+function isCommentDeletedPayload(payload: unknown): payload is CommentDeletedPayload {
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    "taskId" in payload &&
+    typeof payload.taskId === "string"
+  );
+}
+
 function invalidateTaskComments(taskId: string, queryClient: QueryClient): void {
   queryClient.invalidateQueries({ queryKey: commentKeys.list(taskId) });
 }
@@ -42,6 +68,15 @@ function invalidateTaskComments(taskId: string, queryClient: QueryClient): void 
 // Attachment payload shapes, per backend/src/modules/attachment/attachment.service.ts.
 interface AttachmentUploadedOrDeletedPayload {
   taskId: string;
+}
+
+function isAttachmentPayload(payload: unknown): payload is AttachmentUploadedOrDeletedPayload {
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    "taskId" in payload &&
+    typeof payload.taskId === "string"
+  );
 }
 
 function invalidateTaskAttachments(taskId: string, queryClient: QueryClient): void {
@@ -65,11 +100,41 @@ interface ActivityCreatedPayload {
   };
 }
 
+function isActivityCreatedPayload(payload: unknown): payload is ActivityCreatedPayload {
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    "workspaceId" in payload &&
+    typeof payload.workspaceId === "string" &&
+    "activity" in payload &&
+    typeof payload.activity === "object" &&
+    payload.activity !== null &&
+    "entityType" in payload.activity &&
+    typeof payload.activity.entityType === "string" &&
+    "entityId" in payload.activity &&
+    typeof payload.activity.entityId === "string"
+  );
+}
+
 // Task payload shapes, per backend/src/modules/task/task.service.ts. All four
 // carry the full task (workspaceId + task), so projectId/id are always
 // available without a second lookup.
 interface TaskEventPayload {
   task: { id: string; projectId: string };
+}
+
+function isTaskEventPayload(payload: unknown): payload is TaskEventPayload {
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    "task" in payload &&
+    typeof payload.task === "object" &&
+    payload.task !== null &&
+    "id" in payload.task &&
+    typeof payload.task.id === "string" &&
+    "projectId" in payload.task &&
+    typeof payload.task.projectId === "string"
+  );
 }
 
 function invalidateTask(taskId: string, projectId: string, queryClient: QueryClient): void {
@@ -91,9 +156,35 @@ interface SprintTaskEventPayload {
   task: { id: string };
 }
 
+function isSprintTaskEventPayload(payload: unknown): payload is SprintTaskEventPayload {
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    "projectId" in payload &&
+    typeof payload.projectId === "string" &&
+    "task" in payload &&
+    typeof payload.task === "object" &&
+    payload.task !== null &&
+    "id" in payload.task &&
+    typeof payload.task.id === "string"
+  );
+}
+
 // Project payload shapes, per backend/src/modules/project/project.service.ts.
 interface ProjectEventPayload {
   project: { id: string };
+}
+
+function isProjectEventPayload(payload: unknown): payload is ProjectEventPayload {
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    "project" in payload &&
+    typeof payload.project === "object" &&
+    payload.project !== null &&
+    "id" in payload.project &&
+    typeof payload.project.id === "string"
+  );
 }
 
 // projectKeys.list(workspaceId, status?) always appends a concrete status
@@ -114,6 +205,15 @@ function invalidateProjectLists(queryClient: QueryClient): void {
 // backend/src/modules/invitation/invitation.service.ts.
 interface WorkspaceScopedPayload {
   workspaceId: string;
+}
+
+function isWorkspaceScopedPayload(payload: unknown): payload is WorkspaceScopedPayload {
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    "workspaceId" in payload &&
+    typeof payload.workspaceId === "string"
+  );
 }
 
 /**
@@ -166,65 +266,90 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
   },
 
   [REALTIME_EVENTS.COMMENT_CREATED]: (payload, queryClient) => {
-    const { taskId } = payload as CommentCreatedOrUpdatedPayload;
-    invalidateTaskComments(taskId, queryClient);
+    if (!isCommentCreatedOrUpdatedPayload(payload)) {
+      return;
+    }
+    invalidateTaskComments(payload.taskId, queryClient);
   },
 
   [REALTIME_EVENTS.COMMENT_UPDATED]: (payload, queryClient) => {
-    const { taskId } = payload as CommentCreatedOrUpdatedPayload;
-    invalidateTaskComments(taskId, queryClient);
+    if (!isCommentCreatedOrUpdatedPayload(payload)) {
+      return;
+    }
+    invalidateTaskComments(payload.taskId, queryClient);
   },
 
   [REALTIME_EVENTS.COMMENT_DELETED]: (payload, queryClient) => {
-    const { taskId } = payload as CommentDeletedPayload;
-    invalidateTaskComments(taskId, queryClient);
+    if (!isCommentDeletedPayload(payload)) {
+      return;
+    }
+    invalidateTaskComments(payload.taskId, queryClient);
   },
 
   [REALTIME_EVENTS.ATTACHMENT_UPLOADED]: (payload, queryClient) => {
-    const { taskId } = payload as AttachmentUploadedOrDeletedPayload;
-    invalidateTaskAttachments(taskId, queryClient);
+    if (!isAttachmentPayload(payload)) {
+      return;
+    }
+    invalidateTaskAttachments(payload.taskId, queryClient);
   },
 
   [REALTIME_EVENTS.ATTACHMENT_DELETED]: (payload, queryClient) => {
-    const { taskId } = payload as AttachmentUploadedOrDeletedPayload;
-    invalidateTaskAttachments(taskId, queryClient);
+    if (!isAttachmentPayload(payload)) {
+      return;
+    }
+    invalidateTaskAttachments(payload.taskId, queryClient);
   },
 
   [REALTIME_EVENTS.ACTIVITY_CREATED]: (payload, queryClient) => {
-    const { workspaceId, activity } = payload as ActivityCreatedPayload;
+    if (!isActivityCreatedPayload(payload)) {
+      return;
+    }
+    const { workspaceId, activity } = payload;
     queryClient.invalidateQueries({
       queryKey: activityKeys.list(workspaceId, activity.entityType, activity.entityId),
     });
   },
 
   [REALTIME_EVENTS.TASK_CREATED]: (payload, queryClient) => {
-    const { task } = payload as TaskEventPayload;
-    queryClient.invalidateQueries({ queryKey: taskKeys.list(task.projectId) });
+    if (!isTaskEventPayload(payload)) {
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: taskKeys.list(payload.task.projectId) });
   },
 
   [REALTIME_EVENTS.TASK_UPDATED]: (payload, queryClient) => {
-    const { task } = payload as TaskEventPayload;
-    invalidateTask(task.id, task.projectId, queryClient);
+    if (!isTaskEventPayload(payload)) {
+      return;
+    }
+    invalidateTask(payload.task.id, payload.task.projectId, queryClient);
   },
 
   [REALTIME_EVENTS.TASK_COMPLETED]: (payload, queryClient) => {
-    const { task } = payload as TaskEventPayload;
-    invalidateTask(task.id, task.projectId, queryClient);
+    if (!isTaskEventPayload(payload)) {
+      return;
+    }
+    invalidateTask(payload.task.id, payload.task.projectId, queryClient);
   },
 
   [REALTIME_EVENTS.TASK_DELETED]: (payload, queryClient) => {
-    const { task } = payload as TaskEventPayload;
-    invalidateTask(task.id, task.projectId, queryClient);
+    if (!isTaskEventPayload(payload)) {
+      return;
+    }
+    invalidateTask(payload.task.id, payload.task.projectId, queryClient);
   },
 
   [REALTIME_EVENTS.TASK_ASSIGNED_TO_SPRINT]: (payload, queryClient) => {
-    const { projectId, task } = payload as SprintTaskEventPayload;
-    invalidateTask(task.id, projectId, queryClient);
+    if (!isSprintTaskEventPayload(payload)) {
+      return;
+    }
+    invalidateTask(payload.task.id, payload.projectId, queryClient);
   },
 
   [REALTIME_EVENTS.TASK_REMOVED_FROM_SPRINT]: (payload, queryClient) => {
-    const { projectId, task } = payload as SprintTaskEventPayload;
-    invalidateTask(task.id, projectId, queryClient);
+    if (!isSprintTaskEventPayload(payload)) {
+      return;
+    }
+    invalidateTask(payload.task.id, payload.projectId, queryClient);
   },
 
   [REALTIME_EVENTS.PROJECT_CREATED]: (_payload, queryClient) => {
@@ -232,14 +357,18 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
   },
 
   [REALTIME_EVENTS.PROJECT_UPDATED]: (payload, queryClient) => {
-    const { project } = payload as ProjectEventPayload;
-    queryClient.invalidateQueries({ queryKey: projectKeys.detail(project.id) });
+    if (!isProjectEventPayload(payload)) {
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: projectKeys.detail(payload.project.id) });
     invalidateProjectLists(queryClient);
   },
 
   [REALTIME_EVENTS.PROJECT_ARCHIVED]: (payload, queryClient) => {
-    const { project } = payload as ProjectEventPayload;
-    queryClient.invalidateQueries({ queryKey: projectKeys.detail(project.id) });
+    if (!isProjectEventPayload(payload)) {
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: projectKeys.detail(payload.project.id) });
     invalidateProjectLists(queryClient);
   },
 
@@ -249,34 +378,44 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
   // that structurally cannot fire.
 
   [REALTIME_EVENTS.MEMBER_LEFT]: (payload, queryClient) => {
-    const { workspaceId } = payload as WorkspaceScopedPayload;
-    queryClient.invalidateQueries({ queryKey: workspaceKeys.members(workspaceId) });
+    if (!isWorkspaceScopedPayload(payload)) {
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: workspaceKeys.members(payload.workspaceId) });
   },
 
   [REALTIME_EVENTS.OWNERSHIP_TRANSFERRED]: (payload, queryClient) => {
-    const { workspaceId } = payload as WorkspaceScopedPayload;
+    if (!isWorkspaceScopedPayload(payload)) {
+      return;
+    }
     // Unlike member.left, this changes what the *current user's own* role is
     // for the two members involved (Workspace.role in workspace-keys' list()/
     // detail() reflects "my role in this workspace") — so, alongside the
     // member list, both are invalidated too.
-    queryClient.invalidateQueries({ queryKey: workspaceKeys.members(workspaceId) });
-    queryClient.invalidateQueries({ queryKey: workspaceKeys.detail(workspaceId) });
+    queryClient.invalidateQueries({ queryKey: workspaceKeys.members(payload.workspaceId) });
+    queryClient.invalidateQueries({ queryKey: workspaceKeys.detail(payload.workspaceId) });
     queryClient.invalidateQueries({ queryKey: workspaceKeys.list() });
   },
 
   [REALTIME_EVENTS.INVITATION_CREATED]: (payload, queryClient) => {
-    const { workspaceId } = payload as WorkspaceScopedPayload;
-    queryClient.invalidateQueries({ queryKey: workspaceKeys.invitations(workspaceId) });
+    if (!isWorkspaceScopedPayload(payload)) {
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: workspaceKeys.invitations(payload.workspaceId) });
   },
 
   [REALTIME_EVENTS.INVITATION_ACCEPTED]: (payload, queryClient) => {
-    const { workspaceId } = payload as WorkspaceScopedPayload;
-    queryClient.invalidateQueries({ queryKey: workspaceKeys.invitations(workspaceId) });
-    queryClient.invalidateQueries({ queryKey: workspaceKeys.members(workspaceId) });
+    if (!isWorkspaceScopedPayload(payload)) {
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: workspaceKeys.invitations(payload.workspaceId) });
+    queryClient.invalidateQueries({ queryKey: workspaceKeys.members(payload.workspaceId) });
   },
 
   [REALTIME_EVENTS.INVITATION_DECLINED]: (payload, queryClient) => {
-    const { workspaceId } = payload as WorkspaceScopedPayload;
-    queryClient.invalidateQueries({ queryKey: workspaceKeys.invitations(workspaceId) });
+    if (!isWorkspaceScopedPayload(payload)) {
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: workspaceKeys.invitations(payload.workspaceId) });
   },
 };

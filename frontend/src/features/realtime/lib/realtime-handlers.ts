@@ -117,6 +117,33 @@ interface WorkspaceScopedPayload {
 }
 
 /**
+ * Runs on every "connect" (the very first login connect, every automatic
+ * reconnect after a network drop, and every reconnect Commit 6 triggers
+ * after a membership change) — see RealtimeProvider's handleConnect.
+ *
+ * The backend has no missed-event replay mechanism: any event emitted while
+ * the socket was disconnected (30s idle, laptop sleep, wifi drop, etc.) is
+ * permanently lost. Rather than trying to replay individual missed events,
+ * this does one coarse refresh limited to the two query families that go
+ * stale purely from *time passing while the user is away*, not from an
+ * action they'd naturally cause a refetch for themselves:
+ * notifications (badge/list) and activity feeds. Tasks, comments,
+ * attachments, projects, and workspaces are deliberately excluded — those
+ * are already covered by their own explicit handlers above when the socket
+ * is connected, and by ordinary navigation/refetch when it wasn't.
+ *
+ * Imported into RealtimeProvider as a single function (not raw query keys),
+ * the same way the domain-event handlers above are — the provider stays
+ * generic connection-lifecycle infrastructure with no direct feature
+ * imports of its own.
+ */
+export function runReconnectCatchUp(queryClient: QueryClient): void {
+  queryClient.invalidateQueries({ queryKey: notificationKeys.lists() });
+  queryClient.invalidateQueries({ queryKey: notificationKeys.unreadCount() });
+  queryClient.invalidateQueries({ queryKey: activityKeys.all });
+}
+
+/**
  * The single place every realtime-reactive feature plugs into.
  * RealtimeProvider iterates this table and registers exactly one
  * socket.on(...) per entry — no feature should ever call socket.on directly.

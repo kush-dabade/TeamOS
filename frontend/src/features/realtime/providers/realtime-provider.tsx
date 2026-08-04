@@ -5,7 +5,7 @@ import { useAuth } from "@/features/auth";
 import { useWorkspaceList } from "@/features/workspaces";
 
 import { createSocket } from "../lib/socket-client";
-import { realtimeHandlers } from "../lib/realtime-handlers";
+import { realtimeHandlers, runReconnectCatchUp } from "../lib/realtime-handlers";
 import type { RealtimeEvent } from "../lib/realtime-events";
 import type { RealtimeConnectionStatus, RealtimeContextValue } from "../types";
 
@@ -64,7 +64,13 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
     const socket = createSocket();
     socketRef.current = socket;
 
-    const handleConnect = () => setRawStatus("connected");
+    const handleConnect = () => {
+      setRawStatus("connected");
+      // Fires on the very first connect and on every reconnect alike (network
+      // recovery, membership-change reconnect) — see runReconnectCatchUp's own
+      // doc comment for why that's the correct scope, not just "reconnects."
+      runReconnectCatchUp(queryClient);
+    };
     const handleDisconnect = () => setRawStatus("disconnected");
 
     socket.on("connect", handleConnect);
@@ -72,11 +78,12 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
     socket.on("connect_error", handleDisconnect);
 
     // Centralized handler registry: one socket.on(...) per entry, registered
-    // here and nowhere else in the app. `realtimeHandlers` is empty as of
-    // this commit — feature wiring lands in later commits, each adding one
-    // entry rather than a new socket.on(...) call site. The same socket
-    // instance survives Socket.IO's own reconnects internally, so these
-    // registrations don't need to be redone on reconnect.
+    // here and nowhere else in the app — every entry added by Commits 3-5
+    // (notifications, comments, attachments, activity, tasks, projects,
+    // workspace, invitations). Adding a future event means adding one entry
+    // to realtimeHandlers, not a new socket.on(...) call site here. The same
+    // socket instance survives Socket.IO's own reconnects internally, so
+    // these registrations don't need to be redone on reconnect.
     //
     // Object.entries widens a Partial<Record<K, V>>'s values to `V`, since it
     // can't express "only present keys are included" — the cast back to

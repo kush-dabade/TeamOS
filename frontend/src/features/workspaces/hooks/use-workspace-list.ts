@@ -10,10 +10,16 @@ import type { Workspace } from "../types";
  * Fetches every workspace the signed-in user belongs to. Consumed by
  * WorkspaceProvider to resolve the active workspace — not intended to be
  * called directly by feature code (use `useActiveWorkspace` instead).
+ *
+ * `enabled` defaults to true (WorkspaceProvider's existing usage is
+ * unaffected) — RealtimeProvider passes `isAuthenticated` explicitly, since
+ * it's mounted above the router and would otherwise fire this query while
+ * logged out.
  */
-export function useWorkspaceList() {
+export function useWorkspaceList(enabled = true) {
   return useQuery<Workspace[], AppError>({
     queryKey: workspaceKeys.list(),
     queryFn: fetchWorkspaces,
+    enabled,
   });
 }

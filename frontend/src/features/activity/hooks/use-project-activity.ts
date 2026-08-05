@@ -21,8 +21,7 @@ export function useProjectActivity(
     queryKey: activityKeys.list(workspaceId ?? "", "PROJECT", projectId ?? ""),
     queryFn: async () => {
       const result = await fetchWorkspaceActivities(workspaceId as string, {
-        entityType: "PROJECT",
-        entityId: projectId as string,
+        projectId: projectId as string,
       });
 
       return result.activities;

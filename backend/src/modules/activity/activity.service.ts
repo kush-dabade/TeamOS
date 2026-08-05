@@ -31,6 +31,9 @@ type ActivityWithActor = {
   entityType: ActivityResponse["entityType"];
   entityId: string;
 
+  taskId: string | null;
+  projectId: string | null;
+
   metadata: Record<string, unknown> | null;
 
   createdAt: Date;
@@ -50,6 +53,9 @@ function toActivityResponse(activity: ActivityWithActor): ActivityResponse {
 
     entityType: activity.entityType,
     entityId: activity.entityId,
+
+    taskId: activity.taskId,
+    projectId: activity.projectId,
 
     metadata: activity.metadata,
 

@@ -255,9 +255,10 @@ model Project {
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  owner   User     @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict)
-  tasks   Task[]
-  sprints Sprint[]
+  owner      User       @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  tasks      Task[]
+  sprints    Sprint[]
+  activities Activity[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -304,6 +305,7 @@ model Task {
 
   comments    Comment[]
   attachments Attachment[]
+  activities  Activity[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -384,17 +386,25 @@ model Activity {
   entityType ActivityEntityType
   entityId   String
 
+  taskId    String?
+  projectId String?
+
   metadata Json?
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   actor User @relation(fields: [actorId], references: [id], onDelete: Restrict)
 
+  task    Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
 
   @@index([workspaceId])
   @@index([actorId])
   @@index([workspaceId, createdAt])
+  @@index([workspaceId, taskId, createdAt])
+  @@index([workspaceId, projectId, createdAt])
 }
 
 model Sprint {

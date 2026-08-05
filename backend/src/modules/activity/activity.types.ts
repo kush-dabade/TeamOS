@@ -52,6 +52,9 @@ export interface ListActivitiesOptions {
 
   entityType?: ActivityEntityType;
   entityId?: string;
+
+  taskId?: string;
+  projectId?: string;
 }
 
 type ActivityWithActor = {

@@ -21,6 +21,9 @@ export async function listWorkspaceActivitiesHandler(
 
       ...(query.entityType !== undefined && { entityType: query.entityType }),
       ...(query.entityId !== undefined && { entityId: query.entityId }),
+
+      ...(query.taskId !== undefined && { taskId: query.taskId }),
+      ...(query.projectId !== undefined && { projectId: query.projectId }),
     });
 
     return res.status(200).json({

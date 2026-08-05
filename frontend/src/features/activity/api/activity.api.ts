@@ -7,6 +7,8 @@ interface BackendActivity {
   type: Activity["type"];
   entityType: Activity["entityType"];
   entityId: string;
+  taskId: string | null;
+  projectId: string | null;
   metadata: Record<string, unknown> | null;
   createdAt: string;
   actor: {
@@ -45,6 +47,8 @@ type ActivityEntityFilter =
 export type ListActivitiesParams = {
   page?: number;
   limit?: number;
+  taskId?: string;
+  projectId?: string;
 } & ActivityEntityFilter;
 
 export interface ListActivitiesResult {
@@ -58,6 +62,8 @@ function toActivity(activity: BackendActivity): Activity {
     type: activity.type,
     entityType: activity.entityType,
     entityId: activity.entityId,
+    taskId: activity.taskId,
+    projectId: activity.projectId,
     metadata: activity.metadata,
     actor: activity.actor,
     createdAt: activity.createdAt,

@@ -120,8 +120,12 @@ export async function createComment(
     entityType: ActivityEntityType.COMMENT,
     entityId: comment.id,
 
+    taskId: task.id,
+    projectId: task.projectId,
+
     metadata: {
       taskId: task.id,
+      taskTitle: task.title,
     },
   });
 
@@ -212,6 +216,7 @@ export async function updateComment(
     include: {
       task: {
         select: {
+          title: true,
           projectId: true,
         },
       },
@@ -273,8 +278,12 @@ export async function updateComment(
     entityType: ActivityEntityType.COMMENT,
     entityId: comment.id,
 
+    taskId: comment.taskId,
+    projectId: comment.task.projectId,
+
     metadata: {
       taskId: comment.taskId,
+      taskTitle: comment.task.title,
     },
   });
 
@@ -301,6 +310,7 @@ export async function deleteComment(
     include: {
       task: {
         select: {
+          title: true,
           projectId: true,
         },
       },
@@ -358,8 +368,12 @@ export async function deleteComment(
     entityType: ActivityEntityType.COMMENT,
     entityId: comment.id,
 
+    taskId: comment.taskId,
+    projectId: comment.task.projectId,
+
     metadata: {
       taskId: comment.taskId,
+      taskTitle: comment.task.title,
     },
   });
 

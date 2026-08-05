@@ -127,6 +127,9 @@ export async function createTask(actorId: string, data: CreateTaskData) {
     entityType: ActivityEntityType.TASK,
     entityId: task.id,
 
+    taskId: task.id,
+    projectId: task.projectId,
+
     metadata: {
       taskTitle: task.title,
     },
@@ -266,6 +269,9 @@ export async function deleteTask(actorId: string, taskId: string) {
 
     entityType: ActivityEntityType.TASK,
     entityId: task.id,
+
+    taskId: task.id,
+    projectId: task.projectId,
 
     metadata: {
       taskTitle: task.title,
@@ -419,6 +425,9 @@ export async function updateTask(
       entityType: ActivityEntityType.TASK,
       entityId: updatedTask.id,
 
+      taskId: updatedTask.id,
+      projectId: updatedTask.projectId,
+
       metadata: {
         oldStatus,
         newStatus: updatedTask.status,
@@ -439,6 +448,9 @@ export async function updateTask(
 
       entityType: ActivityEntityType.TASK,
       entityId: updatedTask.id,
+
+      taskId: updatedTask.id,
+      projectId: updatedTask.projectId,
 
       metadata: {
         taskTitle: updatedTask.title,

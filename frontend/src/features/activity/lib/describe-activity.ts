@@ -43,11 +43,11 @@ export function describeActivity(activity: Activity): ActivityDescription {
     case "PROJECT_ARCHIVED":
       return { action: "archived project", entity: projectName };
     case "COMMENT_CREATED":
-      return { action: "commented", entity: null };
+      return { action: "commented", entity: taskTitle };
     case "COMMENT_UPDATED":
-      return { action: "edited comment", entity: null };
+      return { action: "edited comment", entity: taskTitle };
     case "COMMENT_DELETED":
-      return { action: "deleted comment", entity: null };
+      return { action: "deleted comment", entity: taskTitle };
     case "ATTACHMENT_UPLOADED":
       return { action: "added attachment", entity: attachmentName };
     case "ATTACHMENT_DELETED":

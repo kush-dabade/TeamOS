@@ -83,6 +83,7 @@ async function findTaskById(taskId: string) {
       id: true,
       title: true,
       workspaceId: true,
+      projectId: true,
     },
   });
 
@@ -105,6 +106,7 @@ async function findAttachmentById(attachmentId: string) {
           title: true,
           workspaceId: true,
           deletedAt: true,
+          projectId: true,
         },
       },
 
@@ -231,6 +233,9 @@ export async function uploadAttachment(
       entityType: ActivityEntityType.ATTACHMENT,
       entityId: attachment.id,
 
+      taskId: task.id,
+      projectId: task.projectId,
+
       metadata: {
         attachmentName: attachment.originalName,
         taskTitle: task.title,
@@ -348,6 +353,9 @@ export async function deleteAttachment(
 
     entityType: ActivityEntityType.ATTACHMENT,
     entityId: attachment.id,
+
+    taskId: attachment.task.id,
+    projectId: attachment.task.projectId,
 
     metadata: {
       attachmentName: attachment.originalName,

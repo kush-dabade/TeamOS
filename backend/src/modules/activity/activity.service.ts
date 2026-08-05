@@ -31,6 +31,9 @@ type ActivityWithActor = {
   entityType: ActivityResponse["entityType"];
   entityId: string;
 
+  taskId: string | null;
+  projectId: string | null;
+
   metadata: Record<string, unknown> | null;
 
   createdAt: Date;
@@ -50,6 +53,9 @@ function toActivityResponse(activity: ActivityWithActor): ActivityResponse {
 
     entityType: activity.entityType,
     entityId: activity.entityId,
+
+    taskId: activity.taskId,
+    projectId: activity.projectId,
 
     metadata: activity.metadata,
 
@@ -72,6 +78,9 @@ export async function createActivity(data: CreateActivityData): Promise<void> {
 
     entityType: data.entityType,
     entityId: data.entityId,
+
+    ...(data.taskId !== undefined && { taskId: data.taskId }),
+    ...(data.projectId !== undefined && { projectId: data.projectId }),
 
     ...(data.metadata && {
       metadata: data.metadata as Prisma.InputJsonValue,
@@ -119,6 +128,14 @@ export async function listWorkspaceActivities(
         entityType: options.entityType,
         entityId: options.entityId,
       }),
+
+    ...(options.taskId && {
+      taskId: options.taskId,
+    }),
+
+    ...(options.projectId && {
+      projectId: options.projectId,
+    }),
   };
 
   const [total, activities] = await Promise.all([

@@ -84,19 +84,27 @@ function invalidateTaskAttachments(taskId: string, queryClient: QueryClient): vo
 }
 
 // Activity payload shape, per backend/src/modules/activity/activity.service.ts.
-// entityType/entityId identify which task's or project's activity feed this
-// belongs to — activityKeys is keyed per-entity, so this is the only key that
-// needs invalidating. Every comment/attachment mutation already emits its own
-// comment.*/attachment.* event (handled above) *and* a separate
-// activity.created event for the resulting Activity row — invalidating
-// activityKeys from this handler alone is enough; doing it again from the
-// comment/attachment handlers above would be a redundant, unnecessary
-// invalidation of the same feed.
+// Since PR #59, an Activity row also carries denormalized taskId/projectId
+// ancestry — e.g. a COMMENT row's own entityType/entityId identify the
+// comment, but the row also belongs to that comment's task's and project's
+// aggregated activity feeds. So this handler invalidates the row's own
+// entityType/entityId key (as before) plus the task/project feed keys when
+// present. TASK- and PROJECT-type rows are self-referential (their own
+// entityId already equals taskId/projectId respectively, per
+// activity.service.ts's write path), so those two cases are skipped to avoid
+// invalidating the exact same key twice. Every comment/attachment mutation
+// already emits its own comment.*/attachment.* event (handled above) *and* a
+// separate activity.created event for the resulting Activity row —
+// invalidating activityKeys from this handler alone is enough; doing it
+// again from the comment/attachment handlers above would be a redundant,
+// unnecessary invalidation of the same feed.
 interface ActivityCreatedPayload {
   workspaceId: string;
   activity: {
     entityType: ActivityEntityType;
     entityId: string;
+    taskId?: string | null;
+    projectId?: string | null;
   };
 }
 
@@ -112,7 +120,13 @@ function isActivityCreatedPayload(payload: unknown): payload is ActivityCreatedP
     "entityType" in payload.activity &&
     typeof payload.activity.entityType === "string" &&
     "entityId" in payload.activity &&
-    typeof payload.activity.entityId === "string"
+    typeof payload.activity.entityId === "string" &&
+    (!("taskId" in payload.activity) ||
+      payload.activity.taskId === null ||
+      typeof payload.activity.taskId === "string") &&
+    (!("projectId" in payload.activity) ||
+      payload.activity.projectId === null ||
+      typeof payload.activity.projectId === "string")
   );
 }
 
@@ -305,9 +319,28 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
       return;
     }
     const { workspaceId, activity } = payload;
+
     queryClient.invalidateQueries({
       queryKey: activityKeys.list(workspaceId, activity.entityType, activity.entityId),
     });
+
+    if (
+      activity.taskId &&
+      !(activity.entityType === "TASK" && activity.entityId === activity.taskId)
+    ) {
+      queryClient.invalidateQueries({
+        queryKey: activityKeys.list(workspaceId, "TASK", activity.taskId),
+      });
+    }
+
+    if (
+      activity.projectId &&
+      !(activity.entityType === "PROJECT" && activity.entityId === activity.projectId)
+    ) {
+      queryClient.invalidateQueries({
+        queryKey: activityKeys.list(workspaceId, "PROJECT", activity.projectId),
+      });
+    }
   },
 
   [REALTIME_EVENTS.TASK_CREATED]: (payload, queryClient) => {

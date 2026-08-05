@@ -17,6 +17,9 @@ export type ActivityResponse = {
   entityType: ActivityEntityType;
   entityId: string;
 
+  taskId: string | null;
+  projectId: string | null;
+
   metadata: Record<string, unknown> | null;
 
   createdAt: Date;
@@ -38,6 +41,9 @@ export interface CreateActivityData {
   entityType: ActivityEntityType;
   entityId: string;
 
+  taskId?: string;
+  projectId?: string;
+
   metadata?: Record<string, unknown>;
 }
 
@@ -49,45 +55,7 @@ export interface ListActivitiesOptions {
 
   entityType?: ActivityEntityType;
   entityId?: string;
-}
 
-type ActivityWithActor = {
-  id: string;
-
-  type: string;
-
-  entityType: string;
-  entityId: string;
-
-  metadata: Record<string, unknown> | null;
-
-  createdAt: Date;
-
-  actor: {
-    id: string;
-    name: string;
-    image: string | null;
-  };
-};
-
-function toActivityResponse(activity: ActivityWithActor): ActivityResponse {
-  return {
-    id: activity.id,
-
-    type: activity.type as ActivityResponse["type"],
-
-    entityType: activity.entityType as ActivityResponse["entityType"],
-
-    entityId: activity.entityId,
-
-    metadata: activity.metadata,
-
-    createdAt: activity.createdAt,
-
-    actor: {
-      id: activity.actor.id,
-      name: activity.actor.name,
-      image: activity.actor.image,
-    },
-  };
+  taskId?: string;
+  projectId?: string;
 }

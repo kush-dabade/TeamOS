@@ -41,6 +41,8 @@ export interface Activity {
   type: ActivityType;
   entityType: ActivityEntityType;
   entityId: string;
+  taskId: string | null;
+  projectId: string | null;
   metadata: Record<string, unknown> | null;
   actor: ActivityActor;
   createdAt: string;

@@ -73,6 +73,9 @@ export async function createActivity(data: CreateActivityData): Promise<void> {
     entityType: data.entityType,
     entityId: data.entityId,
 
+    taskId: data.taskId,
+    projectId: data.projectId,
+
     ...(data.metadata && {
       metadata: data.metadata as Prisma.InputJsonValue,
     }),

@@ -172,6 +172,8 @@ export async function updateProject(
       entityType: ActivityEntityType.PROJECT,
       entityId: updatedProject.id,
 
+      projectId: updatedProject.id,
+
       metadata,
     });
   }
@@ -224,6 +226,8 @@ export async function archiveProject(actorId: string, projectId: string) {
 
     entityType: ActivityEntityType.PROJECT,
     entityId: archivedProject.id,
+
+    projectId: archivedProject.id,
 
     metadata: {
       projectName: archivedProject.name,
@@ -323,6 +327,8 @@ export async function createProject(actorId: string, data: CreateProjectData) {
 
     entityType: ActivityEntityType.PROJECT,
     entityId: project.id,
+
+    projectId: project.id,
 
     metadata: {
       projectName: project.name,

@@ -132,6 +132,9 @@ export async function assignTaskToSprint(
     entityType: ActivityEntityType.TASK,
     entityId: updatedTask.id,
 
+    taskId: updatedTask.id,
+    projectId: updatedTask.projectId,
+
     metadata: previousSprint
       ? {
           taskTitle: updatedTask.title,
@@ -220,6 +223,9 @@ export async function removeTaskFromSprint(
 
     entityType: ActivityEntityType.TASK,
     entityId: updatedTask.id,
+
+    taskId: updatedTask.id,
+    projectId: updatedTask.projectId,
 
     metadata: {
       taskTitle: updatedTask.title,

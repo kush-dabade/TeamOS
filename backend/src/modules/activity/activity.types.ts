@@ -38,6 +38,9 @@ export interface CreateActivityData {
   entityType: ActivityEntityType;
   entityId: string;
 
+  taskId?: string;
+  projectId?: string;
+
   metadata?: Record<string, unknown>;
 }
 

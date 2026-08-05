@@ -163,6 +163,8 @@ export async function createSprint(actorId: string, data: CreateSprintData) {
     entityType: ActivityEntityType.SPRINT,
     entityId: sprint.id,
 
+    projectId: sprint.projectId,
+
     metadata: {
       sprintName: sprint.name,
     },
@@ -338,6 +340,8 @@ export async function updateSprint(
       entityType: ActivityEntityType.SPRINT,
       entityId: updatedSprint.id,
 
+      projectId: updatedSprint.projectId,
+
       metadata,
     });
   }
@@ -412,6 +416,8 @@ export async function startSprint(actorId: string, sprintId: string) {
     entityType: ActivityEntityType.SPRINT,
     entityId: updatedSprint.id,
 
+    projectId: updatedSprint.projectId,
+
     metadata: {
       sprintName: updatedSprint.name,
     },
@@ -478,6 +484,8 @@ export async function completeSprint(actorId: string, sprintId: string) {
 
     entityType: ActivityEntityType.SPRINT,
     entityId: updatedSprint.id,
+
+    projectId: updatedSprint.projectId,
 
     metadata: {
       sprintName: updatedSprint.name,

@@ -21,6 +21,7 @@ function toNotification(notification: BackendNotification): Notification {
     type: notification.type,
     title: notification.title,
     message: notification.message,
+    metadata: notification.metadata,
     isRead: notification.isRead,
     createdAt: notification.createdAt,
   };
@@ -46,4 +47,12 @@ export async function markNotificationRead(notificationId: string): Promise<Noti
   );
 
   return toNotification(response.data.data);
+}
+
+export async function markAllNotificationsRead(): Promise<number> {
+  const response = await apiClient.patch<ApiSuccess<{ updated: number }>>(
+    "/notifications/read-all",
+  );
+
+  return response.data.data.updated;
 }

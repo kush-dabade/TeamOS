@@ -194,6 +194,8 @@ export function SearchCommandContent({
                   icon={ListTodoIcon}
                   title={task.title}
                   description={task.description}
+                  status={task.status}
+                  priority={task.priority}
                   onSelect={() => onSelectTask(task.id)}
                 />
               ))}

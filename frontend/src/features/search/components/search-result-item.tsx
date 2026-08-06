@@ -1,18 +1,25 @@
 import type { LucideIcon } from "lucide-react";
 
 import { CommandItem } from "@/components/ui";
+import { TaskPriorityBadge } from "@/features/tasks/components/TaskPriorityBadge";
+import { TaskStatusBadge } from "@/features/tasks/components/TaskStatusBadge";
+import type { TaskPriority, TaskStatus } from "@/features/tasks";
 
 interface SearchResultItemProps {
   value: string;
   icon: LucideIcon;
   title: string;
   description: string | null;
+  status?: TaskStatus;
+  priority?: TaskPriority;
   onSelect: () => void;
 }
 
 // Deliberately dumb/presentational - it doesn't know whether it's rendering
-// a project or a task. SearchCommand picks the icon and the navigation
-// target per result type; this just lays the row out.
+// a project or a task, only whether it was given status/priority to show.
+// SearchCommand picks the icon and the navigation target per result type;
+// this just lays the row out. Project rows never pass status/priority, so
+// the badges simply don't render for them.
 //
 // `value` is an explicit, stable identifier (not derived from title text) -
 // cmdk uses it to key keyboard highlighting/selection, and relying on its
@@ -23,6 +30,8 @@ export function SearchResultItem({
   icon: Icon,
   title,
   description,
+  status,
+  priority,
   onSelect,
 }: SearchResultItemProps) {
   return (
@@ -39,6 +48,12 @@ export function SearchResultItem({
           <span className="truncate text-xs text-muted-foreground">{description}</span>
         ) : null}
       </div>
+      {status && priority ? (
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          <TaskStatusBadge status={status} />
+          <TaskPriorityBadge priority={priority} />
+        </div>
+      ) : null}
     </CommandItem>
   );
 }

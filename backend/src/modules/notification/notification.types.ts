@@ -31,10 +31,3 @@ export interface CreateNotificationData {
 
   metadata?: Record<string, unknown>;
 }
-
-export interface ListNotificationsOptions {
-  recipientId: string;
-
-  page: number;
-  limit: number;
-}

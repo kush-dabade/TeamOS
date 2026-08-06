@@ -79,6 +79,8 @@ export async function listNotifications(
     orderBy: {
       createdAt: "desc",
     },
+
+    take: 50,
   });
 
   return notifications.map(toNotificationResponse);

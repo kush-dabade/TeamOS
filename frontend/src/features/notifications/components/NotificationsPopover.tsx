@@ -3,13 +3,14 @@ import { BellIcon } from "lucide-react";
 
 import { Button, Popover, PopoverContent, PopoverTrigger } from "@/components/ui";
 
+import { useMarkAllNotificationsRead } from "../hooks/use-mark-all-notifications-read";
 import { useMarkNotificationRead } from "../hooks/use-mark-notification-read";
 import { useNotifications } from "../hooks/use-notifications";
 import { useUnreadNotificationCount } from "../hooks/use-unread-notification-count";
 import { NotificationList } from "./NotificationList";
 
 // The only stateful notifications component - owns popover open state, the
-// list/unread-count queries, and the mark-read mutation. Mirrors
+// list/unread-count queries, and the mark-read mutations. Mirrors
 // CommentsPanel's role in the comments feature: self-contained, since the
 // header bell is its only consumer.
 export function NotificationsPopover() {
@@ -18,6 +19,7 @@ export function NotificationsPopover() {
   const notificationsQuery = useNotifications(open);
   const unreadCountQuery = useUnreadNotificationCount();
   const markReadMutation = useMarkNotificationRead();
+  const markAllReadMutation = useMarkAllNotificationsRead();
 
   const unreadCount = unreadCountQuery.data ?? 0;
 
@@ -45,9 +47,20 @@ export function NotificationsPopover() {
         <div className="flex items-center justify-between gap-2 px-3 py-2.5">
           <h2 className="text-sm font-medium">Notifications</h2>
           {unreadCount > 0 ? (
-            <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-              {unreadCount}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                {unreadCount}
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="xs"
+                onClick={() => markAllReadMutation.mutate()}
+                disabled={markAllReadMutation.isPending}
+              >
+                Mark all read
+              </Button>
+            </div>
           ) : null}
         </div>
 

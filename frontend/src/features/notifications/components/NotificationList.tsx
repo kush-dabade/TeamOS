@@ -12,6 +12,7 @@ interface NotificationListProps {
   isError: boolean;
   onRetry: () => void;
   onMarkRead: (notificationId: string) => void;
+  onNavigate: (destination: string) => void;
 }
 
 const skeletonRows = Array.from({ length: 3 }, (_, index) => index);
@@ -26,6 +27,7 @@ export function NotificationList({
   isError,
   onRetry,
   onMarkRead,
+  onNavigate,
 }: NotificationListProps) {
   if (isError) {
     return (
@@ -74,6 +76,7 @@ export function NotificationList({
           key={notification.id}
           notification={notification}
           onMarkRead={() => onMarkRead(notification.id)}
+          onNavigate={onNavigate}
         />
       ))}
     </div>

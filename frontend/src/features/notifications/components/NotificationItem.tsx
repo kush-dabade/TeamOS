@@ -1,5 +1,4 @@
 import { Bell } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 
 import { cn, formatRelativeDate } from "@/utils";
 
@@ -10,6 +9,7 @@ import type { Notification } from "../types";
 interface NotificationItemProps {
   notification: Notification;
   onMarkRead: () => void;
+  onNavigate: (destination: string) => void;
 }
 
 // Presentational building block for a single notification. Clicking an
@@ -18,13 +18,19 @@ interface NotificationItemProps {
 // notifications are inert (no destructive/edit affordances exist for
 // notifications, unlike comments).
 //
+// Navigating is delegated to onNavigate rather than calling useNavigate()
+// here directly - NotificationsPopover owns the popover's open state, so
+// it's the one that closes the popover before navigating, the same way
+// SearchCommand (not SearchResultItem) is what closes the command palette
+// before navigating on select. This component only decides whether/where to
+// go; it doesn't know the popover exists.
+//
 // The unread signal is deliberately singular - a small dot next to the
 // title - rather than stacking a dot + tinted background + tinted icon like
 // the previous design did. The icon container stays neutral for every row;
 // it's a type indicator (comment/mention/assignment/invite), not a user
 // avatar - the Notification contract has no actor field to render one from.
-export function NotificationItem({ notification, onMarkRead }: NotificationItemProps) {
-  const navigate = useNavigate();
+export function NotificationItem({ notification, onMarkRead, onNavigate }: NotificationItemProps) {
   const Icon = NOTIFICATION_ICONS[notification.type] ?? Bell;
 
   const destination = getNotificationDestination(notification);
@@ -41,14 +47,14 @@ export function NotificationItem({ notification, onMarkRead }: NotificationItemP
   function handleClick() {
     if (notification.isRead) {
       if (destination) {
-        navigate(destination);
+        onNavigate(destination);
       }
       return;
     }
 
     onMarkRead();
     if (destination) {
-      navigate(destination);
+      onNavigate(destination);
     }
   }
 

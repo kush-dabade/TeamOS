@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { BellIcon } from "lucide-react";
 
 import { Button, Popover, PopoverContent, PopoverTrigger } from "@/components/ui";
@@ -12,9 +13,14 @@ import { NotificationList } from "./NotificationList";
 // The only stateful notifications component - owns popover open state, the
 // list/unread-count queries, and the mark-read mutations. Mirrors
 // CommentsPanel's role in the comments feature: self-contained, since the
-// header bell is its only consumer.
+// header bell is its only consumer. Also mirrors SearchCommand's role in the
+// search feature: the component that owns `open` is the one that performs
+// navigation, closing the overlay first - NotificationItem only decides
+// whether/where to go and reports it up via onNavigate, the same way
+// SearchResultItem only calls onSelect and lets SearchCommand do the rest.
 export function NotificationsPopover() {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
 
   const notificationsQuery = useNotifications(open);
   const unreadCountQuery = useUnreadNotificationCount();
@@ -22,6 +28,11 @@ export function NotificationsPopover() {
   const markAllReadMutation = useMarkAllNotificationsRead();
 
   const unreadCount = unreadCountQuery.data ?? 0;
+
+  function handleNavigate(destination: string) {
+    setOpen(false);
+    navigate(destination);
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -71,6 +82,7 @@ export function NotificationsPopover() {
             isError={notificationsQuery.isError}
             onRetry={() => notificationsQuery.refetch()}
             onMarkRead={(notificationId) => markReadMutation.mutate(notificationId)}
+            onNavigate={handleNavigate}
           />
         </div>
       </PopoverContent>

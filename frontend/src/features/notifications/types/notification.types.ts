@@ -10,6 +10,7 @@ export interface Notification {
   type: NotificationType;
   title: string;
   message: string;
+  metadata: Record<string, unknown> | null;
   isRead: boolean;
   createdAt: string;
 }

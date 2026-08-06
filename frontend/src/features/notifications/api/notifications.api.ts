@@ -21,6 +21,7 @@ function toNotification(notification: BackendNotification): Notification {
     type: notification.type,
     title: notification.title,
     message: notification.message,
+    metadata: notification.metadata,
     isRead: notification.isRead,
     createdAt: notification.createdAt,
   };

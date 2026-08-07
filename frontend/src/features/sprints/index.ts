@@ -9,3 +9,4 @@ export { useStartSprint } from "./hooks/use-start-sprint";
 export { useCompleteSprint } from "./hooks/use-complete-sprint";
 export { useAssignTaskToSprint } from "./hooks/use-assign-task-to-sprint";
 export { useRemoveTaskFromSprint } from "./hooks/use-remove-task-from-sprint";
+export { SprintsView } from "./components/SprintsView";

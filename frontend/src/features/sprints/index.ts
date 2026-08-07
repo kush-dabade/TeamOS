@@ -1,2 +1,11 @@
 export * from "./types";
 export { sprintKeys } from "./lib/sprint-keys";
+export { useSprints } from "./hooks/use-sprints";
+export { useSprint } from "./hooks/use-sprint";
+export { useSprintTasks } from "./hooks/use-sprint-tasks";
+export { useCreateSprint } from "./hooks/use-create-sprint";
+export { useUpdateSprint } from "./hooks/use-update-sprint";
+export { useStartSprint } from "./hooks/use-start-sprint";
+export { useCompleteSprint } from "./hooks/use-complete-sprint";
+export { useAssignTaskToSprint } from "./hooks/use-assign-task-to-sprint";
+export { useRemoveTaskFromSprint } from "./hooks/use-remove-task-from-sprint";

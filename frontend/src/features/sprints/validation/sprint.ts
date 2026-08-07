@@ -12,7 +12,7 @@ export const sprintSchema = z
     endDate: z.union([z.iso.date(), z.literal("")]),
   })
   .refine((data) => !data.startDate || !data.endDate || data.endDate >= data.startDate, {
-    message: "End date must be after start date.",
+    message: "End date must be on or after the start date.",
     path: ["endDate"],
   });
 

@@ -17,12 +17,14 @@ interface AssignTaskToSprintVariables {
 // useStartSprint/useCompleteSprint. Invalidates both sides of the
 // relationship: the sprint's own task list (sprintKeys.tasks) and the Task's
 // cached copies in the Tasks feature (taskKeys.detail/list), since
-// Task.sprintId changed. Only the target sprint is invalidated - the REST
-// response is the raw Task row and does not report which sprint (if any) the
-// task was previously in, so a task moving sprint-to-sprint cannot also
-// invalidate the *previous* sprint's task list from here. This mirrors the
-// same limitation already accepted in realtime-handlers.ts's
-// TASK_ASSIGNED_TO_SPRINT payload, which only carries the new sprintId too.
+// Task.sprintId changed. Only the target sprint is invalidated here - the
+// REST response is the raw Task row and has no previousSprintId, so a task
+// moved from another sprint can't have that sprint's task list invalidated
+// from this onSuccess. Unlike this REST response, the realtime
+// TASK_ASSIGNED_TO_SPRINT payload does carry previousSprintId, and
+// emitToWorkspace broadcasts to the acting user's own socket too - so
+// realtime-handlers.ts's handler for that event is what actually closes this
+// gap, not this hook.
 export function useAssignTaskToSprint() {
   const queryClient = useQueryClient();
 

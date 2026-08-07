@@ -50,7 +50,10 @@ export function SprintForm({
                   <FieldLabel htmlFor={field.name}>Sprint Name</FieldLabel>
                   <Input
                     {...field}
-                    ref={nameInputRef}
+                    ref={(element) => {
+                      field.ref(element);
+                      nameInputRef.current = element;
+                    }}
                     id={field.name}
                     placeholder="Sprint 12"
                     aria-invalid={fieldState.invalid}

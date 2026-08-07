@@ -160,11 +160,15 @@ function invalidateTask(taskId: string, projectId: string, queryClient: QueryCli
 // task.assigned_to_sprint/removed_from_sprint, per
 // backend/src/modules/sprint-task/sprint-task.service.ts, carry projectId and
 // sprintId at the payload's top level (not nested under task) plus a partial
-// task object with just id/sprintId.
+// task object with id/sprintId. assignTaskToSprint additionally includes
+// task.previousSprintId when the task was moved from another sprint (not
+// present on a fresh, previously-unassigned task) - this is the only place
+// that information exists on the wire; the REST mutation response is just
+// the raw Task row and never carries it.
 interface SprintTaskEventPayload {
   projectId: string;
   sprintId: string;
-  task: { id: string };
+  task: { id: string; previousSprintId?: string };
 }
 
 function isSprintTaskEventPayload(payload: unknown): payload is SprintTaskEventPayload {
@@ -179,7 +183,8 @@ function isSprintTaskEventPayload(payload: unknown): payload is SprintTaskEventP
     typeof payload.task === "object" &&
     payload.task !== null &&
     "id" in payload.task &&
-    typeof payload.task.id === "string"
+    typeof payload.task.id === "string" &&
+    (!("previousSprintId" in payload.task) || typeof payload.task.previousSprintId === "string")
   );
 }
 
@@ -413,6 +418,15 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
     }
     invalidateTask(payload.task.id, payload.projectId, queryClient);
     queryClient.invalidateQueries({ queryKey: sprintKeys.tasks(payload.sprintId) });
+
+    // A task moved from another sprint leaves that sprint's own task-list
+    // cache stale (the mutation's own onSuccess can't invalidate it - the
+    // REST response has no previousSprintId - but this realtime event does,
+    // and emitToWorkspace broadcasts to the acting user's own socket too, so
+    // this closes the gap for both the actor and other connected clients).
+    if (payload.task.previousSprintId) {
+      queryClient.invalidateQueries({ queryKey: sprintKeys.tasks(payload.task.previousSprintId) });
+    }
   },
 
   [REALTIME_EVENTS.TASK_REMOVED_FROM_SPRINT]: (payload, queryClient) => {

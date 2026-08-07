@@ -20,21 +20,29 @@ export function AttachmentsPanel({ taskId }: AttachmentsPanelProps) {
   const uploadAttachment = useUploadAttachment();
   const deleteAttachment = useDeleteAttachment();
 
-  const [deletingAttachmentId, setDeletingAttachmentId] = useState<string | null>(null);
+  // A Set, not a single id - deletes on different attachments can legitimately
+  // overlap (nothing blocks starting a second row's delete while an earlier
+  // one is still in flight), so a single shared id would have one delete's
+  // completion clear another still-pending delete's own indicator.
+  const [deletingAttachmentIds, setDeletingAttachmentIds] = useState<Set<string>>(new Set());
 
   const handleUpload = async (file: File) => {
     await uploadAttachment.mutateAsync({ taskId, file });
   };
 
   const handleDelete = async (attachmentId: string) => {
-    setDeletingAttachmentId(attachmentId);
+    setDeletingAttachmentIds((prev) => new Set(prev).add(attachmentId));
 
     try {
       await deleteAttachment.mutateAsync({ attachmentId, taskId });
     } catch {
       // Failure feedback is already surfaced via the mutation's onError toast.
     } finally {
-      setDeletingAttachmentId(null);
+      setDeletingAttachmentIds((prev) => {
+        const next = new Set(prev);
+        next.delete(attachmentId);
+        return next;
+      });
     }
   };
 
@@ -67,7 +75,7 @@ export function AttachmentsPanel({ taskId }: AttachmentsPanelProps) {
           isError={attachmentsQuery.isError}
           onRetry={() => attachmentsQuery.refetch()}
           onDelete={handleDelete}
-          deletingAttachmentId={deletingAttachmentId}
+          deletingAttachmentIds={deletingAttachmentIds}
           emptyAction={
             <AttachmentUpload onUpload={handleUpload} isUploading={uploadAttachment.isPending} />
           }

@@ -14,7 +14,7 @@ interface AttachmentListProps {
   isError: boolean;
   onRetry: () => void;
   onDelete: (attachmentId: string) => void;
-  deletingAttachmentId: string | null;
+  deletingAttachmentIds: Set<string>;
   emptyAction?: ReactNode;
   className?: string;
 }
@@ -32,7 +32,7 @@ export function AttachmentList({
   isError,
   onRetry,
   onDelete,
-  deletingAttachmentId,
+  deletingAttachmentIds,
   emptyAction,
   className,
 }: AttachmentListProps) {
@@ -88,7 +88,7 @@ export function AttachmentList({
           key={attachment.id}
           attachment={attachment}
           onDelete={() => onDelete(attachment.id)}
-          isDeleting={deletingAttachmentId === attachment.id}
+          isDeleting={deletingAttachmentIds.has(attachment.id)}
         />
       ))}
     </div>

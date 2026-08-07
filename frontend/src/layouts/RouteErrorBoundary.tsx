@@ -11,9 +11,19 @@ interface RouteErrorBoundaryProps {
   // FullPageError's full-viewport wrapper. Left false (PageError) for
   // boundaries that render inside AppShell's already-sized content slot.
   fullPage?: boolean;
+  // Defaults suit the authenticated tree, where "/dashboard" is always a
+  // valid destination. Public/guest usages (Home, Invitation, GuestRoute)
+  // override both, since /dashboard would just bounce a logged-out visitor
+  // to /login instead of doing what the button claims.
+  recoveryPath?: string;
+  recoveryLabel?: string;
 }
 
-export default function RouteErrorBoundary({ fullPage = false }: RouteErrorBoundaryProps) {
+export default function RouteErrorBoundary({
+  fullPage = false,
+  recoveryPath = "/dashboard",
+  recoveryLabel = "Back to dashboard",
+}: RouteErrorBoundaryProps) {
   const error = useRouteError();
 
   useEffect(() => {
@@ -24,7 +34,7 @@ export default function RouteErrorBoundary({ fullPage = false }: RouteErrorBound
     <ErrorState
       icon={TriangleAlert}
       title="Something went wrong"
-      description="This page ran into an unexpected error. Try reloading, or head back to your dashboard."
+      description="This page ran into an unexpected error. Try reloading, or use the button below to get back on track."
       action={
         <>
           <Button variant="outline" onClick={() => window.location.reload()}>
@@ -32,7 +42,7 @@ export default function RouteErrorBoundary({ fullPage = false }: RouteErrorBound
           </Button>
 
           <Button asChild>
-            <Link to="/dashboard">Back to dashboard</Link>
+            <Link to={recoveryPath}>{recoveryLabel}</Link>
           </Button>
         </>
       }

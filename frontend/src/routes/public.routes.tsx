@@ -14,12 +14,12 @@ export const publicRoutes: RouteObject[] = [
   {
     path: "/",
     element: <HomePage />,
-    errorElement: <RouteErrorBoundary fullPage />,
+    errorElement: <RouteErrorBoundary fullPage recoveryPath="/" recoveryLabel="Back to home" />,
   },
   {
     path: "/invitations/:token",
     element: <InvitationPage />,
-    errorElement: <RouteErrorBoundary fullPage />,
+    errorElement: <RouteErrorBoundary fullPage recoveryPath="/" recoveryLabel="Back to home" />,
   },
   {
     path: "*",
@@ -27,7 +27,7 @@ export const publicRoutes: RouteObject[] = [
   },
   {
     element: <GuestRoute />,
-    errorElement: <RouteErrorBoundary fullPage />,
+    errorElement: <RouteErrorBoundary fullPage recoveryPath="/" recoveryLabel="Back to home" />,
     children: [
       {
         element: <PublicLayout />,

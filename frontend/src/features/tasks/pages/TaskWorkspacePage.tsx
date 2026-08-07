@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { SearchX, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui";
+import { Button, Skeleton } from "@/components/ui";
 import { PageLayout } from "@/components/layout";
 import { ErrorState, PageError } from "@/components/ux";
 import { useProjects } from "@/features/projects";
@@ -36,7 +36,10 @@ export function TaskWorkspacePage() {
   if (taskQuery.isLoading) {
     return (
       <PageLayout>
-        <p className="mt-3 text-sm text-muted-foreground">Loading task...</p>
+        <div className="flex flex-col gap-3 py-4" aria-busy="true">
+          <Skeleton className="h-7 w-64" />
+          <Skeleton className="h-4 w-40" />
+        </div>
       </PageLayout>
     );
   }
@@ -133,7 +136,12 @@ export function TaskWorkspacePage() {
 
   return (
     <PageLayout>
-      <TaskHeader taskItem={taskItem} onEdit={handleEdit} onDelete={handleDelete} />
+      <TaskHeader
+        taskItem={taskItem}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+        isDeleting={deleteTask.isPending}
+      />
       <TaskWorkspace taskItem={taskItem} createdBy={createdBy} />
 
       <TaskFormPanel

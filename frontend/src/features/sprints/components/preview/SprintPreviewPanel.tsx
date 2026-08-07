@@ -21,6 +21,7 @@ interface SprintPreviewPanelProps {
   open: boolean;
   isStarting: boolean;
   isCompleting: boolean;
+  isAssigningTask: boolean;
   sprintTasks: Task[];
   isSprintTasksLoading: boolean;
   isSprintTasksError: boolean;
@@ -46,6 +47,7 @@ export function SprintPreviewPanel({
   open,
   isStarting,
   isCompleting,
+  isAssigningTask,
   sprintTasks,
   isSprintTasksLoading,
   isSprintTasksError,
@@ -105,8 +107,13 @@ export function SprintPreviewPanel({
           <div className="mt-5">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-medium">Tasks</h3>
-              <Button type="button" variant="outline" onClick={onAssignTask}>
-                Assign task
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onAssignTask}
+                disabled={isAssigningTask}
+              >
+                {isAssigningTask ? "Assigning..." : "Assign task"}
               </Button>
             </div>
 
@@ -117,6 +124,7 @@ export function SprintPreviewPanel({
                 isError={isSprintTasksError}
                 onRetry={onRetrySprintTasks}
                 onAssignTask={onAssignTask}
+                isAssigningTask={isAssigningTask}
                 removingTaskId={removingTaskId}
                 onRemove={onRemoveTask}
               />

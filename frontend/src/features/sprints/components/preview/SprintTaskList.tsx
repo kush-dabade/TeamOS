@@ -12,6 +12,7 @@ interface SprintTaskListProps {
   isError: boolean;
   onRetry: () => void;
   onAssignTask: () => void;
+  isAssigningTask: boolean;
   removingTaskId: string | null;
   onRemove: (taskId: string) => void;
 }
@@ -24,6 +25,7 @@ export function SprintTaskList({
   isError,
   onRetry,
   onAssignTask,
+  isAssigningTask,
   removingTaskId,
   onRemove,
 }: SprintTaskListProps) {
@@ -58,8 +60,13 @@ export function SprintTaskList({
           title="No tasks in this sprint"
           description="Assign existing tasks from this project to plan this sprint's work."
           action={
-            <Button type="button" variant="outline" onClick={onAssignTask}>
-              Assign task
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onAssignTask}
+              disabled={isAssigningTask}
+            >
+              {isAssigningTask ? "Assigning..." : "Assign task"}
             </Button>
           }
           iconClassName="size-10"

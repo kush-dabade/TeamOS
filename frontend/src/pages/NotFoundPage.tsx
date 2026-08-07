@@ -2,11 +2,11 @@ import { SearchX } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
-import { ErrorState, PageError } from "@/components/ux";
+import { ErrorState } from "@/components/ux";
 
 function NotFoundPage() {
   return (
-    <PageError>
+    <div className="flex h-screen w-screen items-center justify-center bg-background px-5">
       <ErrorState
         icon={SearchX}
         title="Page not found"
@@ -17,7 +17,7 @@ function NotFoundPage() {
           </Button>
         }
       />
-    </PageError>
+    </div>
   );
 }
 

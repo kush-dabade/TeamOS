@@ -61,5 +61,9 @@ export function WorkspaceAttentionPanel() {
     );
   }
 
-  return <DashboardPanel title="Workspace attention">{content}</DashboardPanel>;
+  return (
+    <DashboardPanel title="Workspace attention" isLoading={isLoading}>
+      {content}
+    </DashboardPanel>
+  );
 }

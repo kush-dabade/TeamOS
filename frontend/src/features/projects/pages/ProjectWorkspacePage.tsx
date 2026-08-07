@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { SearchX, TriangleAlert } from "lucide-react";
 
-import { Button } from "@/components/ui";
+import { Button, Skeleton } from "@/components/ui";
 import { PageLayout } from "@/components/layout";
 import { ErrorState, PageError } from "@/components/ux";
 import { useActiveWorkspace } from "@/features/workspaces";
@@ -41,7 +41,10 @@ export function ProjectWorkspacePage() {
   if (isResolvingProject || isLoadingDetail) {
     return (
       <PageLayout>
-        <p className="mt-3 text-sm text-muted-foreground">Loading project...</p>
+        <div className="flex flex-col gap-3 py-4" aria-busy="true">
+          <Skeleton className="h-7 w-64" />
+          <Skeleton className="h-4 w-40" />
+        </div>
       </PageLayout>
     );
   }

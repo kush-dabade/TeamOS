@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { Card, CardAction, CardContent, CardHeader } from "@/components/ui";
 
 import { AttachmentList } from "./AttachmentList";
@@ -18,12 +20,30 @@ export function AttachmentsPanel({ taskId }: AttachmentsPanelProps) {
   const uploadAttachment = useUploadAttachment();
   const deleteAttachment = useDeleteAttachment();
 
+  // A Set, not a single id - deletes on different attachments can legitimately
+  // overlap (nothing blocks starting a second row's delete while an earlier
+  // one is still in flight), so a single shared id would have one delete's
+  // completion clear another still-pending delete's own indicator.
+  const [deletingAttachmentIds, setDeletingAttachmentIds] = useState<Set<string>>(new Set());
+
   const handleUpload = async (file: File) => {
     await uploadAttachment.mutateAsync({ taskId, file });
   };
 
-  const handleDelete = (attachmentId: string) => {
-    deleteAttachment.mutate({ attachmentId, taskId });
+  const handleDelete = async (attachmentId: string) => {
+    setDeletingAttachmentIds((prev) => new Set(prev).add(attachmentId));
+
+    try {
+      await deleteAttachment.mutateAsync({ attachmentId, taskId });
+    } catch {
+      // Failure feedback is already surfaced via the mutation's onError toast.
+    } finally {
+      setDeletingAttachmentIds((prev) => {
+        const next = new Set(prev);
+        next.delete(attachmentId);
+        return next;
+      });
+    }
   };
 
   // Exactly one upload trigger is ever visible: the header action once
@@ -55,6 +75,7 @@ export function AttachmentsPanel({ taskId }: AttachmentsPanelProps) {
           isError={attachmentsQuery.isError}
           onRetry={() => attachmentsQuery.refetch()}
           onDelete={handleDelete}
+          deletingAttachmentIds={deletingAttachmentIds}
           emptyAction={
             <AttachmentUpload onUpload={handleUpload} isUploading={uploadAttachment.isPending} />
           }

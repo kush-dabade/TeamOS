@@ -17,7 +17,7 @@ interface CommentListProps {
   onStartEdit: (commentId: string) => void;
   onCancelEdit: () => void;
   onEditSubmit: (commentId: string, content: string) => Promise<void>;
-  onDelete: (commentId: string) => void;
+  onDelete: (commentId: string) => Promise<void>;
   className?: string;
 }
 

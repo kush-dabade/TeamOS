@@ -35,7 +35,7 @@ interface CommentItemProps {
   onStartEdit: () => void;
   onCancelEdit: () => void;
   onEditSubmit: (content: string) => Promise<void>;
-  onDelete: () => void;
+  onDelete: () => Promise<void>;
 }
 
 // Presentational building block for a single comment. Owns only the
@@ -70,7 +70,12 @@ export function CommentItem({
 
     setIsDeleteDialogOpen(false);
     setIsDeleting(true);
-    deleteTimeoutRef.current = window.setTimeout(onDelete, DELETE_COLLAPSE_MS);
+    // If the mutation fails, the row must reappear - it was never actually
+    // deleted, so staying collapsed would falsely look like it was (the
+    // mutation's own onError already toasts the failure).
+    deleteTimeoutRef.current = window.setTimeout(() => {
+      onDelete().catch(() => setIsDeleting(false));
+    }, DELETE_COLLAPSE_MS);
   };
 
   return (

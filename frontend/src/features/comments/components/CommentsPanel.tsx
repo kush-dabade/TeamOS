@@ -37,7 +37,7 @@ export function CommentsPanel({ taskId }: CommentsPanelProps) {
   };
 
   const handleDelete = (commentId: string) => {
-    deleteComment.mutate({ commentId, taskId });
+    return deleteComment.mutateAsync({ commentId, taskId });
   };
 
   const count = commentsQuery.data?.length ?? 0;

@@ -6,9 +6,16 @@ interface DashboardPanelProps extends PropsWithChildren {
   title: string;
   description?: string;
   action?: ReactNode;
+  isLoading?: boolean;
 }
 
-export function DashboardPanel({ title, description, action, children }: DashboardPanelProps) {
+export function DashboardPanel({
+  title,
+  description,
+  action,
+  isLoading,
+  children,
+}: DashboardPanelProps) {
   return (
     <Card className="flex h-full flex-col overflow-hidden">
       <header
@@ -35,7 +42,9 @@ export function DashboardPanel({ title, description, action, children }: Dashboa
         </div>
       </header>
 
-      <section className="flex flex-1 flex-col px-4 py-2">{children}</section>
+      <section className="flex flex-1 flex-col px-4 py-2" aria-busy={isLoading}>
+        {children}
+      </section>
     </Card>
   );
 }

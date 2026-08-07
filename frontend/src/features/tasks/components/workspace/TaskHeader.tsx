@@ -10,9 +10,10 @@ interface TaskHeaderProps {
   taskItem: TaskListItem;
   onEdit: (trigger: HTMLButtonElement) => void;
   onDelete: () => void;
+  isDeleting: boolean;
 }
 
-export function TaskHeader({ taskItem, onEdit, onDelete }: TaskHeaderProps) {
+export function TaskHeader({ taskItem, onEdit, onDelete, isDeleting }: TaskHeaderProps) {
   const { assignee, project, task } = taskItem;
 
   return (
@@ -44,7 +45,9 @@ export function TaskHeader({ taskItem, onEdit, onDelete }: TaskHeaderProps) {
         <Button type="button" variant="outline" onClick={(event) => onEdit(event.currentTarget)}>
           Edit task
         </Button>
-        <Button type="button" variant="destructive" onClick={onDelete}>Delete task</Button>
+        <Button type="button" variant="destructive" onClick={onDelete} disabled={isDeleting}>
+          {isDeleting ? "Deleting..." : "Delete task"}
+        </Button>
       </div>
     </header>
   );

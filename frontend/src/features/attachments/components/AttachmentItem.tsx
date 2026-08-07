@@ -25,12 +25,13 @@ import type { Attachment } from "../types";
 interface AttachmentItemProps {
   attachment: Attachment;
   onDelete: () => void;
+  isDeleting: boolean;
 }
 
 // Presentational building block for a single attachment row. Any workspace
 // member (not just the uploader) can delete an attachment - the backend
 // enforces membership/guest restrictions, so this never gates on ownership.
-export function AttachmentItem({ attachment, onDelete }: AttachmentItemProps) {
+export function AttachmentItem({ attachment, onDelete, isDeleting }: AttachmentItemProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { icon: Icon, label } = ATTACHMENT_FILE_TYPES[attachment.mimeType] ?? DEFAULT_ATTACHMENT_FILE_TYPE;
 
@@ -63,6 +64,7 @@ export function AttachmentItem({ attachment, onDelete }: AttachmentItemProps) {
               variant="ghost"
               size="icon-xs"
               aria-label={`Actions for ${attachment.originalName}`}
+              disabled={isDeleting}
             >
               <MoreHorizontal />
             </Button>

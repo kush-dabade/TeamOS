@@ -76,5 +76,9 @@ export function RecentActivityPanel() {
     );
   }
 
-  return <DashboardPanel title="Recent activity">{content}</DashboardPanel>;
+  return (
+    <DashboardPanel title="Recent activity" isLoading={isLoading}>
+      {content}
+    </DashboardPanel>
+  );
 }

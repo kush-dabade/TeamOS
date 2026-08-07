@@ -232,6 +232,7 @@ export function SprintsView({ projectId }: SprintsViewProps) {
         open={isPreviewOpen}
         isStarting={startSprint.isPending}
         isCompleting={completeSprint.isPending}
+        isAssigningTask={assignTaskToSprint.isPending}
         sprintTasks={sprintTasks}
         isSprintTasksLoading={sprintTasksQuery.isLoading}
         isSprintTasksError={sprintTasksQuery.isError}

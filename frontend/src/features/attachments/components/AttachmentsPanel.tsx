@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { Card, CardAction, CardContent, CardHeader } from "@/components/ui";
 
 import { AttachmentList } from "./AttachmentList";
@@ -18,12 +20,22 @@ export function AttachmentsPanel({ taskId }: AttachmentsPanelProps) {
   const uploadAttachment = useUploadAttachment();
   const deleteAttachment = useDeleteAttachment();
 
+  const [deletingAttachmentId, setDeletingAttachmentId] = useState<string | null>(null);
+
   const handleUpload = async (file: File) => {
     await uploadAttachment.mutateAsync({ taskId, file });
   };
 
-  const handleDelete = (attachmentId: string) => {
-    deleteAttachment.mutate({ attachmentId, taskId });
+  const handleDelete = async (attachmentId: string) => {
+    setDeletingAttachmentId(attachmentId);
+
+    try {
+      await deleteAttachment.mutateAsync({ attachmentId, taskId });
+    } catch {
+      // Failure feedback is already surfaced via the mutation's onError toast.
+    } finally {
+      setDeletingAttachmentId(null);
+    }
   };
 
   // Exactly one upload trigger is ever visible: the header action once
@@ -55,6 +67,7 @@ export function AttachmentsPanel({ taskId }: AttachmentsPanelProps) {
           isError={attachmentsQuery.isError}
           onRetry={() => attachmentsQuery.refetch()}
           onDelete={handleDelete}
+          deletingAttachmentId={deletingAttachmentId}
           emptyAction={
             <AttachmentUpload onUpload={handleUpload} isUploading={uploadAttachment.isPending} />
           }

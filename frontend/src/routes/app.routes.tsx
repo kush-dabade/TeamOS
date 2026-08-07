@@ -19,6 +19,7 @@ import { DashboardPage } from "@/features/dashboard";
 export const appRoutes: RouteObject[] = [
   {
     element: <AuthenticatedRoute />,
+    errorElement: <RouteErrorBoundary fullPage />,
     children: [
       {
         path: "/onboarding",

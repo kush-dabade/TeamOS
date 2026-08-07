@@ -3,6 +3,7 @@ import type { RouteObject } from "react-router-dom";
 import { GuestRoute } from "@/features/auth";
 import { InvitationPage } from "@/features/invitations";
 import PublicLayout from "@/layouts/PublicLayout";
+import RouteErrorBoundary from "@/layouts/RouteErrorBoundary";
 import HomePage from "@/pages/HomePage";
 import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
@@ -13,10 +14,12 @@ export const publicRoutes: RouteObject[] = [
   {
     path: "/",
     element: <HomePage />,
+    errorElement: <RouteErrorBoundary fullPage />,
   },
   {
     path: "/invitations/:token",
     element: <InvitationPage />,
+    errorElement: <RouteErrorBoundary fullPage />,
   },
   {
     path: "*",
@@ -24,6 +27,7 @@ export const publicRoutes: RouteObject[] = [
   },
   {
     element: <GuestRoute />,
+    errorElement: <RouteErrorBoundary fullPage />,
     children: [
       {
         element: <PublicLayout />,

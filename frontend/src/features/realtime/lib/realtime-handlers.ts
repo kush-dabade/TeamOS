@@ -7,6 +7,7 @@ import { activityKeys } from "@/features/activity";
 import type { ActivityEntityType } from "@/features/activity";
 import { taskKeys } from "@/features/tasks";
 import { projectKeys } from "@/features/projects";
+import { sprintKeys } from "@/features/sprints";
 import { workspaceKeys } from "@/features/workspaces";
 
 import { REALTIME_EVENTS, type RealtimeEvent } from "./realtime-events";
@@ -157,17 +158,17 @@ function invalidateTask(taskId: string, projectId: string, queryClient: QueryCli
 }
 
 // task.assigned_to_sprint/removed_from_sprint, per
-// backend/src/modules/sprint-task/sprint-task.service.ts, carry projectId at
-// the payload's top level (not nested under task) plus a partial task object
-// with just id/sprintId. There is currently no dedicated Sprints frontend
-// feature/query-key factory (Sprints has no route or feature module yet —
-// confirmed absent from frontend/src/features), so these two events only
-// invalidate the Task queries that actually exist and actually show
-// sprintId (TaskWorkspacePage, TasksPage) — there is nothing sprint-specific
-// to invalidate today. Revisit once a Sprints feature module exists.
+// backend/src/modules/sprint-task/sprint-task.service.ts, carry projectId and
+// sprintId at the payload's top level (not nested under task) plus a partial
+// task object with id/sprintId. assignTaskToSprint additionally includes
+// task.previousSprintId when the task was moved from another sprint (not
+// present on a fresh, previously-unassigned task) - this is the only place
+// that information exists on the wire; the REST mutation response is just
+// the raw Task row and never carries it.
 interface SprintTaskEventPayload {
   projectId: string;
-  task: { id: string };
+  sprintId: string;
+  task: { id: string; previousSprintId?: string };
 }
 
 function isSprintTaskEventPayload(payload: unknown): payload is SprintTaskEventPayload {
@@ -176,12 +177,52 @@ function isSprintTaskEventPayload(payload: unknown): payload is SprintTaskEventP
     payload !== null &&
     "projectId" in payload &&
     typeof payload.projectId === "string" &&
+    "sprintId" in payload &&
+    typeof payload.sprintId === "string" &&
     "task" in payload &&
     typeof payload.task === "object" &&
     payload.task !== null &&
     "id" in payload.task &&
-    typeof payload.task.id === "string"
+    typeof payload.task.id === "string" &&
+    (!("previousSprintId" in payload.task) || typeof payload.task.previousSprintId === "string")
   );
+}
+
+// sprint.created/updated/started/completed, per
+// backend/src/modules/sprint/sprint.service.ts, all carry the same shape:
+// workspaceId + projectId at the top level plus the full SprintResponse.
+// Only sprint.id is actually read here (name/goal/dates/status are already
+// covered by invalidate-then-refetch), so the guard only requires that much.
+interface SprintEventPayload {
+  projectId: string;
+  sprint: { id: string };
+}
+
+function isSprintEventPayload(payload: unknown): payload is SprintEventPayload {
+  return (
+    typeof payload === "object" &&
+    payload !== null &&
+    "projectId" in payload &&
+    typeof payload.projectId === "string" &&
+    "sprint" in payload &&
+    typeof payload.sprint === "object" &&
+    payload.sprint !== null &&
+    "id" in payload.sprint &&
+    typeof payload.sprint.id === "string"
+  );
+}
+
+// Sprint create only affects the project's sprint list - there is no detail
+// query yet for a sprint the client couldn't have been viewing before it
+// existed. Update/start/complete affect both the list (status/name/date
+// shown in the row) and the specific sprint's own detail query.
+function invalidateSprintLists(projectId: string, queryClient: QueryClient): void {
+  queryClient.invalidateQueries({ queryKey: sprintKeys.list(projectId) });
+}
+
+function invalidateSprint(sprintId: string, projectId: string, queryClient: QueryClient): void {
+  queryClient.invalidateQueries({ queryKey: sprintKeys.detail(sprintId) });
+  invalidateSprintLists(projectId, queryClient);
 }
 
 // Project payload shapes, per backend/src/modules/project/project.service.ts.
@@ -376,6 +417,16 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
       return;
     }
     invalidateTask(payload.task.id, payload.projectId, queryClient);
+    queryClient.invalidateQueries({ queryKey: sprintKeys.tasks(payload.sprintId) });
+
+    // A task moved from another sprint leaves that sprint's own task-list
+    // cache stale (the mutation's own onSuccess can't invalidate it - the
+    // REST response has no previousSprintId - but this realtime event does,
+    // and emitToWorkspace broadcasts to the acting user's own socket too, so
+    // this closes the gap for both the actor and other connected clients).
+    if (payload.task.previousSprintId) {
+      queryClient.invalidateQueries({ queryKey: sprintKeys.tasks(payload.task.previousSprintId) });
+    }
   },
 
   [REALTIME_EVENTS.TASK_REMOVED_FROM_SPRINT]: (payload, queryClient) => {
@@ -383,6 +434,35 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
       return;
     }
     invalidateTask(payload.task.id, payload.projectId, queryClient);
+    queryClient.invalidateQueries({ queryKey: sprintKeys.tasks(payload.sprintId) });
+  },
+
+  [REALTIME_EVENTS.SPRINT_CREATED]: (payload, queryClient) => {
+    if (!isSprintEventPayload(payload)) {
+      return;
+    }
+    invalidateSprintLists(payload.projectId, queryClient);
+  },
+
+  [REALTIME_EVENTS.SPRINT_UPDATED]: (payload, queryClient) => {
+    if (!isSprintEventPayload(payload)) {
+      return;
+    }
+    invalidateSprint(payload.sprint.id, payload.projectId, queryClient);
+  },
+
+  [REALTIME_EVENTS.SPRINT_STARTED]: (payload, queryClient) => {
+    if (!isSprintEventPayload(payload)) {
+      return;
+    }
+    invalidateSprint(payload.sprint.id, payload.projectId, queryClient);
+  },
+
+  [REALTIME_EVENTS.SPRINT_COMPLETED]: (payload, queryClient) => {
+    if (!isSprintEventPayload(payload)) {
+      return;
+    }
+    invalidateSprint(payload.sprint.id, payload.projectId, queryClient);
   },
 
   [REALTIME_EVENTS.PROJECT_CREATED]: (_payload, queryClient) => {

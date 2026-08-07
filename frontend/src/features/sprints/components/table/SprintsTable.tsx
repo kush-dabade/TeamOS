@@ -10,16 +10,20 @@ import { SprintsTableSkeleton } from "./SprintsTableSkeleton";
 
 interface SprintsTableProps {
   sprints: Sprint[];
+  selectedSprintId: string | null;
   isLoading: boolean;
   error: string | null;
+  onSprintSelect: (sprintId: string, trigger: HTMLButtonElement | null) => void;
   onRetry: () => void;
   onCreateSprint: (trigger: HTMLButtonElement) => void;
 }
 
 export function SprintsTable({
   sprints,
+  selectedSprintId,
   isLoading,
   error,
+  onSprintSelect,
   onRetry,
   onCreateSprint,
 }: SprintsTableProps) {
@@ -72,7 +76,16 @@ export function SprintsTable({
         </thead>
         <tbody>
           {isLoading ? <SprintsTableSkeleton /> : null}
-          {!isLoading ? sprints.map((sprint) => <SprintRow key={sprint.id} sprint={sprint} />) : null}
+          {!isLoading
+            ? sprints.map((sprint) => (
+                <SprintRow
+                  key={sprint.id}
+                  sprint={sprint}
+                  isSelected={sprint.id === selectedSprintId}
+                  onSelect={onSprintSelect}
+                />
+              ))
+            : null}
         </tbody>
       </table>
     </div>

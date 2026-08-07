@@ -8,8 +8,11 @@ import {
   SheetTitle,
 } from "@/components/ui";
 import { formatDate, formatRelativeDate } from "@/utils";
+import type { Task } from "@/features/tasks";
 
 import { SprintStatusBadge } from "../SprintStatusBadge";
+
+import { SprintTaskList } from "./SprintTaskList";
 
 import type { Sprint } from "../../types";
 
@@ -18,6 +21,13 @@ interface SprintPreviewPanelProps {
   open: boolean;
   isStarting: boolean;
   isCompleting: boolean;
+  sprintTasks: Task[];
+  isSprintTasksLoading: boolean;
+  isSprintTasksError: boolean;
+  removingTaskId: string | null;
+  onRetrySprintTasks: () => void;
+  onRemoveTask: (taskId: string) => void;
+  onAssignTask: () => void;
   onClose: () => void;
   onCloseAutoFocus: () => void;
   onEdit: () => void;
@@ -36,6 +46,13 @@ export function SprintPreviewPanel({
   open,
   isStarting,
   isCompleting,
+  sprintTasks,
+  isSprintTasksLoading,
+  isSprintTasksError,
+  removingTaskId,
+  onRetrySprintTasks,
+  onRemoveTask,
+  onAssignTask,
   onClose,
   onCloseAutoFocus,
   onEdit,
@@ -84,6 +101,27 @@ export function SprintPreviewPanel({
               <dd className="text-sm font-medium">{formatRelativeDate(sprint.updatedAt)}</dd>
             </div>
           </dl>
+
+          <div className="mt-5">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-medium">Tasks</h3>
+              <Button type="button" variant="outline" onClick={onAssignTask}>
+                Assign task
+              </Button>
+            </div>
+
+            <div className="mt-2">
+              <SprintTaskList
+                tasks={sprintTasks}
+                isLoading={isSprintTasksLoading}
+                isError={isSprintTasksError}
+                onRetry={onRetrySprintTasks}
+                onAssignTask={onAssignTask}
+                removingTaskId={removingTaskId}
+                onRemove={onRemoveTask}
+              />
+            </div>
+          </div>
         </div>
 
         <Separator />

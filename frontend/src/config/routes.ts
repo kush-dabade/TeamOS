@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, Home, ListTodo, Milestone, type LucideIcon } from "lucide-react";
+import { BriefcaseBusiness, Home, ListTodo, type LucideIcon } from "lucide-react";
 
 export interface AppRoute {
   path: string;
@@ -28,13 +28,6 @@ export const appRoutesConfig: AppRoute[] = [
     title: "Tasks",
     navigationLabel: "Tasks",
     icon: ListTodo,
-    showInSidebar: true,
-  },
-  {
-    path: "/sprints",
-    title: "Sprints",
-    navigationLabel: "Sprints",
-    icon: Milestone,
     showInSidebar: true,
   },
   {

@@ -1,10 +1,11 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/ux";
 import { useAuth } from "@/features/auth";
+import { authClient } from "@/lib/auth-client";
 import { getAvatarUrl } from "@/utils";
 
 import { useDeleteAvatar } from "../hooks/use-delete-avatar";
@@ -16,6 +17,8 @@ interface AvatarUploadControlProps {
   image?: string | null;
   updatedAt: Date | string;
 }
+
+type PendingOperation = "upload" | "delete" | null;
 
 function validateAvatarFile(file: File): string | null {
   if (
@@ -41,12 +44,19 @@ export function AvatarUploadControl({ name, image, updatedAt }: AvatarUploadCont
   const deleteAvatar = useDeleteAvatar();
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Covers the full user-visible operation - the mutation itself *and* the
+  // session refetch that follows it - not just the network request. The
+  // mutations' own `isPending` flips false as soon as the request resolves,
+  // before the avatar the user sees has actually updated; this stays true
+  // until that's done too, so the controls can't be re-triggered in between.
+  const [pendingOperation, setPendingOperation] = useState<PendingOperation>(null);
+
   const hasAvatar = Boolean(image);
   const avatarUrl = getAvatarUrl({ image, updatedAt });
 
-  const isUploading = uploadAvatar.isPending;
-  const isDeleting = deleteAvatar.isPending;
-  const isPending = isUploading || isDeleting;
+  const isUploading = pendingOperation === "upload";
+  const isDeleting = pendingOperation === "delete";
+  const isPending = pendingOperation !== null;
 
   async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -65,26 +75,77 @@ export function AvatarUploadControl({ name, image, updatedAt }: AvatarUploadCont
       return;
     }
 
+    setPendingOperation("upload");
+
     try {
       await uploadAvatar.mutateAsync(file);
-      await refetch();
-
-      toast.success("Avatar updated successfully!");
     } catch {
-      // Failure feedback is already surfaced via the mutation's onError toast.
-      // The previous avatar is untouched since session state was never
-      // optimistically changed.
+      // Mutation failed - already surfaced via the mutation's onError toast.
+      // Nothing changed server-side, so there's nothing to resync.
+      setPendingOperation(null);
+      return;
     }
+
+    // Mutation succeeded. Stay pending through the session resync too, so
+    // the controls can't be re-triggered before the visible avatar catches
+    // up with what the backend now has.
+    await syncSessionAfterMutation("updated");
   }
 
   async function handleRemove() {
+    setPendingOperation("delete");
+
     try {
       await deleteAvatar.mutateAsync();
-      await refetch();
-
-      toast.success("Avatar removed successfully!");
     } catch {
-      // Failure feedback is already surfaced via the mutation's onError toast.
+      // Mutation failed - already surfaced via the mutation's onError toast.
+      // Nothing changed server-side, so there's nothing to resync.
+      setPendingOperation(null);
+      return;
+    }
+
+    await syncSessionAfterMutation("removed");
+  }
+
+  // The mutation succeeding and the session refetch succeeding are two
+  // different things: the backend can have genuinely applied the change
+  // while our client fails to learn about it (a transient blip right after).
+  // That's not a mutation failure - the mutation's onError never fires for
+  // it - so it needs its own feedback instead of falling into the generic
+  // error path or staying silent.
+  //
+  // useAuth()'s refetch() can't tell us which case we're in: Better Auth's
+  // session hook swallows fetch failures internally (it always resolves,
+  // storing any error in its own shared session state rather than rejecting
+  // the caller's promise), so `await refetch()` never throws here even when
+  // the request genuinely fails. authClient.$fetch is the same underlying,
+  // publicly-exposed client used for every other Better Auth call in this
+  // app (see profile.api.ts) and does surface `{ error }` directly, so it's
+  // used here purely to detect success/failure for this toast; refetch()
+  // is still called alongside it so the rest of the app (sidebar, etc.)
+  // picks up the change through the normal reactive session state.
+  async function syncSessionAfterMutation(verb: "updated" | "removed") {
+    try {
+      const [{ error }] = await Promise.all([
+        authClient.$fetch("/get-session", { method: "GET" }),
+        refetch(),
+      ]);
+
+      if (error) {
+        toast.warning(
+          `Avatar ${verb}, but we couldn't refresh your view. Refresh the page to see it.`,
+        );
+      } else {
+        toast.success(`Avatar ${verb} successfully!`);
+      }
+    } catch {
+      // Belt-and-braces: even if something above throws unexpectedly, don't
+      // claim success and don't leave the user with no feedback at all.
+      toast.warning(
+        `Avatar ${verb}, but we couldn't refresh your view. Refresh the page to see it.`,
+      );
+    } finally {
+      setPendingOperation(null);
     }
   }
 

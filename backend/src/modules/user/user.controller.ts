@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 
 import { uploadAvatar, getAvatar, deleteAvatar } from "./user.service.js";
 
+import { ConflictError } from "../../shared/errors/conflict-error.js";
 import { NotFoundError } from "../../shared/errors/not-found-error.js";
 import { ValidationError } from "../../shared/errors/validation-error.js";
 
@@ -38,6 +39,16 @@ export async function uploadAvatarHandler(req: Request, res: Response) {
       });
     }
 
+    if (error instanceof ConflictError) {
+      return res.status(409).json({
+        success: false,
+        error: {
+          code: "AVATAR_CONFLICT",
+          message: error.message,
+        },
+      });
+    }
+
     console.error("Avatar upload error:", error);
 
     return res.status(500).json({
@@ -57,6 +68,7 @@ export async function getAvatarHandler(req: Request, res: Response) {
     res.setHeader("Content-Type", avatar.mimeType);
     res.setHeader("Content-Length", avatar.size.toString());
     res.setHeader("Cache-Control", "private, max-age=0, must-revalidate");
+    res.setHeader("X-Content-Type-Options", "nosniff");
 
     avatar.stream.on("error", (error) => {
       console.error("Avatar stream error:", error);

@@ -8,6 +8,7 @@ import {
   getExtensionMimeType,
 } from "../../storage/index.js";
 
+import { ConflictError } from "../../shared/errors/conflict-error.js";
 import { NotFoundError } from "../../shared/errors/not-found-error.js";
 import { ValidationError } from "../../shared/errors/validation-error.js";
 
@@ -49,7 +50,10 @@ export async function uploadAvatar(
   const directory = buildAvatarDirectory(userId);
 
   // Store the new file first; the previous avatar (if any) is untouched
-  // at this point.
+  // at this point. This write is outside PostgreSQL's transactional
+  // boundary - no DB transaction can make it atomic with the update below,
+  // so correctness has to come from the conditional update, not from
+  // wrapping these two operations together.
   const storageObject = await storageService.upload({
     content: file.buffer,
     directory,
@@ -62,15 +66,22 @@ export async function uploadAvatar(
     where: { id: userId },
     select: { image: true },
   });
+  const previousImage = previousUser?.image ?? null;
+
+  let result;
 
   try {
-    await prisma.user.update({
-      where: { id: userId },
+    // Optimistic concurrency: only persist if `image` still matches what we
+    // just read. `image` doubles as the compare-and-swap token, so no
+    // separate version column is needed. `update()` can't express this
+    // (Prisma only accepts unique-key filters there); `updateMany()` can.
+    result = await prisma.user.updateMany({
+      where: { id: userId, image: previousImage },
       data: { image: storageObject.storageKey },
     });
   } catch (error) {
-    // Persistence failed: roll back the newly uploaded file and leave the
-    // existing avatar reference untouched.
+    // Persistence failed outright (not a race, a genuine error): roll back
+    // the newly uploaded file and leave the existing avatar untouched.
     try {
       await storageService.delete(storageObject.storageKey);
     } catch {
@@ -80,11 +91,26 @@ export async function uploadAvatar(
     throw error;
   }
 
-  // Only remove the old avatar once the new one is successfully stored
-  // and persisted.
-  if (previousUser?.image && previousUser.image !== storageObject.storageKey) {
+  if (result.count === 0) {
+    // Lost the race: another request changed `image` between our read and
+    // our write. Clean up our own now-orphaned upload rather than leaving
+    // it unreferenced, and let the caller retry against the current state.
     try {
-      await storageService.delete(previousUser.image);
+      await storageService.delete(storageObject.storageKey);
+    } catch (error) {
+      console.error("Failed to clean up losing avatar upload:", error);
+    }
+
+    throw new ConflictError(
+      "Your avatar changed while this upload was in progress. Please try again.",
+    );
+  }
+
+  // We won the race - only now remove the old avatar, since we know our
+  // write is the one that's actually current.
+  if (previousImage && previousImage !== storageObject.storageKey) {
+    try {
+      await storageService.delete(previousImage);
     } catch (error) {
       console.error("Failed to delete previous avatar file:", error);
     }
@@ -135,10 +161,22 @@ export async function deleteAvatar(userId: string): Promise<void> {
 
   const storageKey = user.image;
 
-  await prisma.user.update({
-    where: { id: userId },
+  // Same compare-and-swap as uploadAvatar: only clear `image` if it still
+  // matches what we just read.
+  const result = await prisma.user.updateMany({
+    where: { id: userId, image: storageKey },
     data: { image: null },
   });
+
+  if (result.count === 0) {
+    // Lost the race: some other request already changed `image` since we
+    // read it - either another delete already cleared it, or a concurrent
+    // upload replaced it with a newer avatar. Either way that request owns
+    // the current state; deleting `storageKey` here could remove a file a
+    // concurrent upload just made current, so treat this as a no-op rather
+    // than a failure.
+    return;
+  }
 
   try {
     await storageService.delete(storageKey);

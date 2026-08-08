@@ -5,11 +5,11 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/ux";
 import { useAuth } from "@/features/auth";
+import { getAvatarUrl } from "@/utils";
 
 import { useDeleteAvatar } from "../hooks/use-delete-avatar";
 import { useUploadAvatar } from "../hooks/use-upload-avatar";
 import { ALLOWED_AVATAR_MIME_TYPES, AVATAR_MAX_FILE_SIZE } from "../lib/avatar-config";
-import { getAvatarUrl } from "../lib/get-avatar-url";
 
 interface AvatarUploadControlProps {
   name: string;

@@ -1,8 +1,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldContent, FieldTitle } from "@/components/ui/field";
-import { UserAvatar } from "@/components/ux";
 import { formatDate } from "@/utils";
 
+import { AvatarUploadControl } from "./avatar-upload-control";
 import { ProfileNameForm } from "./profile-name-form";
 
 interface PersonalInformationCardProps {
@@ -10,6 +10,7 @@ interface PersonalInformationCardProps {
   email: string;
   image?: string | null;
   createdAt: Date | string;
+  updatedAt: Date | string;
 }
 
 export function PersonalInformationCard({
@@ -17,6 +18,7 @@ export function PersonalInformationCard({
   email,
   image,
   createdAt,
+  updatedAt,
 }: PersonalInformationCardProps) {
   return (
     <Card>
@@ -28,7 +30,7 @@ export function PersonalInformationCard({
       </CardHeader>
 
       <CardContent className="flex flex-col gap-6">
-        <UserAvatar name={name} image={image} size="lg" />
+        <AvatarUploadControl name={name} image={image} updatedAt={updatedAt} />
 
         <ProfileNameForm name={name} />
 

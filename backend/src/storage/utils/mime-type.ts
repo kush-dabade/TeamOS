@@ -24,3 +24,19 @@ export function getMimeTypeExtension(mimeType: string): string | null {
       return null;
   }
 }
+
+export function getExtensionMimeType(extension: string): string | null {
+  switch (extension.toLowerCase()) {
+    case ".jpg":
+    case ".jpeg":
+      return "image/jpeg";
+    case ".png":
+      return "image/png";
+    case ".webp":
+      return "image/webp";
+    case ".pdf":
+      return "application/pdf";
+    default:
+      return null;
+  }
+}

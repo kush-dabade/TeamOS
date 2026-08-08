@@ -74,6 +74,11 @@ export async function getAvatarHandler(req: Request, res: Response) {
       console.error("Avatar stream error:", error);
 
       if (!res.headersSent) {
+        // The avatar Content-Type set above would otherwise leak onto this
+        // JSON error body, since res.json() only sets Content-Type when
+        // none is already present.
+        res.removeHeader("Content-Type");
+
         res.status(500).json({
           success: false,
           error: {

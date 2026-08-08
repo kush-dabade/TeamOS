@@ -10,7 +10,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import { UserAvatar } from "@/components/ux";
 import { logout, useAuth } from "@/features/auth";
+import { getAvatarUrl } from "@/utils";
 
 import { ThemeToggle } from "./theme-toggle";
 
@@ -20,6 +22,7 @@ export function SidebarUser() {
 
   const name = user?.name ?? "Unknown User";
   const email = user?.email ?? "";
+  const avatarUrl = user ? getAvatarUrl(user) : null;
 
   async function handleSignOut() {
     try {
@@ -42,9 +45,7 @@ export function SidebarUser() {
               size="lg"
               className="h-14 rounded-lg group-data-[collapsible=icon]:justify-center"
             >
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-sidebar-accent font-semibold text-sidebar-accent-foreground">
-                {getInitials(name)}
-              </div>
+              <UserAvatar name={name} image={avatarUrl} size="lg" />
 
               <div className="flex min-w-0 flex-1 flex-col text-left group-data-[collapsible=icon]:hidden">
                 <span className="truncate text-sm font-medium">{name}</span>
@@ -80,16 +81,4 @@ export function SidebarUser() {
       </SidebarMenuItem>
     </SidebarMenu>
   );
-}
-
-function getInitials(name: string) {
-  const initials = name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join("");
-
-  return initials || "?";
 }

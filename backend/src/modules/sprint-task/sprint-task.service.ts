@@ -9,20 +9,12 @@ import {
 import { emitToWorkspace } from "../../realtime/realtime.emitter.js";
 import { REALTIME_EVENTS } from "../../realtime/realtime.constants.js";
 
-import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
 import { NotFoundError } from "../../shared/errors/not-found-error.js";
 import { ValidationError } from "../../shared/errors/validation-error.js";
-
-async function getWorkspaceMembership(workspaceId: string, userId: string) {
-  return prisma.workspaceMember.findUnique({
-    where: {
-      workspaceId_userId: {
-        workspaceId,
-        userId,
-      },
-    },
-  });
-}
+import {
+  requireWorkspaceMembership,
+  requireRole,
+} from "../../shared/authorization/workspace-access.js";
 
 async function findSprintById(sprintId: string) {
   return prisma.sprint.findUnique({
@@ -73,17 +65,9 @@ export async function assignTaskToSprint(
     throw new NotFoundError("Sprint not found");
   }
 
-  const membership = await getWorkspaceMembership(sprint.workspaceId, userId);
+  const membership = await requireWorkspaceMembership(sprint.workspaceId, userId);
 
-  if (!membership) {
-    throw new ForbiddenError("You are not a member of this workspace");
-  }
-
-  if (membership.role !== "OWNER" && membership.role !== "ADMIN") {
-    throw new ForbiddenError(
-      "Only workspace owners and admins can assign tasks to sprints",
-    );
-  }
+  requireRole(membership, ["OWNER", "ADMIN"]);
 
   const task = await findTaskById(taskId);
 
@@ -178,17 +162,9 @@ export async function removeTaskFromSprint(
     throw new NotFoundError("Sprint not found");
   }
 
-  const membership = await getWorkspaceMembership(sprint.workspaceId, userId);
+  const membership = await requireWorkspaceMembership(sprint.workspaceId, userId);
 
-  if (!membership) {
-    throw new ForbiddenError("You are not a member of this workspace");
-  }
-
-  if (membership.role !== "OWNER" && membership.role !== "ADMIN") {
-    throw new ForbiddenError(
-      "Only workspace owners and admins can remove tasks from sprints",
-    );
-  }
+  requireRole(membership, ["OWNER", "ADMIN"]);
 
   const task = await findTaskById(taskId);
 
@@ -257,11 +233,7 @@ export async function listSprintTasks(userId: string, sprintId: string) {
     throw new NotFoundError("Sprint not found");
   }
 
-  const membership = await getWorkspaceMembership(sprint.workspaceId, userId);
-
-  if (!membership) {
-    throw new ForbiddenError("You are not a member of this workspace");
-  }
+  await requireWorkspaceMembership(sprint.workspaceId, userId);
 
   return prisma.task.findMany({
     where: {

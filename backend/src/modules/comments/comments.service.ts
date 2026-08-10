@@ -24,17 +24,7 @@ import {
 import { NotFoundError } from "../../shared/errors/not-found-error.js";
 import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
 import { ValidationError } from "../../shared/errors/validation-error.js";
-
-async function getWorkspaceMembership(workspaceId: string, userId: string) {
-  return prisma.workspaceMember.findUnique({
-    where: {
-      workspaceId_userId: {
-        workspaceId,
-        userId,
-      },
-    },
-  });
-}
+import { requireWorkspaceMembership } from "../../shared/authorization/workspace-access.js";
 
 type CommentWithAuthor = {
   id: string;
@@ -77,11 +67,7 @@ export async function createComment(
     throw new NotFoundError("Task not found");
   }
 
-  const membership = await getWorkspaceMembership(task.workspaceId, actorId);
-
-  if (!membership) {
-    throw new ForbiddenError("You are not a member of this workspace");
-  }
+  const membership = await requireWorkspaceMembership(task.workspaceId, actorId);
 
   if (membership.role === "GUEST") {
     throw new ForbiddenError("Guests cannot create comments");
@@ -179,11 +165,7 @@ export async function listComments(
     throw new NotFoundError("Task not found");
   }
 
-  const membership = await getWorkspaceMembership(task.workspaceId, actorId);
-
-  if (!membership) {
-    throw new ForbiddenError("You are not a member of this workspace");
-  }
+  await requireWorkspaceMembership(task.workspaceId, actorId);
 
   const comments = await prisma.comment.findMany({
     where: {
@@ -231,11 +213,7 @@ export async function updateComment(
     throw new NotFoundError("Comment not found");
   }
 
-  const membership = await getWorkspaceMembership(comment.workspaceId, actorId);
-
-  if (!membership) {
-    throw new ForbiddenError("You are not a member of this workspace");
-  }
+  const membership = await requireWorkspaceMembership(comment.workspaceId, actorId);
 
   if (membership.role === "GUEST") {
     throw new ForbiddenError("Guests cannot edit comments");
@@ -325,11 +303,7 @@ export async function deleteComment(
     throw new NotFoundError("Comment not found");
   }
 
-  const membership = await getWorkspaceMembership(comment.workspaceId, actorId);
-
-  if (!membership) {
-    throw new ForbiddenError("You are not a member of this workspace");
-  }
+  const membership = await requireWorkspaceMembership(comment.workspaceId, actorId);
 
   if (membership.role === "GUEST") {
     throw new ForbiddenError("Guests cannot delete comments");

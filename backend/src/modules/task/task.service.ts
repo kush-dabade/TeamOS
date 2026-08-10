@@ -4,6 +4,7 @@ import type { Task } from "../../generated/prisma/client.js";
 import { NotFoundError } from "../../shared/errors/not-found-error.js";
 import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
 import { ValidationError } from "../../shared/errors/validation-error.js";
+import { requireWorkspaceMembership } from "../../shared/authorization/workspace-access.js";
 
 import type {
   CreateTaskData,
@@ -22,17 +23,6 @@ import {
   ActivityType,
   NotificationType,
 } from "../../generated/prisma/enums.js";
-
-async function getWorkspaceMembership(workspaceId: string, userId: string) {
-  return prisma.workspaceMember.findUnique({
-    where: {
-      workspaceId_userId: {
-        workspaceId,
-        userId,
-      },
-    },
-  });
-}
 
 function toTaskResponse(task: Task) {
   return {
@@ -74,21 +64,25 @@ export async function createTask(actorId: string, data: CreateTaskData) {
     throw new ValidationError("Archived projects cannot be modified");
   }
 
-  const membership = await getWorkspaceMembership(project.workspaceId, actorId);
-
-  if (!membership) {
-    throw new ForbiddenError("You are not a member of this workspace");
-  }
+  const membership = await requireWorkspaceMembership(project.workspaceId, actorId);
 
   if (membership.role === "GUEST") {
     throw new ForbiddenError("Guests cannot create tasks");
   }
 
   if (data.assigneeId) {
-    const assigneeMembership = await getWorkspaceMembership(
-      project.workspaceId,
-      data.assigneeId,
-    );
+    // Not an actor-authorization check: this validates that the assignee
+    // (a different user than the actor) is a workspace member, so it stays
+    // a ValidationError rather than going through the ForbiddenError-only
+    // authorization primitive.
+    const assigneeMembership = await prisma.workspaceMember.findUnique({
+      where: {
+        workspaceId_userId: {
+          workspaceId: project.workspaceId,
+          userId: data.assigneeId,
+        },
+      },
+    });
 
     if (!assigneeMembership) {
       throw new ValidationError("Assignee must be a workspace member");
@@ -183,11 +177,7 @@ export async function listTasks(actorId: string, options: ListTasksOptions) {
     throw new NotFoundError("Project not found");
   }
 
-  const membership = await getWorkspaceMembership(project.workspaceId, actorId);
-
-  if (!membership) {
-    throw new ForbiddenError("You are not a member of this workspace");
-  }
+  await requireWorkspaceMembership(project.workspaceId, actorId);
 
   const tasks = await prisma.task.findMany({
     where: {
@@ -215,11 +205,7 @@ export async function getTaskById(actorId: string, taskId: string) {
     throw new NotFoundError("Task not found");
   }
 
-  const membership = await getWorkspaceMembership(task.workspaceId, actorId);
-
-  if (!membership) {
-    throw new ForbiddenError("You are not a member of this workspace");
-  }
+  await requireWorkspaceMembership(task.workspaceId, actorId);
 
   return toTaskResponse(task);
 }
@@ -236,11 +222,7 @@ export async function deleteTask(actorId: string, taskId: string) {
     throw new NotFoundError("Task not found");
   }
 
-  const membership = await getWorkspaceMembership(task.workspaceId, actorId);
-
-  if (!membership) {
-    throw new ForbiddenError("You are not a member of this workspace");
-  }
+  const membership = await requireWorkspaceMembership(task.workspaceId, actorId);
 
   if (membership.role === "GUEST") {
     throw new ForbiddenError("Guests cannot delete tasks");
@@ -304,11 +286,7 @@ export async function updateTask(
     throw new NotFoundError("Task not found");
   }
 
-  const membership = await getWorkspaceMembership(task.workspaceId, actorId);
-
-  if (!membership) {
-    throw new ForbiddenError("You are not a member of this workspace");
-  }
+  const membership = await requireWorkspaceMembership(task.workspaceId, actorId);
 
   if (membership.role === "GUEST") {
     throw new ForbiddenError("Guests cannot update tasks");
@@ -325,10 +303,18 @@ export async function updateTask(
   }
 
   if (data.assigneeId !== undefined && data.assigneeId !== null) {
-    const assigneeMembership = await getWorkspaceMembership(
-      task.workspaceId,
-      data.assigneeId,
-    );
+    // Not an actor-authorization check: this validates that the assignee
+    // (a different user than the actor) is a workspace member, so it stays
+    // a ValidationError rather than going through the ForbiddenError-only
+    // authorization primitive.
+    const assigneeMembership = await prisma.workspaceMember.findUnique({
+      where: {
+        workspaceId_userId: {
+          workspaceId: task.workspaceId,
+          userId: data.assigneeId,
+        },
+      },
+    });
 
     if (!assigneeMembership) {
       throw new ValidationError("Assignee must be a workspace member");

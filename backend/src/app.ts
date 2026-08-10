@@ -22,6 +22,8 @@ import attachmentItemRoutes from "./modules/attachment/attachment-item.routes.js
 import commentItemRoutes from "./modules/comments/comments-item.routes.js";
 import searchRoutes from "./modules/search/search.routes.js";
 import userRoutes from "./modules/user/user.routes.js";
+import { notFoundHandler } from "./middleware/not-found.js";
+import { errorHandler } from "./middleware/error-handler.js";
 
 const app = express();
 
@@ -81,5 +83,8 @@ app.get("/health", (_req, res) => {
     message: "TeamOS API is running",
   });
 });
+
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 export default app;

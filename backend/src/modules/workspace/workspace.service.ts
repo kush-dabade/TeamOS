@@ -10,6 +10,10 @@ import {
 import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
 import { NotFoundError } from "../../shared/errors/not-found-error.js";
 import { ValidationError } from "../../shared/errors/validation-error.js";
+import {
+  requireWorkspaceMembership,
+  requireRole,
+} from "../../shared/authorization/workspace-access.js";
 import type { CreateWorkspaceData } from "./workspace.types.js";
 import type { UpdateWorkspaceInput } from "./workspace.schema.js";
 import { createActivity } from "../activity/activity.service.js";
@@ -37,23 +41,6 @@ async function generateUniqueSlug(name: string): Promise<string> {
     slug = `${baseSlug}-${counter}`;
     counter++;
   }
-}
-
-async function getWorkspaceMembership(workspaceId: string, userId: string) {
-  const membership = await prisma.workspaceMember.findUnique({
-    where: {
-      workspaceId_userId: {
-        workspaceId,
-        userId,
-      },
-    },
-  });
-
-  if (!membership) {
-    throw new ForbiddenError("You are not a member of this workspace");
-  }
-
-  return membership;
 }
 
 async function getWorkspaceById(workspaceId: string) {
@@ -185,7 +172,7 @@ export async function getUserWorkspaces(userId: string) {
 }
 
 export async function getWorkspace(workspaceId: string, actorId: string) {
-  const membership = await getWorkspaceMembership(workspaceId, actorId);
+  const membership = await requireWorkspaceMembership(workspaceId, actorId);
   const workspace = await getWorkspaceById(workspaceId);
 
   return {
@@ -203,13 +190,9 @@ export async function updateWorkspace(
   workspaceId: string,
   data: UpdateWorkspaceInput,
 ) {
-  const membership = await getWorkspaceMembership(workspaceId, actorId);
+  const membership = await requireWorkspaceMembership(workspaceId, actorId);
 
-  if (membership.role !== WorkspaceRole.OWNER) {
-    throw new ForbiddenError(
-      "Only the workspace owner can update this workspace",
-    );
-  }
+  requireRole(membership, [WorkspaceRole.OWNER]);
 
   const workspace = await prisma.workspace.update({
     where: {
@@ -235,7 +218,7 @@ export async function listWorkspaceMembers(
   workspaceId: string,
   actorId: string,
 ) {
-  await getWorkspaceMembership(workspaceId, actorId);
+  await requireWorkspaceMembership(workspaceId, actorId);
 
   const members = await prisma.workspaceMember.findMany({
     where: {
@@ -267,7 +250,7 @@ export async function updateWorkspaceMemberRole(
   memberId: string,
   role: WorkspaceRole,
 ) {
-  const actorMembership = await getWorkspaceMembership(workspaceId, actorId);
+  const actorMembership = await requireWorkspaceMembership(workspaceId, actorId);
 
   const targetMember = await getWorkspaceMemberById(workspaceId, memberId);
 
@@ -320,7 +303,7 @@ export async function removeWorkspaceMember(
   workspaceId: string,
   memberId: string,
 ) {
-  const actorMembership = await getWorkspaceMembership(workspaceId, actorId);
+  const actorMembership = await requireWorkspaceMembership(workspaceId, actorId);
 
   const targetMember = await getWorkspaceMemberById(workspaceId, memberId);
 
@@ -352,7 +335,7 @@ export async function transferWorkspaceOwnership(
   workspaceId: string,
   memberId: string,
 ) {
-  const actorMembership = await getWorkspaceMembership(workspaceId, actorId);
+  const actorMembership = await requireWorkspaceMembership(workspaceId, actorId);
 
   const workspace = await getWorkspaceById(workspaceId);
 
@@ -505,7 +488,7 @@ export async function transferWorkspaceOwnership(
 }
 
 export async function leaveWorkspace(actorId: string, workspaceId: string) {
-  const membership = await getWorkspaceMembership(workspaceId, actorId);
+  const membership = await requireWorkspaceMembership(workspaceId, actorId);
 
   const workspace = await getWorkspaceById(workspaceId);
 

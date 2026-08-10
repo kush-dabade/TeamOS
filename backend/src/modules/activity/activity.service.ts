@@ -1,6 +1,6 @@
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
-import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
+import { requireWorkspaceMembership } from "../../shared/authorization/workspace-access.js";
 
 import type {
   ActivityResponse,
@@ -11,17 +11,6 @@ import type {
 
 import { emitToWorkspace } from "../../realtime/realtime.emitter.js";
 import { REALTIME_EVENTS } from "../../realtime/realtime.constants.js";
-
-async function getWorkspaceMembership(workspaceId: string, userId: string) {
-  return prisma.workspaceMember.findUnique({
-    where: {
-      workspaceId_userId: {
-        workspaceId,
-        userId,
-      },
-    },
-  });
-}
 
 type ActivityWithActor = {
   id: string;
@@ -112,11 +101,7 @@ export async function listWorkspaceActivities(
   actorId: string,
   options: ListActivitiesOptions,
 ): Promise<ListActivitiesResult> {
-  const membership = await getWorkspaceMembership(options.workspaceId, actorId);
-
-  if (!membership) {
-    throw new ForbiddenError("You are not a member of this workspace");
-  }
+  await requireWorkspaceMembership(options.workspaceId, actorId);
 
   const skip = (options.page - 1) * options.limit;
 

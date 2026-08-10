@@ -23,6 +23,7 @@ import type {
 import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
 import { NotFoundError } from "../../shared/errors/not-found-error.js";
 import { ValidationError } from "../../shared/errors/validation-error.js";
+import { requireWorkspaceMembership } from "../../shared/authorization/workspace-access.js";
 
 type AttachmentWithUploader = Prisma.AttachmentGetPayload<{
   include: {
@@ -55,23 +56,6 @@ type AttachmentWithRelations = Prisma.AttachmentGetPayload<{
     };
   };
 }>;
-
-async function getWorkspaceMembership(workspaceId: string, userId: string) {
-  const membership = await prisma.workspaceMember.findUnique({
-    where: {
-      workspaceId_userId: {
-        workspaceId,
-        userId,
-      },
-    },
-  });
-
-  if (!membership) {
-    throw new ForbiddenError("You are not a member of this workspace.");
-  }
-
-  return membership;
-}
 
 async function findTaskById(taskId: string) {
   const task = await prisma.task.findFirst({
@@ -173,7 +157,7 @@ export async function uploadAttachment(
 ): Promise<AttachmentResponse> {
   const task = await findTaskById(taskId);
 
-  const membership = await getWorkspaceMembership(task.workspaceId, actorId);
+  const membership = await requireWorkspaceMembership(task.workspaceId, actorId);
 
   if (membership.role === WorkspaceRole.GUEST) {
     throw new ForbiddenError("Guests cannot upload attachments.");
@@ -281,7 +265,7 @@ export async function listTaskAttachments(
 ): Promise<AttachmentResponse[]> {
   const task = await findTaskById(taskId);
 
-  await getWorkspaceMembership(task.workspaceId, actorId);
+  await requireWorkspaceMembership(task.workspaceId, actorId);
 
   const attachments = await prisma.attachment.findMany({
     where: {
@@ -310,7 +294,7 @@ export async function downloadAttachment(
 ): Promise<DownloadAttachmentResponse> {
   const attachment = await findAttachmentById(attachmentId);
 
-  await getWorkspaceMembership(attachment.task.workspaceId, actorId);
+  await requireWorkspaceMembership(attachment.task.workspaceId, actorId);
 
   const file = await storageService.stream(attachment.storageKey);
 
@@ -328,7 +312,7 @@ export async function deleteAttachment(
 ): Promise<void> {
   const attachment = await findAttachmentById(attachmentId);
 
-  const membership = await getWorkspaceMembership(
+  const membership = await requireWorkspaceMembership(
     attachment.task.workspaceId,
     actorId,
   );

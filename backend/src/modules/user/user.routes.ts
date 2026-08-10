@@ -1,10 +1,7 @@
 import { Router } from "express";
 
 import { requireAuth } from "../../middleware/require-auth.js";
-import {
-  uploadSingleAvatar,
-  handleAvatarUploadError,
-} from "../../middleware/multer.js";
+import { uploadSingleAvatar } from "../../middleware/multer.js";
 
 import {
   uploadAvatarHandler,
@@ -18,7 +15,6 @@ router.post(
   "/me/avatar",
   requireAuth,
   uploadSingleAvatar,
-  handleAvatarUploadError,
   uploadAvatarHandler,
 );
 

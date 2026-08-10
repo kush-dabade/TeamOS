@@ -1,7 +1,7 @@
 import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
 
-import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
+import { requireWorkspaceMembership } from "../../shared/authorization/workspace-access.js";
 
 import type {
   SearchProjectResult,
@@ -97,23 +97,6 @@ LIMIT ${limit};
   `);
 }
 
-async function getWorkspaceMembership(workspaceId: string, userId: string) {
-  const membership = await prisma.workspaceMember.findUnique({
-    where: {
-      workspaceId_userId: {
-        workspaceId,
-        userId,
-      },
-    },
-  });
-
-  if (!membership) {
-    throw new ForbiddenError("You are not a member of this workspace");
-  }
-
-  return membership;
-}
-
 async function searchTasks(
   workspaceId: string,
   query: string,
@@ -153,7 +136,7 @@ export async function search(
   actorId: string,
   query: SearchQuery,
 ): Promise<SearchResponse> {
-  await getWorkspaceMembership(query.workspaceId, actorId);
+  await requireWorkspaceMembership(query.workspaceId, actorId);
 
   const [projects, tasks] = await Promise.all([
     searchProjects(query.workspaceId, query.q, query.limit),

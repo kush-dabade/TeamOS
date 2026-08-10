@@ -1,3 +1,5 @@
+import { ValidationError } from "../shared/errors/validation-error.js";
+
 export function generateSlug(value: string): string {
   const slug = value
     .trim()
@@ -6,7 +8,7 @@ export function generateSlug(value: string): string {
     .replace(/^-+|-+$/g, "");
 
   if (!slug) {
-    throw new Error("Cannot generate slug from input: no valid alphanumeric characters found");
+    throw new ValidationError("Cannot generate slug from input: no valid alphanumeric characters found");
   }
 
   return slug;

@@ -23,29 +23,17 @@ import { enqueueWorkspaceInvitationEmail } from "../../queues/email/index.js";
 import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
 import { NotFoundError } from "../../shared/errors/not-found-error.js";
 import { ValidationError } from "../../shared/errors/validation-error.js";
+import {
+  findWorkspaceMembership,
+  requireWorkspaceMembership,
+  requireRole,
+} from "../../shared/authorization/workspace-access.js";
 
 import type {
   CreateInvitationData,
   InvitationPreviewResponse,
   InvitationResponse,
 } from "./invitation.types.js";
-
-async function getWorkspaceMembership(workspaceId: string, userId: string) {
-  const membership = await prisma.workspaceMember.findUnique({
-    where: {
-      workspaceId_userId: {
-        workspaceId,
-        userId,
-      },
-    },
-  });
-
-  if (!membership) {
-    throw new ForbiddenError("You are not a member of this workspace");
-  }
-
-  return membership;
-}
 
 async function getWorkspaceById(workspaceId: string) {
   const workspace = await prisma.workspace.findUnique({
@@ -233,12 +221,12 @@ function toInvitationRealtimeResponse(invitation: InvitationEntity) {
 export async function createInvitation(
   data: CreateInvitationData,
 ): Promise<InvitationResponse> {
-  const workspace = await getWorkspaceById(data.workspaceId);
-
-  const actorMembership = await getWorkspaceMembership(
+  const actorMembership = await requireWorkspaceMembership(
     data.workspaceId,
     data.invitedById,
   );
+
+  const workspace = await getWorkspaceById(data.workspaceId);
 
   const actor = await prisma.user.findUnique({
     where: {
@@ -261,14 +249,10 @@ export async function createInvitation(
   const existingUser = await findUserByEmail(email);
 
   if (existingUser) {
-    const existingMembership = await prisma.workspaceMember.findUnique({
-      where: {
-        workspaceId_userId: {
-          workspaceId: data.workspaceId,
-          userId: existingUser.id,
-        },
-      },
-    });
+    const existingMembership = await findWorkspaceMembership(
+      data.workspaceId,
+      existingUser.id,
+    );
 
     if (existingMembership) {
       throw new ValidationError("User is already a member of this workspace");
@@ -359,14 +343,9 @@ export async function listWorkspaceInvitations(
   workspaceId: string,
   actorId: string,
 ): Promise<InvitationResponse[]> {
-  const membership = await getWorkspaceMembership(workspaceId, actorId);
+  const membership = await requireWorkspaceMembership(workspaceId, actorId);
 
-  if (
-    membership.role !== WorkspaceRole.OWNER &&
-    membership.role !== WorkspaceRole.ADMIN
-  ) {
-    throw new ForbiddenError("You do not have permission to view invitations");
-  }
+  requireRole(membership, [WorkspaceRole.OWNER, WorkspaceRole.ADMIN]);
 
   const invitations = await prisma.workspaceInvitation.findMany({
     where: {
@@ -389,14 +368,9 @@ export async function cancelInvitation(
   workspaceId: string,
   invitationId: string,
 ): Promise<{ success: true }> {
-  const actorMembership = await getWorkspaceMembership(workspaceId, actorId);
+  const actorMembership = await requireWorkspaceMembership(workspaceId, actorId);
 
-  if (
-    actorMembership.role !== WorkspaceRole.OWNER &&
-    actorMembership.role !== WorkspaceRole.ADMIN
-  ) {
-    throw new ForbiddenError("You do not have permission to cancel invitations");
-  }
+  requireRole(actorMembership, [WorkspaceRole.OWNER, WorkspaceRole.ADMIN]);
 
   const invitation = await getWorkspaceInvitationById(workspaceId, invitationId);
 
@@ -426,14 +400,9 @@ export async function resendInvitation(
   workspaceId: string,
   invitationId: string,
 ): Promise<InvitationResponse> {
-  const actorMembership = await getWorkspaceMembership(workspaceId, actorId);
+  const actorMembership = await requireWorkspaceMembership(workspaceId, actorId);
 
-  if (
-    actorMembership.role !== WorkspaceRole.OWNER &&
-    actorMembership.role !== WorkspaceRole.ADMIN
-  ) {
-    throw new ForbiddenError("You do not have permission to resend invitations");
-  }
+  requireRole(actorMembership, [WorkspaceRole.OWNER, WorkspaceRole.ADMIN]);
 
   const invitation = await getWorkspaceInvitationById(workspaceId, invitationId);
 
@@ -538,14 +507,10 @@ async function acceptResolvedInvitation(
 ): Promise<InvitationResponse> {
   assertInvitationEligible(invitation, email);
 
-  const existingMembership = await prisma.workspaceMember.findUnique({
-    where: {
-      workspaceId_userId: {
-        workspaceId: invitation.workspaceId,
-        userId,
-      },
-    },
-  });
+  const existingMembership = await findWorkspaceMembership(
+    invitation.workspaceId,
+    userId,
+  );
 
   if (existingMembership) {
     throw new ValidationError("You are already a member of this workspace");

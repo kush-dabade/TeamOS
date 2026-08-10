@@ -19,6 +19,7 @@ import {
   ActivityEntityType,
   ActivityType,
   NotificationType,
+  WorkspaceRole,
 } from "../../generated/prisma/enums.js";
 
 import { NotFoundError } from "../../shared/errors/not-found-error.js";
@@ -69,7 +70,7 @@ export async function createComment(
 
   const membership = await requireWorkspaceMembership(task.workspaceId, actorId);
 
-  if (membership.role === "GUEST") {
+  if (membership.role === WorkspaceRole.GUEST) {
     throw new ForbiddenError("Guests cannot create comments");
   }
 
@@ -215,7 +216,7 @@ export async function updateComment(
 
   const membership = await requireWorkspaceMembership(comment.workspaceId, actorId);
 
-  if (membership.role === "GUEST") {
+  if (membership.role === WorkspaceRole.GUEST) {
     throw new ForbiddenError("Guests cannot edit comments");
   }
 
@@ -305,7 +306,7 @@ export async function deleteComment(
 
   const membership = await requireWorkspaceMembership(comment.workspaceId, actorId);
 
-  if (membership.role === "GUEST") {
+  if (membership.role === WorkspaceRole.GUEST) {
     throw new ForbiddenError("Guests cannot delete comments");
   }
 
@@ -321,8 +322,8 @@ export async function deleteComment(
 
   const canDelete =
     comment.authorId === actorId ||
-    membership.role === "ADMIN" ||
-    membership.role === "OWNER";
+    membership.role === WorkspaceRole.ADMIN ||
+    membership.role === WorkspaceRole.OWNER;
 
   if (!canDelete) {
     throw new ForbiddenError("You do not have permission to delete this comment");

@@ -4,6 +4,7 @@ import { createActivity } from "../activity/activity.service.js";
 import {
   ActivityEntityType,
   ActivityType,
+  WorkspaceRole,
 } from "../../generated/prisma/enums.js";
 
 import { emitToWorkspace } from "../../realtime/realtime.emitter.js";
@@ -67,7 +68,7 @@ export async function assignTaskToSprint(
 
   const membership = await requireWorkspaceMembership(sprint.workspaceId, userId);
 
-  requireRole(membership, ["OWNER", "ADMIN"]);
+  requireRole(membership, [WorkspaceRole.OWNER, WorkspaceRole.ADMIN]);
 
   const task = await findTaskById(taskId);
 
@@ -164,7 +165,7 @@ export async function removeTaskFromSprint(
 
   const membership = await requireWorkspaceMembership(sprint.workspaceId, userId);
 
-  requireRole(membership, ["OWNER", "ADMIN"]);
+  requireRole(membership, [WorkspaceRole.OWNER, WorkspaceRole.ADMIN]);
 
   const task = await findTaskById(taskId);
 

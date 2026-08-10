@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { pipeline } from "node:stream/promises";
 
 import {
   uploadAttachment,
@@ -7,17 +8,14 @@ import {
   deleteAttachment,
 } from "./attachment.service.js";
 
+import { ValidationError } from "../../shared/errors/validation-error.js";
+import { buildAttachmentContentDisposition } from "../../shared/http/content-disposition.js";
+
 export async function uploadAttachmentHandler(req: Request, res: Response) {
   const file = req.file;
 
   if (!file) {
-    return res.status(400).json({
-      success: false,
-      error: {
-        code: "VALIDATION_ERROR",
-        message: "Attachment file is required.",
-      },
-    });
+    throw new ValidationError("Attachment file is required.");
   }
 
   const attachment = await uploadAttachment(
@@ -58,15 +56,25 @@ export async function downloadAttachmentHandler(req: Request, res: Response) {
 
   res.setHeader(
     "Content-Disposition",
-    `attachment; filename="${attachment.originalName}"`,
+    buildAttachmentContentDisposition(attachment.originalName),
   );
 
   res.setHeader("Content-Length", attachment.size.toString());
 
-  attachment.stream.on("error", (error) => {
+  try {
+    // pipeline() (unlike a bare .pipe()) guarantees the source stream is
+    // destroyed when the destination closes early — e.g. the client
+    // disconnects mid-download — not just when the source itself errors.
+    await pipeline(attachment.stream, res);
+  } catch (error) {
     console.error("Attachment stream error:", error);
 
-    if (!res.headersSent) {
+    // pipeline() always destroys the destination on failure — including
+    // when the source errors before any bytes were written, well before
+    // headersSent would be true. Attempting a JSON response on an
+    // already-destroyed res is a no-op write into a torn-down connection,
+    // so both conditions must be checked, not headersSent alone.
+    if (!res.headersSent && !res.destroyed) {
       res.status(500).json({
         success: false,
         error: {
@@ -74,12 +82,8 @@ export async function downloadAttachmentHandler(req: Request, res: Response) {
           message: "Failed to stream attachment.",
         },
       });
-    } else {
-      res.destroy(error);
     }
-  });
-
-  attachment.stream.pipe(res);
+  }
 }
 
 export async function deleteAttachmentHandler(req: Request, res: Response) {

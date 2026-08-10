@@ -24,6 +24,7 @@ import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
 import { NotFoundError } from "../../shared/errors/not-found-error.js";
 import { ValidationError } from "../../shared/errors/validation-error.js";
 import {
+  findWorkspaceMembership,
   requireWorkspaceMembership,
   requireRole,
 } from "../../shared/authorization/workspace-access.js";
@@ -220,12 +221,12 @@ function toInvitationRealtimeResponse(invitation: InvitationEntity) {
 export async function createInvitation(
   data: CreateInvitationData,
 ): Promise<InvitationResponse> {
-  const workspace = await getWorkspaceById(data.workspaceId);
-
   const actorMembership = await requireWorkspaceMembership(
     data.workspaceId,
     data.invitedById,
   );
+
+  const workspace = await getWorkspaceById(data.workspaceId);
 
   const actor = await prisma.user.findUnique({
     where: {
@@ -248,14 +249,10 @@ export async function createInvitation(
   const existingUser = await findUserByEmail(email);
 
   if (existingUser) {
-    const existingMembership = await prisma.workspaceMember.findUnique({
-      where: {
-        workspaceId_userId: {
-          workspaceId: data.workspaceId,
-          userId: existingUser.id,
-        },
-      },
-    });
+    const existingMembership = await findWorkspaceMembership(
+      data.workspaceId,
+      existingUser.id,
+    );
 
     if (existingMembership) {
       throw new ValidationError("User is already a member of this workspace");
@@ -510,14 +507,10 @@ async function acceptResolvedInvitation(
 ): Promise<InvitationResponse> {
   assertInvitationEligible(invitation, email);
 
-  const existingMembership = await prisma.workspaceMember.findUnique({
-    where: {
-      workspaceId_userId: {
-        workspaceId: invitation.workspaceId,
-        userId,
-      },
-    },
-  });
+  const existingMembership = await findWorkspaceMembership(
+    invitation.workspaceId,
+    userId,
+  );
 
   if (existingMembership) {
     throw new ValidationError("You are already a member of this workspace");

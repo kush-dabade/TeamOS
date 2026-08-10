@@ -5,11 +5,11 @@ import type { WorkspaceRole } from "../../generated/prisma/enums.js";
 
 import { ForbiddenError } from "../errors/forbidden-error.js";
 
-export async function requireWorkspaceMembership(
+export async function findWorkspaceMembership(
   workspaceId: string,
   userId: string,
-): Promise<WorkspaceMember> {
-  const membership = await prisma.workspaceMember.findUnique({
+): Promise<WorkspaceMember | null> {
+  return prisma.workspaceMember.findUnique({
     where: {
       workspaceId_userId: {
         workspaceId,
@@ -17,6 +17,13 @@ export async function requireWorkspaceMembership(
       },
     },
   });
+}
+
+export async function requireWorkspaceMembership(
+  workspaceId: string,
+  userId: string,
+): Promise<WorkspaceMember> {
+  const membership = await findWorkspaceMembership(workspaceId, userId);
 
   if (!membership) {
     throw new ForbiddenError("You are not a member of this workspace");

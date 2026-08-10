@@ -1,18 +1,15 @@
 import type { Request, Response } from "express";
+import { pipeline } from "node:stream/promises";
 
 import { uploadAvatar, getAvatar, deleteAvatar } from "./user.service.js";
+
+import { ValidationError } from "../../shared/errors/validation-error.js";
 
 export async function uploadAvatarHandler(req: Request, res: Response) {
   const file = req.file;
 
   if (!file) {
-    return res.status(400).json({
-      success: false,
-      error: {
-        code: "VALIDATION_ERROR",
-        message: "Avatar file is required.",
-      },
-    });
+    throw new ValidationError("Avatar file is required.");
   }
 
   await uploadAvatar(req.user!.id, file);
@@ -33,10 +30,20 @@ export async function getAvatarHandler(req: Request, res: Response) {
   res.setHeader("Cache-Control", "private, max-age=0, must-revalidate");
   res.setHeader("X-Content-Type-Options", "nosniff");
 
-  avatar.stream.on("error", (error) => {
+  try {
+    // pipeline() (unlike a bare .pipe()) guarantees the source stream is
+    // destroyed when the destination closes early — e.g. the client
+    // disconnects mid-download — not just when the source itself errors.
+    await pipeline(avatar.stream, res);
+  } catch (error) {
     console.error("Avatar stream error:", error);
 
-    if (!res.headersSent) {
+    // pipeline() always destroys the destination on failure — including
+    // when the source errors before any bytes were written, well before
+    // headersSent would be true. Attempting a JSON response on an
+    // already-destroyed res is a no-op write into a torn-down connection,
+    // so both conditions must be checked, not headersSent alone.
+    if (!res.headersSent && !res.destroyed) {
       // The avatar Content-Type set above would otherwise leak onto this
       // JSON error body, since res.json() only sets Content-Type when
       // none is already present.
@@ -49,12 +56,8 @@ export async function getAvatarHandler(req: Request, res: Response) {
           message: "Failed to stream avatar.",
         },
       });
-    } else {
-      res.destroy(error);
     }
-  });
-
-  avatar.stream.pipe(res);
+  }
 }
 
 export async function deleteAvatarHandler(req: Request, res: Response) {

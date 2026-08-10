@@ -9,6 +9,7 @@ import type { UpdateSprintInput } from "./sprint.schema.js";
 import {
   ActivityEntityType,
   ActivityType,
+  WorkspaceRole,
 } from "../../generated/prisma/enums.js";
 
 import { emitToWorkspace } from "../../realtime/realtime.emitter.js";
@@ -100,7 +101,7 @@ export async function createSprint(actorId: string, data: CreateSprintData) {
 
   const membership = await requireWorkspaceMembership(project.workspaceId, actorId);
 
-  requireRole(membership, ["OWNER", "ADMIN"]);
+  requireRole(membership, [WorkspaceRole.OWNER, WorkspaceRole.ADMIN]);
 
   if (project.status === "ARCHIVED") {
     throw new ValidationError("Archived projects cannot be modified");
@@ -212,7 +213,7 @@ export async function updateSprint(
 
   const membership = await requireWorkspaceMembership(sprint.workspaceId, actorId);
 
-  requireRole(membership, ["OWNER", "ADMIN"]);
+  requireRole(membership, [WorkspaceRole.OWNER, WorkspaceRole.ADMIN]);
 
   const project = await findProjectById(sprint.projectId);
 
@@ -334,7 +335,7 @@ export async function startSprint(actorId: string, sprintId: string) {
 
   const membership = await requireWorkspaceMembership(sprint.workspaceId, actorId);
 
-  requireRole(membership, ["OWNER", "ADMIN"]);
+  requireRole(membership, [WorkspaceRole.OWNER, WorkspaceRole.ADMIN]);
 
   const project = await findProjectById(sprint.projectId);
 
@@ -403,7 +404,7 @@ export async function completeSprint(actorId: string, sprintId: string) {
 
   const membership = await requireWorkspaceMembership(sprint.workspaceId, actorId);
 
-  requireRole(membership, ["OWNER", "ADMIN"]);
+  requireRole(membership, [WorkspaceRole.OWNER, WorkspaceRole.ADMIN]);
 
   const project = await findProjectById(sprint.projectId);
 

@@ -22,6 +22,7 @@ import type { Project } from "../../generated/prisma/client.js";
 import { NotFoundError } from "../../shared/errors/not-found-error.js";
 import { ValidationError } from "../../shared/errors/validation-error.js";
 import {
+  findWorkspaceMembership,
   requireWorkspaceMembership,
   requireRole,
 } from "../../shared/authorization/workspace-access.js";
@@ -265,14 +266,10 @@ export async function createProject(actorId: string, data: CreateProjectData) {
   // owner (a different user than the actor) is a workspace member, so it
   // stays a ValidationError rather than going through the ForbiddenError-only
   // authorization primitive.
-  const ownerMembership = await prisma.workspaceMember.findUnique({
-    where: {
-      workspaceId_userId: {
-        workspaceId: data.workspaceId,
-        userId: data.ownerId,
-      },
-    },
-  });
+  const ownerMembership = await findWorkspaceMembership(
+    data.workspaceId,
+    data.ownerId,
+  );
 
   if (!ownerMembership) {
     throw new ValidationError("Project owner must be a workspace member");

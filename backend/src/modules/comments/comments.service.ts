@@ -21,6 +21,10 @@ import {
   NotificationType,
 } from "../../generated/prisma/enums.js";
 
+import { NotFoundError } from "../../shared/errors/not-found-error.js";
+import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
+import { ValidationError } from "../../shared/errors/validation-error.js";
+
 async function getWorkspaceMembership(workspaceId: string, userId: string) {
   return prisma.workspaceMember.findUnique({
     where: {
@@ -70,17 +74,17 @@ export async function createComment(
   });
 
   if (!task) {
-    throw new Error("Task not found");
+    throw new NotFoundError("Task not found");
   }
 
   const membership = await getWorkspaceMembership(task.workspaceId, actorId);
 
   if (!membership) {
-    throw new Error("You are not a member of this workspace");
+    throw new ForbiddenError("You are not a member of this workspace");
   }
 
   if (membership.role === "GUEST") {
-    throw new Error("Guests cannot create comments");
+    throw new ForbiddenError("Guests cannot create comments");
   }
 
   const project = await prisma.project.findUnique({
@@ -90,7 +94,7 @@ export async function createComment(
   });
 
   if (project?.status === "ARCHIVED") {
-    throw new Error("Archived projects cannot be modified");
+    throw new ValidationError("Archived projects cannot be modified");
   }
 
   const comment = await prisma.comment.create({
@@ -172,13 +176,13 @@ export async function listComments(
   });
 
   if (!task) {
-    throw new Error("Task not found");
+    throw new NotFoundError("Task not found");
   }
 
   const membership = await getWorkspaceMembership(task.workspaceId, actorId);
 
   if (!membership) {
-    throw new Error("You are not a member of this workspace");
+    throw new ForbiddenError("You are not a member of this workspace");
   }
 
   const comments = await prisma.comment.findMany({
@@ -224,17 +228,17 @@ export async function updateComment(
   });
 
   if (!comment) {
-    throw new Error("Comment not found");
+    throw new NotFoundError("Comment not found");
   }
 
   const membership = await getWorkspaceMembership(comment.workspaceId, actorId);
 
   if (!membership) {
-    throw new Error("You are not a member of this workspace");
+    throw new ForbiddenError("You are not a member of this workspace");
   }
 
   if (membership.role === "GUEST") {
-    throw new Error("Guests cannot edit comments");
+    throw new ForbiddenError("Guests cannot edit comments");
   }
 
   const project = await prisma.project.findUnique({
@@ -244,11 +248,11 @@ export async function updateComment(
   });
 
   if (project?.status === "ARCHIVED") {
-    throw new Error("Archived projects cannot be modified");
+    throw new ValidationError("Archived projects cannot be modified");
   }
 
   if (comment.authorId !== actorId) {
-    throw new Error("You can only edit your own comments");
+    throw new ForbiddenError("You can only edit your own comments");
   }
 
   const updated = await prisma.comment.update({
@@ -318,17 +322,17 @@ export async function deleteComment(
   });
 
   if (!comment) {
-    throw new Error("Comment not found");
+    throw new NotFoundError("Comment not found");
   }
 
   const membership = await getWorkspaceMembership(comment.workspaceId, actorId);
 
   if (!membership) {
-    throw new Error("You are not a member of this workspace");
+    throw new ForbiddenError("You are not a member of this workspace");
   }
 
   if (membership.role === "GUEST") {
-    throw new Error("Guests cannot delete comments");
+    throw new ForbiddenError("Guests cannot delete comments");
   }
 
   const project = await prisma.project.findUnique({
@@ -338,7 +342,7 @@ export async function deleteComment(
   });
 
   if (project?.status === "ARCHIVED") {
-    throw new Error("Archived projects cannot be modified");
+    throw new ValidationError("Archived projects cannot be modified");
   }
 
   const canDelete =
@@ -347,7 +351,7 @@ export async function deleteComment(
     membership.role === "OWNER";
 
   if (!canDelete) {
-    throw new Error("You do not have permission to delete this comment");
+    throw new ForbiddenError("You do not have permission to delete this comment");
   }
 
   await prisma.comment.update({

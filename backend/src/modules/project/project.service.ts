@@ -19,6 +19,10 @@ import {
 
 import type { Project } from "../../generated/prisma/client.js";
 
+import { NotFoundError } from "../../shared/errors/not-found-error.js";
+import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
+import { ValidationError } from "../../shared/errors/validation-error.js";
+
 function toProjectResponse(project: Project) {
   return {
     id: project.id,
@@ -70,13 +74,13 @@ export async function getProject(actorId: string, projectId: string) {
   const project = await findProjectById(projectId);
 
   if (!project) {
-    throw new Error("Project not found");
+    throw new NotFoundError("Project not found");
   }
 
   const membership = await getWorkspaceMembership(project.workspaceId, actorId);
 
   if (!membership) {
-    throw new Error("You are not a member of this workspace");
+    throw new ForbiddenError("You are not a member of this workspace");
   }
 
   return {
@@ -111,21 +115,21 @@ export async function updateProject(
   const project = await findProjectById(projectId);
 
   if (!project) {
-    throw new Error("Project not found");
+    throw new NotFoundError("Project not found");
   }
 
   const membership = await getWorkspaceMembership(project.workspaceId, actorId);
 
   if (!membership) {
-    throw new Error("You are not a member of this workspace");
+    throw new ForbiddenError("You are not a member of this workspace");
   }
 
   if (membership.role !== "OWNER" && membership.role !== "ADMIN") {
-    throw new Error("Only workspace owners and admins can update projects");
+    throw new ForbiddenError("Only workspace owners and admins can update projects");
   }
 
   if (project.status === "ARCHIVED") {
-    throw new Error("Archived projects cannot be updated");
+    throw new ValidationError("Archived projects cannot be updated");
   }
 
   const oldName = project.name;
@@ -192,21 +196,21 @@ export async function archiveProject(actorId: string, projectId: string) {
   const project = await findProjectById(projectId);
 
   if (!project) {
-    throw new Error("Project not found");
+    throw new NotFoundError("Project not found");
   }
 
   const membership = await getWorkspaceMembership(project.workspaceId, actorId);
 
   if (!membership) {
-    throw new Error("You are not a member of this workspace");
+    throw new ForbiddenError("You are not a member of this workspace");
   }
 
   if (membership.role !== "OWNER" && membership.role !== "ADMIN") {
-    throw new Error("Only workspace owners and admins can archive projects");
+    throw new ForbiddenError("Only workspace owners and admins can archive projects");
   }
 
   if (project.status === "ARCHIVED") {
-    throw new Error("Project is already archived");
+    throw new ValidationError("Project is already archived");
   }
 
   const archivedProject = await prisma.project.update({
@@ -280,11 +284,11 @@ export async function createProject(actorId: string, data: CreateProjectData) {
   const membership = await getWorkspaceMembership(data.workspaceId, actorId);
 
   if (!membership) {
-    throw new Error("You are not a member of this workspace");
+    throw new ForbiddenError("You are not a member of this workspace");
   }
 
   if (membership.role !== "OWNER" && membership.role !== "ADMIN") {
-    throw new Error("Only workspace owners and admins can create projects");
+    throw new ForbiddenError("Only workspace owners and admins can create projects");
   }
 
   const ownerMembership = await getWorkspaceMembership(
@@ -293,7 +297,7 @@ export async function createProject(actorId: string, data: CreateProjectData) {
   );
 
   if (!ownerMembership) {
-    throw new Error("Project owner must be a workspace member");
+    throw new ValidationError("Project owner must be a workspace member");
   }
 
   const slug = await generateUniqueProjectSlug(data.workspaceId, data.name);
@@ -352,7 +356,7 @@ export async function listProjects(
   const membership = await getWorkspaceMembership(options.workspaceId, actorId);
 
   if (!membership) {
-    throw new Error("You are not a member of this workspace");
+    throw new ForbiddenError("You are not a member of this workspace");
   }
 
   const projects = await prisma.project.findMany({

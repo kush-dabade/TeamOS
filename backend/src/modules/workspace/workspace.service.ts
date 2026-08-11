@@ -18,6 +18,7 @@ import type { CreateWorkspaceData } from "./workspace.types.js";
 import type { UpdateWorkspaceInput } from "./workspace.schema.js";
 import { createActivity } from "../activity/activity.service.js";
 import { emitToWorkspace } from "../../realtime/realtime.emitter.js";
+import { evictFromWorkspace } from "../../realtime/realtime.eviction.js";
 import { REALTIME_EVENTS } from "../../realtime/realtime.constants.js";
 import { enqueueNotification } from "../../queues/notification/index.js";
 
@@ -325,6 +326,16 @@ export async function removeWorkspaceMember(
     },
   });
 
+  // Best-effort: the membership is already gone at this point, so a failure
+  // here must not fail the request - it would just leave the removed
+  // member's already-open socket(s) in the workspace room until they
+  // naturally reconnect, not block the removal itself.
+  try {
+    await evictFromWorkspace(workspaceId, targetMember.userId);
+  } catch (error) {
+    console.error("Failed to evict removed member's sockets:", error);
+  }
+
   return {
     success: true,
   };
@@ -530,6 +541,17 @@ export async function leaveWorkspace(actorId: string, workspaceId: string) {
     });
   } catch (error) {
     console.error("Failed to record leave-workspace activity:", error);
+  }
+
+  // Best-effort and independent of the activity/emit block above - one
+  // failing must not prevent the other from running. Covers a device/tab
+  // other than the one that issued this request (the frontend's own
+  // client-side disconnect/reconnect only reaches the socket that made
+  // this call).
+  try {
+    await evictFromWorkspace(workspaceId, actorId);
+  } catch (error) {
+    console.error("Failed to evict leaving member's sockets:", error);
   }
 
   return {

@@ -510,6 +510,19 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
     queryClient.invalidateQueries({ queryKey: workspaceKeys.list() });
   },
 
+  // Sent directly to this socket (not broadcast to the workspace room) when
+  // the backend evicts it after a WorkspaceMember deletion (removal or
+  // self-initiated leave) - see backend/src/realtime/realtime.eviction.ts.
+  // Invalidating the list is the necessary reconciliation: WorkspaceProvider
+  // derives activeWorkspaceId purely from this query's data, so once the
+  // refetch no longer includes this workspace, it falls back to another
+  // workspace (or WorkspaceGuard redirects to onboarding if none remain) on
+  // its own - no separate detail/members invalidation is needed here, since
+  // the user no longer has access to either.
+  [REALTIME_EVENTS.WORKSPACE_ACCESS_REVOKED]: (_payload, queryClient) => {
+    queryClient.invalidateQueries({ queryKey: workspaceKeys.list() });
+  },
+
   [REALTIME_EVENTS.INVITATION_CREATED]: (payload, queryClient) => {
     if (!isWorkspaceScopedPayload(payload)) {
       return;

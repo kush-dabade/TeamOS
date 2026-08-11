@@ -26,8 +26,18 @@ import userRoutes from "./modules/user/user.routes.js";
 import { notFoundHandler } from "./middleware/not-found.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { generalApiLimiter } from "./middleware/rate-limit.js";
+import { securityHeaders } from "./middleware/security-headers.js";
 
 const app = express();
+
+// Mounted first, ahead of CORS/auth/body-parsing/rate limiting/routes -
+// res.setHeader calls persist on the response regardless of what happens
+// afterward, including an error jumping straight to errorHandler past all
+// remaining non-error middleware. Mounting this before everything else is
+// what makes these headers show up on every response this app sends,
+// success or error (404, 401/403, 429, 500 included), without needing to
+// special-case any individual error path.
+app.use(securityHeaders);
 
 // FRONTEND_URL is not consumed here - it is validated for the API process
 // specifically because this is currently the only startup-time guard for it

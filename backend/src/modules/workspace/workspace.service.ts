@@ -327,13 +327,23 @@ export async function removeWorkspaceMember(
   });
 
   // Best-effort: the membership is already gone at this point, so a failure
-  // here must not fail the request - it would just leave the removed
-  // member's already-open socket(s) in the workspace room until they
-  // naturally reconnect, not block the removal itself.
+  // here must not fail the request. This is not reachable in practice today
+  // (see realtime.eviction.ts's own comment on why), so this branch exists
+  // as a guard for once a network-backed Socket.IO adapter is introduced -
+  // if it ever does fire, the residual risk is bounded, not open-ended: the
+  // removed member's already-open socket(s) would keep receiving this
+  // workspace's events until they next disconnect/reconnect
+  // (joinWorkspaceRooms re-checks membership fresh from the database every
+  // time), not indefinitely.
   try {
     await evictFromWorkspace(workspaceId, targetMember.userId);
   } catch (error) {
-    console.error("Failed to evict removed member's sockets:", error);
+    console.error(
+      "SECURITY: failed to evict removed member's sockets after retries - they may " +
+        "continue receiving this workspace's realtime events until their socket " +
+        "next disconnects/reconnects:",
+      error,
+    );
   }
 
   return {
@@ -547,11 +557,17 @@ export async function leaveWorkspace(actorId: string, workspaceId: string) {
   // failing must not prevent the other from running. Covers a device/tab
   // other than the one that issued this request (the frontend's own
   // client-side disconnect/reconnect only reaches the socket that made
-  // this call).
+  // this call). See removeWorkspaceMember's matching comment above - this
+  // branch isn't reachable in practice today, same reasoning applies here.
   try {
     await evictFromWorkspace(workspaceId, actorId);
   } catch (error) {
-    console.error("Failed to evict leaving member's sockets:", error);
+    console.error(
+      "SECURITY: failed to evict leaving member's other sockets after retries - they " +
+        "may continue receiving this workspace's realtime events until their socket " +
+        "next disconnects/reconnects:",
+      error,
+    );
   }
 
   return {

@@ -18,10 +18,27 @@ export function connectTestSocket(baseUrl: string, cookie: string): Promise<Sock
       forceNew: true,
       transports: ["websocket"],
       extraHeaders: { Cookie: cookie },
+      // Tests manage each socket's lifecycle explicitly (openSockets
+      // arrays, disconnect() in afterEach) - automatic reconnection would
+      // let a socket whose test already ended keep retrying in the
+      // background, potentially outliving the test file itself.
+      reconnection: false,
+      // Bounded, rather than socket.io-client's own 20s default - a
+      // connection that hasn't succeeded by then is not going to, and
+      // failing fast here is more useful than waiting for Vitest's own
+      // testTimeout to eventually time the whole test out instead.
+      timeout: 5000,
     });
 
     socket.once("connect", () => resolve(socket));
-    socket.once("connect_error", (error) => reject(error));
+    socket.once("connect_error", (error) => {
+      // Cleans up any internal state left behind by the failed attempt
+      // (timers, the underlying transport) rather than leaving it to the
+      // caller, who never receives a Socket to clean up themselves since
+      // this path rejects instead of resolving.
+      socket.disconnect();
+      reject(error);
+    });
   });
 }
 
@@ -69,10 +86,19 @@ export async function waitForEventWithRetries<T = unknown>(
   { attempts = 10, attemptTimeoutMs = 200 }: { attempts?: number; attemptTimeoutMs?: number } = {},
 ): Promise<T> {
   for (let attempt = 1; attempt <= attempts; attempt++) {
+    // waitForEvent's listener is registered synchronously inside its
+    // Promise executor, the moment it's called - creating the promise
+    // before triggerEmit() guarantees the listener exists before this
+    // attempt's emit can possibly arrive, closing the same
+    // register-after-emit race this helper exists to work around in the
+    // first place, rather than just relying on retries to make it
+    // statistically unlikely.
+    const eventPromise = waitForEvent<T>(socket, event, attemptTimeoutMs);
+
     triggerEmit();
 
     try {
-      return await waitForEvent<T>(socket, event, attemptTimeoutMs);
+      return await eventPromise;
     } catch {
       if (attempt === attempts) {
         throw new Error(

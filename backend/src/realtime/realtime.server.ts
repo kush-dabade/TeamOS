@@ -49,10 +49,33 @@ function registerMiddleware(io: Server): void {
   io.use(authenticateSocket);
 }
 
+/**
+ * Reads membership, joins rooms accordingly, then re-reads membership and
+ * leaves anything no longer present - closes a real race with
+ * removeWorkspaceMember/leaveWorkspace: evictFromWorkspace only evicts
+ * sockets that have already joined the affected user's `user:<id>` room at
+ * the moment its own fetchSockets() snapshot runs. A socket connecting
+ * concurrently with a removal can read a pre-removal membership snapshot,
+ * then join the now-stale workspace room *after* that eviction snapshot
+ * already ran (and therefore never saw this socket), ending up
+ * indefinitely subscribed to a room it's no longer authorized for.
+ *
+ * The second read closes that window without a lock: any removal that
+ * committed before this second query is caught right here, self-correcting
+ * the stale join before connection setup even finishes. A removal that
+ * commits after this second query is caught by the normal
+ * evictFromWorkspace path instead, since by then this socket is already
+ * fully joined (both rooms) and discoverable - the same "already connected"
+ * case the realtime test suite already covers. What remains is a purely
+ * in-process window between this query resolving and the loop below
+ * finishing, not one spanning a database round trip.
+ */
 async function joinWorkspaceRooms(socket: AuthenticatedSocket): Promise<void> {
+  const userId = socket.data.user.id;
+
   const memberships = await prisma.workspaceMember.findMany({
     where: {
-      userId: socket.data.user.id,
+      userId,
     },
     select: {
       workspaceId: true,
@@ -63,8 +86,26 @@ async function joinWorkspaceRooms(socket: AuthenticatedSocket): Promise<void> {
     socket.join(getWorkspaceRoom(membership.workspaceId));
   }
 
+  const currentMemberships = await prisma.workspaceMember.findMany({
+    where: {
+      userId,
+    },
+    select: {
+      workspaceId: true,
+    },
+  });
+  const currentWorkspaceIds = new Set(
+    currentMemberships.map((membership) => membership.workspaceId),
+  );
+
+  for (const membership of memberships) {
+    if (!currentWorkspaceIds.has(membership.workspaceId)) {
+      socket.leave(getWorkspaceRoom(membership.workspaceId));
+    }
+  }
+
   console.log(
-    `Socket ${socket.id} joined ${memberships.length} workspace room(s)`,
+    `Socket ${socket.id} joined ${currentWorkspaceIds.size} workspace room(s)`,
   );
 }
 
@@ -77,9 +118,14 @@ function registerConnectionHandlers(io: Server): void {
     try {
       const authenticatedSocket = socket as AuthenticatedSocket;
 
-      await joinWorkspaceRooms(authenticatedSocket);
-
+      // Joined first, synchronously, before any database round trip -
+      // makes this socket discoverable via fetchSockets() on the user room
+      // (see realtime.eviction.ts) from the earliest possible moment,
+      // which joinWorkspaceRooms's own re-verification above depends on to
+      // close the join/eviction race.
       joinUserRoom(authenticatedSocket);
+
+      await joinWorkspaceRooms(authenticatedSocket);
 
       console.log(`Socket connected: ${socket.id}`);
 

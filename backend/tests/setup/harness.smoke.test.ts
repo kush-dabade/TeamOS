@@ -71,4 +71,52 @@ describe("test harness", () => {
 
     expect(await prisma.user.count()).toBe(1);
   });
+
+  describe("resetDatabase refuses to run against anything but teamos_test", () => {
+    const realTestDatabaseUrl = process.env.DATABASE_URL;
+
+    afterEach(() => {
+      // Every case below mutates process.env.DATABASE_URL to something
+      // resetDatabase() must refuse - restored immediately after each
+      // assertion so the real teamos_test connection string (which every
+      // other test in this suite depends on) is never left in a mutated
+      // state, regardless of which branch of the assertion ran.
+      process.env.DATABASE_URL = realTestDatabaseUrl;
+    });
+
+    it("refuses an obvious development database name", async () => {
+      process.env.DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/teamos";
+
+      await expect(resetDatabase()).rejects.toThrow(/Refusing to reset database/);
+    });
+
+    it("refuses a URL where 'teamos_test' appears only outside the database name (not a substring match)", async () => {
+      // The path segment - the actual database name - is "teamos", not
+      // "teamos_test". A substring-matching implementation of this guard
+      // would incorrectly treat this as safe just because "teamos_test"
+      // appears elsewhere in the connection string; this proves the check
+      // is parsing the URL properly instead.
+      process.env.DATABASE_URL = "postgresql://teamos_test:teamos_test@localhost:5432/teamos";
+
+      await expect(resetDatabase()).rejects.toThrow(/Refusing to reset database/);
+    });
+
+    it("refuses when DATABASE_URL is unset", async () => {
+      delete process.env.DATABASE_URL;
+
+      await expect(resetDatabase()).rejects.toThrow(/DATABASE_URL is not set/);
+    });
+
+    it("refuses a malformed connection string instead of guessing", async () => {
+      process.env.DATABASE_URL = "not-a-valid-connection-string";
+
+      await expect(resetDatabase()).rejects.toThrow(/not a valid connection string/);
+    });
+
+    it("still permits the real teamos_test database", async () => {
+      process.env.DATABASE_URL = realTestDatabaseUrl;
+
+      await expect(resetDatabase()).resolves.toBeUndefined();
+    });
+  });
 });

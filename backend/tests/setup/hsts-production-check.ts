@@ -24,7 +24,13 @@ async function main() {
   const res = await fetch(`${server.baseUrl}/health`);
   const hsts = res.headers.get("strict-transport-security");
 
-  process.stdout.write(hsts ?? "ABSENT");
+  // write()'s callback fires only once the data is fully flushed (covers
+  // both the immediate-flush and buffered/backpressure cases) - without
+  // waiting for it, process.exit() below could terminate the process
+  // before the write actually reaches the parent's captured stdout.
+  await new Promise<void>((resolve) => {
+    process.stdout.write(hsts ?? "ABSENT", () => resolve());
+  });
 
   await server.close();
   process.exit(0);

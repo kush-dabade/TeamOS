@@ -28,7 +28,8 @@ export async function getAvatarHandler(req: Request, res: Response) {
   res.setHeader("Content-Type", avatar.mimeType);
   res.setHeader("Content-Length", avatar.size.toString());
   res.setHeader("Cache-Control", "private, max-age=0, must-revalidate");
-  res.setHeader("X-Content-Type-Options", "nosniff");
+  // X-Content-Type-Options: nosniff is now set globally by
+  // middleware/security-headers.ts, mounted ahead of this route.
 
   try {
     // pipeline() (unlike a bare .pipe()) guarantees the source stream is

@@ -3,6 +3,7 @@ import cors from "cors";
 import { toNodeHandler } from "better-auth/node";
 
 import { auth } from "./lib/auth.js";
+import { trustedOrigins, trustProxyHops } from "./config/security.config.js";
 import workspaceRoutes from "./modules/workspace/workspace.routes.js";
 import workspaceItemRoutes from "./modules/workspace/workspace-item.routes.js";
 import projectRoutes from "./modules/project/project.routes.js";
@@ -24,18 +25,37 @@ import searchRoutes from "./modules/search/search.routes.js";
 import userRoutes from "./modules/user/user.routes.js";
 import { notFoundHandler } from "./middleware/not-found.js";
 import { errorHandler } from "./middleware/error-handler.js";
+import { generalApiLimiter } from "./middleware/rate-limit.js";
+import { securityHeaders } from "./middleware/security-headers.js";
 
 const app = express();
 
+// Mounted first, ahead of CORS/auth/body-parsing/rate limiting/routes -
+// res.setHeader calls persist on the response regardless of what happens
+// afterward, including an error jumping straight to errorHandler past all
+// remaining non-error middleware. Mounting this before everything else is
+// what makes these headers show up on every response this app sends,
+// success or error (404, 401/403, 429, 500 included), without needing to
+// special-case any individual error path.
+app.use(securityHeaders);
+
+// FRONTEND_URL is not consumed here - it is validated for the API process
+// specifically because this is currently the only startup-time guard for it
+// in this process (modules/email/email.config.ts's copy of this check only
+// loads in the worker process). CORS itself is driven by TRUSTED_ORIGINS via
+// config/security.config.ts, the same source of truth Better Auth and
+// Socket.IO use.
 const frontendUrl = process.env.FRONTEND_URL;
 
 if (!frontendUrl) {
   throw new Error("FRONTEND_URL environment variable is required.");
 }
 
+app.set("trust proxy", trustProxyHops);
+
 app.use(
   cors({
-    origin: frontendUrl,
+    origin: trustedOrigins,
     credentials: true,
   }),
 );
@@ -43,6 +63,14 @@ app.use(
 app.all("/api/auth/*splat", toNodeHandler(auth));
 
 app.use(express.json());
+
+// Scoped to /api/v1 specifically (not a global app.use) so it never touches
+// /api/auth/* or /health below. Better Auth ships its own built-in rate
+// limiter (enabled by default whenever NODE_ENV=production, unconfigured
+// here) and already covers /api/auth/* with sensible defaults for
+// sign-in/sign-up/password-reset - deliberately not duplicated with a
+// second Express limiter on those same routes.
+app.use("/api/v1", generalApiLimiter);
 
 // workspace resources
 app.use("/api/v1/workspaces", workspaceRoutes);

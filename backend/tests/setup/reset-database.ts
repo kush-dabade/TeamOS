@@ -52,7 +52,12 @@ function assertTestDatabase(): void {
   try {
     databaseName = new URL(databaseUrl).pathname.replace(/^\//, "");
   } catch {
-    throw new Error(`DATABASE_URL is not a valid connection string: "${databaseUrl}".`);
+    // Deliberately doesn't interpolate databaseUrl (or any part of it) into
+    // this message - a malformed connection string is exactly the kind of
+    // value that's plausible to end up here via a mistyped or half-pasted
+    // real credential, and this error is the sort of thing that can end up
+    // in logs or crash reports.
+    throw new Error("DATABASE_URL is not a valid connection string.");
   }
 
   if (databaseName !== EXPECTED_TEST_DATABASE_NAME) {

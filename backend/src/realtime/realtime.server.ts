@@ -51,7 +51,7 @@ function registerMiddleware(io: Server): void {
 
 /**
  * Reads membership, joins rooms accordingly, then re-reads membership and
- * leaves anything no longer present - closes a real race with
+ * reconciles against the fresher read - closes a real race with
  * removeWorkspaceMember/leaveWorkspace: evictFromWorkspace only evicts
  * sockets that have already joined the affected user's `user:<id>` room at
  * the moment its own fetchSockets() snapshot runs. A socket connecting
@@ -69,11 +69,22 @@ function registerMiddleware(io: Server): void {
  * case the realtime test suite already covers. What remains is a purely
  * in-process window between this query resolving and the loop below
  * finishing, not one spanning a database round trip.
+ *
+ * The reconciliation is join-then-leave, not leave-then-join: every room in
+ * the fresher, second read is (re-)joined first - socket.join() on an
+ * already-joined room is a no-op, so this is safe to call unconditionally
+ * and is what covers a membership *created* between the two reads (the
+ * initial read alone would otherwise never see it, leaving the socket
+ * permanently unjoined to a workspace it's already a member of until its
+ * next reconnect). Only then are rooms from the initial read that are
+ * absent from the second read left - since anything genuinely still
+ * current was already re-joined above, this can only affect rooms that
+ * really did become stale, so it can't undo the join it just did.
  */
 async function joinWorkspaceRooms(socket: AuthenticatedSocket): Promise<void> {
   const userId = socket.data.user.id;
 
-  const memberships = await prisma.workspaceMember.findMany({
+  const initialMemberships = await prisma.workspaceMember.findMany({
     where: {
       userId,
     },
@@ -82,7 +93,7 @@ async function joinWorkspaceRooms(socket: AuthenticatedSocket): Promise<void> {
     },
   });
 
-  for (const membership of memberships) {
+  for (const membership of initialMemberships) {
     socket.join(getWorkspaceRoom(membership.workspaceId));
   }
 
@@ -98,7 +109,11 @@ async function joinWorkspaceRooms(socket: AuthenticatedSocket): Promise<void> {
     currentMemberships.map((membership) => membership.workspaceId),
   );
 
-  for (const membership of memberships) {
+  for (const workspaceId of currentWorkspaceIds) {
+    socket.join(getWorkspaceRoom(workspaceId));
+  }
+
+  for (const membership of initialMemberships) {
     if (!currentWorkspaceIds.has(membership.workspaceId)) {
       socket.leave(getWorkspaceRoom(membership.workspaceId));
     }

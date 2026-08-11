@@ -113,6 +113,28 @@ describe("test harness", () => {
       await expect(resetDatabase()).rejects.toThrow(/not a valid connection string/);
     });
 
+    it("does not leak DATABASE_URL contents (e.g. credentials) into the malformed-URL error", async () => {
+      const secretToken = "sk_live_super_secret_12345";
+      const malformedUrl = `not-a-valid-connection-string-${secretToken}`;
+      process.env.DATABASE_URL = malformedUrl;
+
+      let caught: unknown;
+
+      try {
+        await resetDatabase();
+      } catch (error) {
+        caught = error;
+      }
+
+      expect(caught).toBeInstanceOf(Error);
+
+      const message = (caught as Error).message;
+
+      expect(message).toBe("DATABASE_URL is not a valid connection string.");
+      expect(message).not.toContain(secretToken);
+      expect(message).not.toContain(malformedUrl);
+    });
+
     it("still permits the real teamos_test database", async () => {
       process.env.DATABASE_URL = realTestDatabaseUrl;
 

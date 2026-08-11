@@ -288,6 +288,77 @@ describe("realtime workspace room isolation", () => {
     }
   });
 
+  it("joins a workspace room for a membership created between the connecting socket's two membership reads (deterministic)", async () => {
+    const owner = await signUpTestUser(app);
+    const { workspace: existingWorkspace } = await createWorkspaceWithMember(owner.userId);
+
+    const target = await signUpTestUser(app);
+    await addWorkspaceMember(existingWorkspace.id, target.userId, WorkspaceRole.MEMBER);
+
+    // A second, brand-new workspace target is NOT a member of yet - added
+    // only after the connecting socket's first membership read has already
+    // captured its (necessarily pre-add) snapshot, below.
+    const { workspace: newWorkspace } = await createWorkspaceWithMember(owner.userId);
+
+    // Same deterministic interception as the removal race above, mirrored
+    // for the opposite direction: joinWorkspaceRooms's first read is let
+    // through for real (so it genuinely reflects "not a member of
+    // newWorkspace yet"), but its resolution back to application code is
+    // withheld until after the new membership has already committed - this
+    // reproduces "a membership was created strictly between the two reads"
+    // using real await ordering, not a guess about timing.
+    const originalFindMany = prisma.workspaceMember.findMany.bind(prisma.workspaceMember);
+    let patchedCallCount = 0;
+    let resolveFirstReadCaptured: () => void;
+    let releaseFirstRead: () => void;
+
+    const firstReadCaptured = new Promise<void>((resolve) => {
+      resolveFirstReadCaptured = resolve;
+    });
+
+    prisma.workspaceMember.findMany = ((...args: Parameters<typeof originalFindMany>) => {
+      patchedCallCount++;
+
+      if (patchedCallCount !== 1) {
+        return originalFindMany(...args);
+      }
+
+      return originalFindMany(...args).then(
+        (result) =>
+          new Promise<typeof result>((resolveRelease) => {
+            releaseFirstRead = () => resolveRelease(result);
+            resolveFirstReadCaptured();
+          }),
+      );
+    }) as typeof originalFindMany;
+
+    try {
+      const connectPromise = connect(target.cookie);
+
+      // Guarantees the first SELECT already executed against Postgres (and
+      // therefore reflects target not yet being a member of newWorkspace)
+      // before the membership below is even created.
+      await firstReadCaptured;
+
+      await addWorkspaceMember(newWorkspace.id, target.userId, WorkspaceRole.MEMBER);
+
+      // Only now does joinWorkspaceRooms's initial join loop see the
+      // (already stale, pre-add) first-read result and run - the second,
+      // unpatched read that follows will see the new membership for real.
+      releaseFirstRead!();
+
+      const socket = await connectPromise;
+
+      // Proves actual delivery, not just absence of an error - if the fix
+      // regressed back to only joining rooms from the first (stale) read,
+      // this would time out, since the socket would never have joined
+      // newWorkspace's room at all.
+      await confirmJoined(socket, newWorkspace.id);
+    } finally {
+      prisma.workspaceMember.findMany = originalFindMany;
+    }
+  });
+
   it("does not rejoin the revoked workspace room on reconnect", async () => {
     const owner = await signUpTestUser(app);
     const { workspace } = await createWorkspaceWithMember(owner.userId);

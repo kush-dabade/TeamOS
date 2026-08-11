@@ -25,6 +25,7 @@ import searchRoutes from "./modules/search/search.routes.js";
 import userRoutes from "./modules/user/user.routes.js";
 import { notFoundHandler } from "./middleware/not-found.js";
 import { errorHandler } from "./middleware/error-handler.js";
+import { generalApiLimiter } from "./middleware/rate-limit.js";
 
 const app = express();
 
@@ -52,6 +53,14 @@ app.use(
 app.all("/api/auth/*splat", toNodeHandler(auth));
 
 app.use(express.json());
+
+// Scoped to /api/v1 specifically (not a global app.use) so it never touches
+// /api/auth/* or /health below. Better Auth ships its own built-in rate
+// limiter (enabled by default whenever NODE_ENV=production, unconfigured
+// here) and already covers /api/auth/* with sensible defaults for
+// sign-in/sign-up/password-reset - deliberately not duplicated with a
+// second Express limiter on those same routes.
+app.use("/api/v1", generalApiLimiter);
 
 // workspace resources
 app.use("/api/v1/workspaces", workspaceRoutes);

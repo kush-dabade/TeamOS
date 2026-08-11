@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import { requireAuth } from "../../middleware/require-auth.js";
 import { uploadSingleAttachment } from "../../middleware/multer.js";
+import { uploadLimiter } from "../../middleware/rate-limit.js";
 
 import {
   uploadAttachmentHandler,
@@ -13,6 +14,7 @@ const router = Router();
 router.post(
   "/:taskId/attachments",
   requireAuth,
+  uploadLimiter,
   uploadSingleAttachment,
   uploadAttachmentHandler,
 );

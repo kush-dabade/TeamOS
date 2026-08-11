@@ -10,6 +10,7 @@ import { NotFoundError } from "../shared/errors/not-found-error.js";
 import { ForbiddenError } from "../shared/errors/forbidden-error.js";
 import { ConflictError } from "../shared/errors/conflict-error.js";
 import { UnauthorizedError } from "../shared/errors/unauthorized-error.js";
+import { RateLimitError } from "../shared/errors/rate-limit-error.js";
 import { StorageError } from "../storage/errors/storage.error.js";
 
 type ErrorEnvelope = {
@@ -70,6 +71,14 @@ export function errorHandler(
 
   if (error instanceof UnauthorizedError) {
     return sendError(res, 401, "AUTH_REQUIRED", error.message);
+  }
+
+  if (error instanceof RateLimitError) {
+    if (error.retryAfterSeconds !== undefined) {
+      res.setHeader("Retry-After", error.retryAfterSeconds.toString());
+    }
+
+    return sendError(res, 429, "RATE_LIMITED", error.message);
   }
 
   // Better Auth wraps every getSession() failure (auth-related or an

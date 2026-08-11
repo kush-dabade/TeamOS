@@ -98,12 +98,18 @@ describe("realtime workspace room isolation", () => {
 
     await confirmJoined(socket, workspace.id);
 
-    await removeWorkspaceMember(owner.userId, workspace.id, membership.id);
-
-    const revoked = await waitForEvent<{ workspaceId: string }>(
+    // Registered before the triggering call, not after - removeWorkspaceMember
+    // can emit WORKSPACE_ACCESS_REVOKED before its own promise resolves, so
+    // awaiting a listener registered afterward would only pass because of
+    // favorable event-loop scheduling, not a guaranteed ordering.
+    const revocationEvent = waitForEvent<{ workspaceId: string }>(
       socket,
       REALTIME_EVENTS.WORKSPACE_ACCESS_REVOKED,
     );
+
+    await removeWorkspaceMember(owner.userId, workspace.id, membership.id);
+
+    const revoked = await revocationEvent;
     expect(revoked.workspaceId).toBe(workspace.id);
 
     const forbidden = trackEvent(socket, WORKSPACE_EVENT);
@@ -129,12 +135,21 @@ describe("realtime workspace room isolation", () => {
 
     await Promise.all([confirmJoined(socketA, workspace.id), confirmJoined(socketB, workspace.id)]);
 
+    // Registered before the triggering call, not after - see the
+    // equivalent comment in the single-socket removeWorkspaceMember test
+    // above for why.
+    const revocationEventA = waitForEvent<{ workspaceId: string }>(
+      socketA,
+      REALTIME_EVENTS.WORKSPACE_ACCESS_REVOKED,
+    );
+    const revocationEventB = waitForEvent<{ workspaceId: string }>(
+      socketB,
+      REALTIME_EVENTS.WORKSPACE_ACCESS_REVOKED,
+    );
+
     await removeWorkspaceMember(owner.userId, workspace.id, membership.id);
 
-    const [revokedA, revokedB] = await Promise.all([
-      waitForEvent<{ workspaceId: string }>(socketA, REALTIME_EVENTS.WORKSPACE_ACCESS_REVOKED),
-      waitForEvent<{ workspaceId: string }>(socketB, REALTIME_EVENTS.WORKSPACE_ACCESS_REVOKED),
-    ]);
+    const [revokedA, revokedB] = await Promise.all([revocationEventA, revocationEventB]);
     expect(revokedA.workspaceId).toBe(workspace.id);
     expect(revokedB.workspaceId).toBe(workspace.id);
 
@@ -165,8 +180,13 @@ describe("realtime workspace room isolation", () => {
     const firstSocket = await connect(target.cookie);
     await confirmJoined(firstSocket, workspace.id);
 
+    // Registered before the triggering call, not after - see the
+    // equivalent comment in the single-socket removeWorkspaceMember test
+    // above for why.
+    const revocationEvent = waitForEvent(firstSocket, REALTIME_EVENTS.WORKSPACE_ACCESS_REVOKED);
+
     await removeWorkspaceMember(owner.userId, workspace.id, membership.id);
-    await waitForEvent(firstSocket, REALTIME_EVENTS.WORKSPACE_ACCESS_REVOKED);
+    await revocationEvent;
 
     firstSocket.disconnect();
 
@@ -208,12 +228,21 @@ describe("realtime workspace room isolation", () => {
 
     await Promise.all([confirmJoined(socketA, workspace.id), confirmJoined(socketB, workspace.id)]);
 
+    // Registered before the triggering call, not after - see the
+    // equivalent comment in the single-socket removeWorkspaceMember test
+    // above for why.
+    const revocationEventA = waitForEvent<{ workspaceId: string }>(
+      socketA,
+      REALTIME_EVENTS.WORKSPACE_ACCESS_REVOKED,
+    );
+    const revocationEventB = waitForEvent<{ workspaceId: string }>(
+      socketB,
+      REALTIME_EVENTS.WORKSPACE_ACCESS_REVOKED,
+    );
+
     await leaveWorkspace(target.userId, workspace.id);
 
-    const [revokedA, revokedB] = await Promise.all([
-      waitForEvent<{ workspaceId: string }>(socketA, REALTIME_EVENTS.WORKSPACE_ACCESS_REVOKED),
-      waitForEvent<{ workspaceId: string }>(socketB, REALTIME_EVENTS.WORKSPACE_ACCESS_REVOKED),
-    ]);
+    const [revokedA, revokedB] = await Promise.all([revocationEventA, revocationEventB]);
     expect(revokedA.workspaceId).toBe(workspace.id);
     expect(revokedB.workspaceId).toBe(workspace.id);
 

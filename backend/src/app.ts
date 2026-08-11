@@ -3,6 +3,7 @@ import cors from "cors";
 import { toNodeHandler } from "better-auth/node";
 
 import { auth } from "./lib/auth.js";
+import { trustedOrigins, trustProxyHops } from "./config/security.config.js";
 import workspaceRoutes from "./modules/workspace/workspace.routes.js";
 import workspaceItemRoutes from "./modules/workspace/workspace-item.routes.js";
 import projectRoutes from "./modules/project/project.routes.js";
@@ -27,15 +28,23 @@ import { errorHandler } from "./middleware/error-handler.js";
 
 const app = express();
 
+// FRONTEND_URL is not consumed here - it is validated for the API process
+// specifically because this is currently the only startup-time guard for it
+// in this process (modules/email/email.config.ts's copy of this check only
+// loads in the worker process). CORS itself is driven by TRUSTED_ORIGINS via
+// config/security.config.ts, the same source of truth Better Auth and
+// Socket.IO use.
 const frontendUrl = process.env.FRONTEND_URL;
 
 if (!frontendUrl) {
   throw new Error("FRONTEND_URL environment variable is required.");
 }
 
+app.set("trust proxy", trustProxyHops);
+
 app.use(
   cors({
-    origin: frontendUrl,
+    origin: trustedOrigins,
     credentials: true,
   }),
 );

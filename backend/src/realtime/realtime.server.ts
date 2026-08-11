@@ -3,6 +3,7 @@ import type { Server as HttpServer } from "node:http";
 import { Server } from "socket.io";
 
 import { prisma } from "../lib/prisma.js";
+import { trustedOrigins } from "../config/security.config.js";
 
 import { authenticateSocket } from "./realtime.auth.js";
 import { getUserRoom, getWorkspaceRoom } from "./realtime.rooms.js";
@@ -13,12 +14,7 @@ let io: Server | null = null;
 export function initializeRealtime(server: HttpServer): Server {
   io = new Server(server, {
     cors: {
-      origin: process.env.TRUSTED_ORIGINS?.split(",")
-        .map((origin) => origin.trim())
-        .filter((origin) => origin.length > 0) ?? [
-        "http://localhost:3000",
-        "http://localhost:5173",
-      ],
+      origin: trustedOrigins,
       credentials: true,
     },
   });

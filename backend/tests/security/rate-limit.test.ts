@@ -1,12 +1,40 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import request from "supertest";
+import type { Redis } from "ioredis";
 
 import app from "../../src/app.js";
+import { rateLimitRedis } from "../../src/lib/redis.js";
 
 import { startTestServer, type TestServer } from "../setup/test-server.js";
 import { resetDatabase } from "../setup/reset-database.js";
 import { seedRateLimitCount } from "../setup/reset-rate-limits.js";
 import { createWorkspaceWithMember, signUpTestUser } from "../setup/fixtures.js";
+
+/**
+ * Bounded, event-driven wait for `client` to reach "ready" - no arbitrary
+ * sleep. Used only to make sure this file's Redis-outage test hands a fully
+ * reconnected client back to whichever test runs next, not "reconnection
+ * kicked off, hope it lands in time."
+ */
+function waitForReady(client: Redis, timeoutMs = 2000): Promise<void> {
+  if (client.status === "ready") {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      client.off("ready", onReady);
+      reject(new Error("Timed out waiting for rateLimitRedis to reconnect"));
+    }, timeoutMs);
+
+    function onReady() {
+      clearTimeout(timer);
+      resolve();
+    }
+
+    client.once("ready", onReady);
+  });
+}
 
 // Mirrors the configured limits in src/middleware/rate-limit.ts - these
 // tests exist specifically to pin those numbers, so hardcoding them here is
@@ -180,5 +208,65 @@ describe("rate limiting", () => {
       .get(`/api/v1/workspaces/${workspaceB.id}/members`)
       .set("Cookie", cookie)
       .expect(429);
+  });
+
+  it("fails open quickly when the rate-limit Redis store is unavailable", async () => {
+    const { cookie } = await signUpTestUser(app);
+
+    const originalHost = rateLimitRedis.options.host;
+    const originalPort = rateLimitRedis.options.port;
+
+    try {
+      // Redirects only the dedicated rate-limit connection to an
+      // unreachable local target (nothing listens on 127.0.0.1:1) - the
+      // real dev Redis, BullMQ's own connection, and the test Postgres are
+      // all untouched. disconnect(true) is ioredis's own signal for an
+      // involuntary drop that should keep retrying (as opposed to
+      // disconnect()'s default "give up, don't reconnect"), verified
+      // against ioredis's source to put the client into an actively
+      // reconnecting state - so the next command goes through the same
+      // queued-command path a real outage would, exercising
+      // commandTimeout for real rather than hitting the instant
+      // "Connection is closed" shortcut a fully-closed client takes.
+      rateLimitRedis.options.host = "127.0.0.1";
+      rateLimitRedis.options.port = 1;
+      rateLimitRedis.disconnect(true);
+
+      const start = Date.now();
+
+      // A bound independent of Vitest's own test timeout - if the fix
+      // regresses to the old ~10s failure mode, this rejects well before
+      // that and the test fails fast instead of eventually timing out.
+      const response = await Promise.race([
+        request(app).get("/api/v1/workspaces").set("Cookie", cookie),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Request exceeded the 3s fail-open bound")), 3000),
+        ),
+      ]);
+
+      const elapsed = Date.now() - start;
+
+      // The request must succeed normally, not fail closed (500) and not
+      // be treated as rate-limited (429) just because the store errored.
+      expect(response.status).not.toBe(429);
+      expect(response.status).not.toBe(500);
+      expect(response.status).toBe(200);
+
+      // Well under the old ~10s failure mode, comfortably above the 500ms
+      // commandTimeout to avoid flaking on CI-level scheduling jitter.
+      expect(elapsed).toBeLessThan(2000);
+    } finally {
+      // Restored even if an assertion above throws - a failed assertion
+      // must not leave the shared connection pointed at a dead target for
+      // the rest of this file's tests.
+      rateLimitRedis.options.host = originalHost;
+      // ioredis's declared RedisOptions type allows `port` to be optional
+      // on read (hence `number | undefined` here) but not on write for
+      // this client's inferred options shape - always defined at runtime
+      // (see lib/redis.ts's construction), hence the assertion.
+      rateLimitRedis.options.port = originalPort!;
+      rateLimitRedis.disconnect(true);
+      await waitForReady(rateLimitRedis);
+    }
   });
 });

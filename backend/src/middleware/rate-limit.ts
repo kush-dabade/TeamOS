@@ -76,6 +76,15 @@ function resolveAuthenticatedUserKey(req: Request): string {
   return `user:${req.user!.id}`;
 }
 
+// Redis is an availability/security optimization here, not a hard
+// dependency - express-rate-limit's own default (passOnStoreError: false)
+// rejects the request when the store errors, which would turn a Redis
+// outage into a 500 for the entire /api/v1 surface on top of the ~10s a
+// command can otherwise take to fail (see commandTimeout in lib/redis.ts).
+// Explicitly failing open here means a Redis problem degrades to
+// "temporarily not rate-limited," not "API unavailable."
+const FAIL_OPEN_ON_STORE_ERROR = { passOnStoreError: true } as const;
+
 // 300/min: routine CRUD across workspaces/tasks/projects/comments etc.
 // Generous enough that an active UI session (several parallel fetches on
 // dashboard load) never gets close, while bounding runaway client bugs or
@@ -88,6 +97,7 @@ export const generalApiLimiter = rateLimit({
   store: createRedisStore("rl:general:"),
   keyGenerator: resolveGeneralLimiterKey,
   handler: handleRateLimitExceeded,
+  ...FAIL_OPEN_ON_STORE_ERROR,
 });
 
 // 20/min: full-text search is the most DB-expensive read path in the API
@@ -102,6 +112,7 @@ export const searchLimiter = rateLimit({
   store: createRedisStore("rl:search:"),
   keyGenerator: resolveAuthenticatedUserKey,
   handler: handleRateLimitExceeded,
+  ...FAIL_OPEN_ON_STORE_ERROR,
 });
 
 // 10/min: uploads carry real resource cost (disk I/O, storage, bandwidth)
@@ -116,4 +127,5 @@ export const uploadLimiter = rateLimit({
   store: createRedisStore("rl:upload:"),
   keyGenerator: resolveAuthenticatedUserKey,
   handler: handleRateLimitExceeded,
+  ...FAIL_OPEN_ON_STORE_ERROR,
 });

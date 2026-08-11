@@ -77,3 +77,21 @@ export async function createWorkspaceWithMember(
 
   return { workspace, member };
 }
+
+/**
+ * Adds an additional member to an already-created workspace - direct
+ * Prisma insert, same rationale as createWorkspaceWithMember.
+ */
+export async function addWorkspaceMember(
+  workspaceId: string,
+  userId: string,
+  role: WorkspaceRole = WorkspaceRole.MEMBER,
+) {
+  return prisma.workspaceMember.create({
+    data: {
+      workspaceId,
+      userId,
+      role,
+    },
+  });
+}

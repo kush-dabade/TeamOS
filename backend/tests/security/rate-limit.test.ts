@@ -4,6 +4,8 @@ import type { Redis } from "ioredis";
 
 import app from "../../src/app.js";
 import { rateLimitRedis } from "../../src/lib/redis.js";
+import { prisma } from "../../src/lib/prisma.js";
+import { WorkspaceRole } from "../../src/generated/prisma/enums.js";
 
 import { startTestServer, type TestServer } from "../setup/test-server.js";
 import { resetDatabase } from "../setup/reset-database.js";
@@ -43,11 +45,17 @@ function waitForReady(client: Redis, timeoutMs = 2000): Promise<void> {
 const GENERAL_LIMIT = 300;
 const SEARCH_LIMIT = 20;
 const UPLOAD_LIMIT = 10;
+const INVITATION_LIMIT = 10;
+const AVATAR_LIMIT = 10;
 
 const RATE_LIMITED_ENVELOPE = {
   success: false,
   error: { code: "RATE_LIMITED", message: expect.any(String) },
 };
+
+// A minimal, valid PNG - real bytes, not a mock, so multer's own handling
+// of the upload is exercised for real, same as the existing upload test.
+const AVATAR_PNG_BYTES = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 describe("rate limiting", () => {
   let server: TestServer;
@@ -208,6 +216,144 @@ describe("rate limiting", () => {
       .get(`/api/v1/workspaces/${workspaceB.id}/members`)
       .set("Cookie", cookie)
       .expect(429);
+  });
+
+  it("enforces the invitation limit on invitation creation", async () => {
+    const { userId, cookie } = await signUpTestUser(app);
+    const { workspace } = await createWorkspaceWithMember(userId);
+
+    await seedRateLimitCount("rl:invitations:", `user:${userId}`, INVITATION_LIMIT - 1);
+
+    const boundaryRes = await request(app)
+      .post(`/api/v1/workspaces/${workspace.id}/invitations`)
+      .set("Cookie", cookie)
+      .send({ email: `invitee-${crypto.randomUUID()}@example.com`, role: "MEMBER" })
+      .expect(201);
+    expect(boundaryRes.headers["ratelimit-limit"]).toBe(String(INVITATION_LIMIT));
+    expect(boundaryRes.headers["ratelimit-remaining"]).toBe("0");
+
+    const blockedRes = await request(app)
+      .post(`/api/v1/workspaces/${workspace.id}/invitations`)
+      .set("Cookie", cookie)
+      .send({ email: `invitee-${crypto.randomUUID()}@example.com`, role: "MEMBER" })
+      .expect(429);
+    expect(blockedRes.body).toEqual(RATE_LIMITED_ENVELOPE);
+    expect(blockedRes.headers["retry-after"]).toBeTruthy();
+    expect(blockedRes.headers["ratelimit-limit"]).toBe(String(INVITATION_LIMIT));
+    expect(blockedRes.headers["ratelimit-remaining"]).toBe("0");
+  });
+
+  it("enforces the invitation limit on resend, sharing the same bucket as creation", async () => {
+    const { userId, cookie } = await signUpTestUser(app);
+    const { workspace } = await createWorkspaceWithMember(userId);
+
+    // Direct insert, not the rate-limited HTTP creation endpoint - creating
+    // this pending invitation via HTTP would itself consume this test's
+    // seeded budget. Same "direct data insert for setup, real HTTP for the
+    // assertion" philosophy fixtures.ts already uses.
+    const invitation = await prisma.workspaceInvitation.create({
+      data: {
+        workspaceId: workspace.id,
+        email: `resend-target-${crypto.randomUUID()}@example.com`,
+        role: WorkspaceRole.MEMBER,
+        invitedById: userId,
+        token: crypto.randomUUID(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
+    });
+
+    // Seeded on the same rl:invitations: prefix invitationLimiter uses for
+    // both routes - reaching the boundary via resend calls proves create
+    // and resend genuinely share one bucket, not just that each
+    // independently respects its own copy of the same number.
+    await seedRateLimitCount("rl:invitations:", `user:${userId}`, INVITATION_LIMIT - 1);
+
+    const resendUrl = `/api/v1/workspaces/${workspace.id}/invitations/${invitation.id}/resend`;
+
+    const boundaryRes = await request(app).post(resendUrl).set("Cookie", cookie).expect(200);
+    expect(boundaryRes.headers["ratelimit-limit"]).toBe(String(INVITATION_LIMIT));
+    expect(boundaryRes.headers["ratelimit-remaining"]).toBe("0");
+
+    const blockedRes = await request(app).post(resendUrl).set("Cookie", cookie).expect(429);
+    expect(blockedRes.body).toEqual(RATE_LIMITED_ENVELOPE);
+    expect(blockedRes.headers["retry-after"]).toBeTruthy();
+    expect(blockedRes.headers["ratelimit-limit"]).toBe(String(INVITATION_LIMIT));
+    expect(blockedRes.headers["ratelimit-remaining"]).toBe("0");
+  });
+
+  it("enforces the avatar upload limit", async () => {
+    const { userId, cookie } = await signUpTestUser(app);
+
+    await seedRateLimitCount("rl:avatar:", `user:${userId}`, AVATAR_LIMIT - 1);
+
+    const boundaryRes = await request(app)
+      .post("/api/v1/users/me/avatar")
+      .set("Cookie", cookie)
+      .attach("file", AVATAR_PNG_BYTES, { filename: "avatar.png", contentType: "image/png" })
+      .expect(200);
+    expect(boundaryRes.headers["ratelimit-limit"]).toBe(String(AVATAR_LIMIT));
+    expect(boundaryRes.headers["ratelimit-remaining"]).toBe("0");
+
+    const blockedRes = await request(app)
+      .post("/api/v1/users/me/avatar")
+      .set("Cookie", cookie)
+      .attach("file", AVATAR_PNG_BYTES, { filename: "avatar-2.png", contentType: "image/png" })
+      .expect(429);
+    expect(blockedRes.body).toEqual(RATE_LIMITED_ENVELOPE);
+    expect(blockedRes.headers["retry-after"]).toBeTruthy();
+    expect(blockedRes.headers["ratelimit-limit"]).toBe(String(AVATAR_LIMIT));
+    expect(blockedRes.headers["ratelimit-remaining"]).toBe("0");
+  });
+
+  it("keeps the invitation bucket independent from the general/search/upload/avatar buckets", async () => {
+    const { userId, cookie } = await signUpTestUser(app);
+    const { workspace } = await createWorkspaceWithMember(userId);
+
+    await seedRateLimitCount("rl:invitations:", `user:${userId}`, INVITATION_LIMIT);
+
+    // Invitation bucket is now exhausted.
+    await request(app)
+      .post(`/api/v1/workspaces/${workspace.id}/invitations`)
+      .set("Cookie", cookie)
+      .send({ email: `invitee-${crypto.randomUUID()}@example.com`, role: "MEMBER" })
+      .expect(429);
+
+    // General bucket unaffected - different prefix/key.
+    await request(app).get("/api/v1/workspaces").set("Cookie", cookie).expect(200);
+
+    // Search bucket unaffected.
+    await request(app)
+      .get(`/api/v1/search?q=test&workspaceId=${workspace.id}`)
+      .set("Cookie", cookie)
+      .expect(200);
+
+    // Upload bucket unaffected.
+    const projectRes = await request(app)
+      .post(`/api/v1/workspaces/${workspace.id}/projects`)
+      .set("Cookie", cookie)
+      .send({ name: "Invitation Independence Project", ownerId: userId })
+      .expect(201);
+    const projectId = projectRes.body.data.id;
+
+    const taskRes = await request(app)
+      .post(`/api/v1/projects/${projectId}/tasks`)
+      .set("Cookie", cookie)
+      .send({ title: "Invitation independence task" })
+      .expect(201);
+    const taskId = taskRes.body.data.id;
+
+    await request(app)
+      .post(`/api/v1/tasks/${taskId}/attachments`)
+      .set("Cookie", cookie)
+      .attach("file", Buffer.from("independent"), "note.txt")
+      .expect(201);
+
+    // Avatar bucket unaffected.
+    await request(app)
+      .post("/api/v1/users/me/avatar")
+      .set("Cookie", cookie)
+      .attach("file", AVATAR_PNG_BYTES, { filename: "avatar.png", contentType: "image/png" })
+      .expect(200);
   });
 
   it("fails open quickly when the rate-limit Redis store is unavailable", async () => {

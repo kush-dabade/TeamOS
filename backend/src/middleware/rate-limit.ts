@@ -129,3 +129,40 @@ export const uploadLimiter = rateLimit({
   handler: handleRateLimitExceeded,
   ...FAIL_OPEN_ON_STORE_ERROR,
 });
+
+// 10/min: each call sends a real outbound email (invitation or resend) to
+// an address that isn't necessarily the caller's own - unlike the general
+// tier's internal API load, unrestrained volume here has third-party
+// blast radius (recipient spam, sender-domain/Resend-account reputation).
+// The existing duplicate-pending-invitation check only guards a single
+// (workspaceId, email) pair, not distinct addresses or a freshly created
+// workspace resetting that scope, so it doesn't substitute for a
+// request-frequency limit.
+export const invitationLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: createRedisStore("rl:invitations:"),
+  keyGenerator: resolveAuthenticatedUserKey,
+  handler: handleRateLimitExceeded,
+  ...FAIL_OPEN_ON_STORE_ERROR,
+});
+
+// 10/min: avatar uploads carry the same resource cost as attachment
+// uploads (disk I/O, storage, bandwidth) - uploadLimiter above only covers
+// the task-attachment route, not this separate upload path. The previous
+// avatar file is deleted after a successful replace (see
+// user.service.ts's uploadAvatar), so this isn't an unbounded-disk-growth
+// concern, but repeated churn is still unnecessary I/O the same tier
+// already exists to bound elsewhere.
+export const avatarLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: createRedisStore("rl:avatar:"),
+  keyGenerator: resolveAuthenticatedUserKey,
+  handler: handleRateLimitExceeded,
+  ...FAIL_OPEN_ON_STORE_ERROR,
+});

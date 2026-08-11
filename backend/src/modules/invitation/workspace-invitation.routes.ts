@@ -1,6 +1,7 @@
 import { Router } from "express";
 
 import { requireAuth } from "../../middleware/require-auth.js";
+import { invitationLimiter } from "../../middleware/rate-limit.js";
 
 import {
   createInvitationHandler,
@@ -11,7 +12,12 @@ import {
 
 const router = Router();
 
-router.post("/:workspaceId/invitations", requireAuth, createInvitationHandler);
+router.post(
+  "/:workspaceId/invitations",
+  requireAuth,
+  invitationLimiter,
+  createInvitationHandler,
+);
 
 router.get(
   "/:workspaceId/invitations",
@@ -22,6 +28,7 @@ router.get(
 router.post(
   "/:workspaceId/invitations/:invitationId/resend",
   requireAuth,
+  invitationLimiter,
   resendInvitationHandler,
 );
 

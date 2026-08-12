@@ -52,10 +52,34 @@ services:
     networks:
       - teamos-network
 
+  # One-shot migration runner. Reuses the backend image (no separate build)
+  # so `prisma migrate deploy` runs against the exact same Prisma Client,
+  # schema, and migrations that backend/worker ship with. No restart policy
+  # is set - the default `restart: "no"` is correct here since this
+  # container is meant to run once and exit 0, which is what
+  # `service_completed_successfully` below waits on; restarting it would
+  # fight that one-shot contract. Redis is intentionally not a dependency:
+  # `prisma migrate deploy` never touches Redis.
+  migrate:
+    image: teamos-backend
+
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+
+    command: npx prisma migrate deploy
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    networks:
+      - teamos-network
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    image: teamos-backend
 
     init: true
     restart: unless-stopped
@@ -73,6 +97,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
     ports:
       - "3000:3000"
@@ -106,6 +132,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
     volumes:
       - uploads-data:/usr/src/app/uploads

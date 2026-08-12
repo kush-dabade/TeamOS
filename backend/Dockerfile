@@ -47,6 +47,10 @@ COPY --from=builder /usr/src/app/package.json ./
 COPY --from=builder /usr/src/app/node_modules ./node_modules
 COPY --from=builder /usr/src/app/dist ./dist
 COPY --from=builder /usr/src/app/prisma ./prisma
+# Prisma 7 sources datasource.url from this config file rather than
+# schema.prisma directly - required at runtime for `prisma migrate deploy`
+# (run by the `migrate` service), not just at build time for `prisma generate`.
+COPY --from=builder /usr/src/app/prisma.config.ts ./
 
 # Create the uploads directory.
 RUN mkdir -p uploads \

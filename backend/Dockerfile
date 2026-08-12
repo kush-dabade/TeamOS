@@ -6,7 +6,13 @@
 
 FROM node:22-slim AS builder
 
-ARG DATABASE_URL
+# prisma.config.ts only requires DATABASE_URL to be present/non-empty for
+# `prisma generate` (it never connects to the database at generate time).
+# This dummy value satisfies that check without ever exposing the real
+# Postgres credential to the build - the production DATABASE_URL is
+# injected at container runtime via Docker Compose `environment:`, never
+# as a build arg, so it never lands in an image layer.
+ARG DATABASE_URL=postgresql://user:password@localhost:5432/db
 ENV DATABASE_URL=${DATABASE_URL}
 
 WORKDIR /usr/src/app

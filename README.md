@@ -180,6 +180,13 @@ backend/
 ```bash
 git clone https://github.com/kush-dabade/TeamOS.git
 cd TeamOS
+
+# Copy the example env files and fill in the required values (database/redis
+# credentials, TRUSTED_ORIGINS, etc.) - the backend image always runs with
+# NODE_ENV=production, so these are required even for local development.
+cp .env.example .env
+cp backend/.env.example backend/.env
+
 docker compose up --build
 ```
 

@@ -1,8 +1,10 @@
 import { resend } from "./email.client.js";
 import { emailConfig } from "./email.config.js";
+import { verifyEmailTemplate } from "./templates/verify-email.js";
 import { workspaceInvitationTemplate } from "./templates/workspace-invitation.js";
 import type {
   EmailTemplate,
+  SendVerificationEmailData,
   SendWorkspaceInvitationEmailData,
 } from "./email.types.js";
 
@@ -40,6 +42,17 @@ export async function sendWorkspaceInvitation(
     role: data.role,
     invitationUrl,
     expiresText,
+  });
+
+  await sendEmail(data.recipientEmail, email);
+}
+
+export async function sendVerificationEmail(
+  data: SendVerificationEmailData,
+): Promise<void> {
+  const email = verifyEmailTemplate({
+    recipientName: data.recipientName,
+    verificationUrl: data.verificationUrl,
   });
 
   await sendEmail(data.recipientEmail, email);

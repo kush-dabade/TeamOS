@@ -4,7 +4,6 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { register } from "../api/auth.api";
-import { getPostAuthRedirect } from "../lib/redirect";
 import { registerSchema, type RegisterFormData } from "../validation/register";
 
 import { Button } from "@/components/ui/button";
@@ -36,9 +35,13 @@ export function RegisterForm() {
         password: data.password,
       });
 
-      toast.success("Account created successfully!");
+      toast.success("Account created. Check your email to verify your address before signing in.");
 
-      navigate(getPostAuthRedirect(location), { replace: true });
+      // Sign-up no longer creates a session (email verification is
+      // required first, backend/src/lib/auth.ts) - send the user to
+      // login instead of the guarded post-auth route, preserving any
+      // intended destination the same way the "Sign in" link below does.
+      navigate("/login", { replace: true, state: location.state });
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Something went wrong. Please try again.",

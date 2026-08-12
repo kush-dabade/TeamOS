@@ -20,3 +20,14 @@ export interface WorkspaceInvitationTemplateData {
   invitationUrl: string;
   expiresText: string;
 }
+
+export interface SendVerificationEmailData {
+  recipientEmail: string;
+  recipientName: string;
+  verificationUrl: string;
+}
+
+export interface VerifyEmailTemplateData {
+  recipientName: string;
+  verificationUrl: string;
+}

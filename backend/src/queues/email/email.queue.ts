@@ -2,7 +2,10 @@ import { Queue } from "bullmq";
 
 import { redisConfig } from "../../config/redis.config.js";
 import { EMAIL_JOB_NAMES } from "./email.jobs.js";
-import type { WorkspaceInvitationEmailJob } from "./email.types.js";
+import type {
+  VerificationEmailJob,
+  WorkspaceInvitationEmailJob,
+} from "./email.types.js";
 
 import { QUEUE_NAMES } from "../queue.constants.js";
 
@@ -22,4 +25,10 @@ export async function enqueueWorkspaceInvitationEmail(
   payload: WorkspaceInvitationEmailJob,
 ): Promise<void> {
   await emailQueue.add(EMAIL_JOB_NAMES.WORKSPACE_INVITATION, payload);
+}
+
+export async function enqueueVerificationEmail(
+  payload: VerificationEmailJob,
+): Promise<void> {
+  await emailQueue.add(EMAIL_JOB_NAMES.EMAIL_VERIFICATION, payload);
 }

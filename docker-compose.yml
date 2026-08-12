@@ -64,7 +64,7 @@ services:
     image: teamos-backend
 
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-teamos}
 
     command: npx prisma migrate deploy
 
@@ -88,9 +88,13 @@ services:
       - ./backend/.env
 
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-teamos}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      # Sourced from the root .env (the same value used to start the redis
+      # container's --requirepass above), not backend/.env's own copy, so
+      # there is a single source of truth for this credential.
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
 
     depends_on:
       postgres:
@@ -152,9 +156,13 @@ services:
       - ./backend/.env
 
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-teamos}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      # Sourced from the root .env (the same value used to start the redis
+      # container's --requirepass above), not backend/.env's own copy, so
+      # there is a single source of truth for this credential.
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
 
     depends_on:
       postgres:

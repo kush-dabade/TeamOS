@@ -84,6 +84,14 @@ services:
     init: true
     restart: unless-stopped
 
+    # server.ts's shutdown handler closes the HTTP server, Socket.IO, the
+    # notification QueueEvents connection, and Prisma - server.close()'s
+    # callback only fires once every active connection ends, so a
+    # long-lived Socket.IO client or an in-progress attachment download
+    # can hold that open past Compose's default 10s grace period. Same
+    # reasoning as worker's stop_grace_period below.
+    stop_grace_period: 30s
+
     env_file:
       - ./backend/.env
 

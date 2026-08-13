@@ -9,3 +9,9 @@ export interface WorkspaceInvitationEmailJob {
   token: string;
   expiresAt: string;
 }
+
+export interface VerificationEmailJob {
+  email: string;
+  name: string;
+  url: string;
+}

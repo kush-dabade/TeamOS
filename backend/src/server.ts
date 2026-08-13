@@ -2,7 +2,9 @@ import "dotenv/config";
 import { createServer } from "node:http";
 
 import app from "./app.js";
+import { registerFatalErrorHandlers } from "./lib/fatal-error-handler.js";
 import { prisma } from "./lib/prisma.js";
+import { createShutdownGate } from "./lib/shutdown-gate.js";
 import {
   closeNotificationQueueEvents,
   initializeNotificationQueueEvents,
@@ -11,16 +13,30 @@ import { closeRealtime, initializeRealtime } from "./realtime/index.js";
 
 const PORT = process.env.PORT || 3000;
 
-let isShuttingDown = false;
+const shutdownGate = createShutdownGate();
 
+/**
+ * exitCode defaults to 0 for the normal SIGTERM/SIGINT path below. A fatal
+ * uncaughtException/unhandledRejection (see registerFatalErrorHandlers in
+ * start()) calls this with 1 instead - same cleanup sequence either way,
+ * only the final exit status differs, since a fatal error means the
+ * process must not report a clean exit even if shutdown itself completes
+ * without error.
+ *
+ * If a fatal error fires while a SIGTERM-triggered shutdown is already in
+ * progress, shutdownGate still only lets the cleanup sequence below run
+ * once (idempotent), but it upgrades the exit code process.exit()
+ * eventually uses to the highest one requested across every call - a
+ * fatal error can never get silently downgraded to a clean 0 exit just
+ * because a graceful shutdown happened to already be in flight.
+ */
 async function shutdown(
   server: ReturnType<typeof createServer>,
+  exitCode = 0,
 ): Promise<void> {
-  if (isShuttingDown) {
+  if (!shutdownGate.requestShutdown(exitCode)) {
     return;
   }
-
-  isShuttingDown = true;
 
   console.log("Shutting down TeamOS API...");
 
@@ -37,7 +53,7 @@ async function shutdown(
 
       console.log("Shutdown completed successfully.");
 
-      process.exit(0);
+      process.exit(shutdownGate.getExitCode());
     } catch (error) {
       console.error("Error during shutdown:", error);
       process.exit(1);
@@ -69,6 +85,11 @@ async function start() {
     initializeNotificationQueueEvents();
 
     registerShutdownHandlers(server);
+
+    registerFatalErrorHandlers({
+      process,
+      shutdown: (exitCode) => shutdown(server, exitCode),
+    });
 
     server.on("error", (error) => {
       console.error("Server error:", error);

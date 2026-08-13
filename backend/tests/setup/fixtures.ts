@@ -11,10 +11,12 @@ export interface AuthenticatedTestUser {
 
 /**
  * Signs up through Better Auth's real /api/auth/sign-up/email endpoint (not
- * a mocked session) and returns the resulting session cookie. emailAndPassword
- * is configured with no requireEmailVerification and Better Auth's default
- * autoSignIn: true (see backend/src/lib/auth.ts), so sign-up alone already
- * returns an active session - no separate sign-in call is needed.
+ * a mocked session). requireEmailVerification is enabled (see
+ * backend/src/lib/auth.ts), so sign-up alone no longer returns a session -
+ * this simulates the user clicking their verification email via a direct
+ * Prisma write (same "skip the UI, hit the DB directly" shortcut already
+ * used by createWorkspaceWithMember/addWorkspaceMember below), then signs
+ * in for a real session cookie exactly as a verified user would.
  *
  * The returned cookie authenticates both HTTP (supertest, via
  * `.set("Cookie", cookie)`) and Socket.IO (via `extraHeaders: { Cookie:
@@ -23,29 +25,42 @@ export interface AuthenticatedTestUser {
  */
 export async function signUpTestUser(app: Express): Promise<AuthenticatedTestUser> {
   const email = `test-${crypto.randomUUID()}@example.com`;
+  const password = "password1234";
 
-  const response = await request(app)
+  const signUpResponse = await request(app)
     .post("/api/auth/sign-up/email")
     .send({
       name: "Test User",
       email,
-      password: "password1234",
+      password,
     })
+    .expect(200);
+
+  const userId = signUpResponse.body.user.id as string;
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { emailVerified: true },
+  });
+
+  const signInResponse = await request(app)
+    .post("/api/auth/sign-in/email")
+    .send({ email, password })
     .expect(200);
 
   // @types/superagent types Response.headers as { [k: string]: string },
   // but Node's http layer always exposes repeated headers like set-cookie
   // as a real string[] - the type declaration is just incomplete here.
-  const setCookie = response.headers["set-cookie"] as unknown as string[] | undefined;
+  const setCookie = signInResponse.headers["set-cookie"] as unknown as string[] | undefined;
 
   if (!setCookie || setCookie.length === 0) {
-    throw new Error("Sign-up did not return a session cookie");
+    throw new Error("Sign-in did not return a session cookie");
   }
 
   const cookie = setCookie.map((entry) => entry.split(";")[0]).join("; ");
 
   return {
-    userId: response.body.user.id,
+    userId,
     cookie,
   };
 }

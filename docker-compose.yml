@@ -52,35 +52,112 @@ services:
     networks:
       - teamos-network
 
+  # One-shot migration runner. Reuses the backend image (no separate build)
+  # so `prisma migrate deploy` runs against the exact same Prisma Client,
+  # schema, and migrations that backend/worker ship with. No restart policy
+  # is set - the default `restart: "no"` is correct here since this
+  # container is meant to run once and exit 0, which is what
+  # `service_completed_successfully` below waits on; restarting it would
+  # fight that one-shot contract. Redis is intentionally not a dependency:
+  # `prisma migrate deploy` never touches Redis.
+  migrate:
+    image: teamos-backend
+
+    # Passed through as discrete values, not interpolated into a single
+    # DATABASE_URL string here - Compose's variable interpolation can't
+    # percent-encode arbitrary credential content (a password containing
+    # @, :, /, #, ?, or % would corrupt a raw-interpolated connection
+    # string), so assembly + encoding happens once, in application code
+    # (src/config/database.config.ts), shared by prisma.config.ts (used by
+    # this service's `prisma migrate deploy`) and lib/prisma.ts (backend/
+    # worker below) - not duplicated per service.
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_DB: ${POSTGRES_DB:-teamos}
+
+    command: npx prisma migrate deploy
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    networks:
+      - teamos-network
+
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-      args:
-        DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    image: teamos-backend
 
     init: true
     restart: unless-stopped
 
+    # server.ts's shutdown handler closes the HTTP server, Socket.IO, the
+    # notification QueueEvents connection, and Prisma - server.close()'s
+    # callback only fires once every active connection ends, so a
+    # long-lived Socket.IO client or an in-progress attachment download
+    # can hold that open past Compose's default 10s grace period. Same
+    # reasoning as worker's stop_grace_period below.
+    stop_grace_period: 30s
+
     env_file:
       - ./backend/.env
 
+    # See the migrate service's comment above - discrete parts, not a
+    # pre-assembled DATABASE_URL, for the same URI-safety reason.
+    #
+    # DATABASE_URL is explicitly cleared here (empty string) rather than
+    # simply omitted: env_file above loads backend/.env, which has its own
+    # DATABASE_URL for local non-Docker development (pointing at
+    # localhost, not this network's `postgres` hostname). Compose's
+    # environment: always overrides env_file: for the same key, so an
+    # empty value here reliably wins and makes database.config.ts's
+    # "DATABASE_URL already set" branch fall through to building the URL
+    # from the POSTGRES_* parts below instead - the same single-source-of-
+    # truth override already used for REDIS_PASSWORD.
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: ""
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_DB: ${POSTGRES_DB:-teamos}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      # Sourced from the root .env (the same value used to start the redis
+      # container's --requirepass above), not backend/.env's own copy, so
+      # there is a single source of truth for this credential.
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
 
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
     ports:
       - "3000:3000"
 
     volumes:
       - uploads-data:/usr/src/app/uploads
+
+    # No curl/wget/pgrep in node:22-slim, so the healthcheck uses Node
+    # itself (always present, it's the runtime) to hit the existing /health
+    # liveness endpoint over plain HTTP.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://127.0.0.1:3000/health',res=>{process.exit(res.statusCode===200?0:1)}).on('error',()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
     networks:
       - teamos-network
@@ -89,30 +166,84 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-      args:
-        DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
 
     init: true
     restart: unless-stopped
 
-    command: npm run start:worker
+    # Invoke Node directly (not `npm run start:worker`) so the container's
+    # PID 1 child is the Node process itself, not an intermediate npm
+    # wrapper. worker.ts registers its own SIGTERM/SIGINT handlers to drain
+    # BullMQ workers gracefully; that only works reliably if Node receives
+    # the signal directly instead of it depending on npm's forwarding.
+    command: ["node", "dist/src/worker.js"]
+
+    # BullMQ's Worker.close() waits for the in-flight job to finish rather
+    # than aborting it (see worker.ts / email.worker.ts / notification.worker.ts).
+    # Compose's default stop_grace_period (10s) can be tight for a job mid-flight
+    # on an external call (e.g. the Resend API). This gives graceful shutdown
+    # real headroom before Compose escalates to SIGKILL, without adding an
+    # application-level timeout that could abort a job itself.
+    stop_grace_period: 30s
 
     env_file:
       - ./backend/.env
 
+    # See the migrate service's comment above - discrete parts, not a
+    # pre-assembled DATABASE_URL, for the same URI-safety reason.
+    #
+    # DATABASE_URL is explicitly cleared here (empty string) rather than
+    # simply omitted: env_file above loads backend/.env, which has its own
+    # DATABASE_URL for local non-Docker development (pointing at
+    # localhost, not this network's `postgres` hostname). Compose's
+    # environment: always overrides env_file: for the same key, so an
+    # empty value here reliably wins and makes database.config.ts's
+    # "DATABASE_URL already set" branch fall through to building the URL
+    # from the POSTGRES_* parts below instead - the same single-source-of-
+    # truth override already used for REDIS_PASSWORD.
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: ""
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_DB: ${POSTGRES_DB:-teamos}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      # Sourced from the root .env (the same value used to start the redis
+      # container's --requirepass above), not backend/.env's own copy, so
+      # there is a single source of truth for this credential.
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
 
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
     volumes:
       - uploads-data:/usr/src/app/uploads
+
+    # The worker has no HTTP endpoint and none is being added just for this.
+    # This checks, from inside the worker's own PID namespace, that a
+    # process with `worker.js` in its command line exists - the simplest
+    # process-level signal available without new tooling or a heartbeat
+    # file. Node's own PID is excluded from the scan: `node -e "<script>"`
+    # puts the script's source (which contains the literal text
+    # "worker.js") into its own /proc/<pid>/cmdline, so without the
+    # exclusion the check would trivially match itself and report healthy
+    # even if the real worker process were dead.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "const fs=require('fs');const self=process.pid;const ok=fs.readdirSync('/proc').filter(p=>!isNaN(Number(p))&&Number(p)!==self).some(p=>{try{return fs.readFileSync('/proc/'+p+'/cmdline','utf8').includes('worker.js')}catch(e){return false}});process.exit(ok?0:1)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
     networks:
       - teamos-network

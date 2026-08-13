@@ -6,7 +6,13 @@
 
 FROM node:22-slim AS builder
 
-ARG DATABASE_URL
+# prisma.config.ts only requires DATABASE_URL to be present/non-empty for
+# `prisma generate` (it never connects to the database at generate time).
+# This dummy value satisfies that check without ever exposing the real
+# Postgres credential to the build - the production DATABASE_URL is
+# injected at container runtime via Docker Compose `environment:`, never
+# as a build arg, so it never lands in an image layer.
+ARG DATABASE_URL=postgresql://user:password@localhost:5432/db
 ENV DATABASE_URL=${DATABASE_URL}
 
 WORKDIR /usr/src/app
@@ -41,6 +47,15 @@ COPY --from=builder /usr/src/app/package.json ./
 COPY --from=builder /usr/src/app/node_modules ./node_modules
 COPY --from=builder /usr/src/app/dist ./dist
 COPY --from=builder /usr/src/app/prisma ./prisma
+# Prisma 7 sources datasource.url from this config file rather than
+# schema.prisma directly - required at runtime for `prisma migrate deploy`
+# (run by the `migrate` service), not just at build time for `prisma generate`.
+COPY --from=builder /usr/src/app/prisma.config.ts ./
+# prisma.config.ts imports this directly (as TS source, not through dist/)
+# to build DATABASE_URL - same reason as the line above: the migrate
+# service invokes the Prisma CLI against prisma.config.ts itself at
+# runtime, so its one dependency needs to exist alongside it here too.
+COPY --from=builder /usr/src/app/src/config/database.config.ts ./src/config/database.config.ts
 
 # Create the uploads directory.
 RUN mkdir -p uploads \

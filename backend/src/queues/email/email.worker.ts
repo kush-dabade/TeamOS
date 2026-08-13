@@ -1,10 +1,16 @@
 import { Worker } from "bullmq";
 
 import { redisConfig } from "../../config/redis.config.js";
-import { sendWorkspaceInvitation } from "../../modules/email/index.js";
+import {
+  sendVerificationEmail,
+  sendWorkspaceInvitation,
+} from "../../modules/email/index.js";
 import { QUEUE_NAMES } from "../queue.constants.js";
 import { EMAIL_JOB_NAMES } from "./email.jobs.js";
-import type { WorkspaceInvitationEmailJob } from "./email.types.js";
+import type {
+  VerificationEmailJob,
+  WorkspaceInvitationEmailJob,
+} from "./email.types.js";
 
 export const emailWorker = new Worker(
   QUEUE_NAMES.EMAIL,
@@ -20,6 +26,18 @@ export const emailWorker = new Worker(
           role: payload.role,
           invitationToken: payload.token,
           expiresAt: new Date(payload.expiresAt),
+        });
+
+        break;
+      }
+
+      case EMAIL_JOB_NAMES.EMAIL_VERIFICATION: {
+        const payload = job.data as VerificationEmailJob;
+
+        await sendVerificationEmail({
+          recipientEmail: payload.email,
+          recipientName: payload.name,
+          verificationUrl: payload.url,
         });
 
         break;

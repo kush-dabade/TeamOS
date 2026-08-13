@@ -10,6 +10,10 @@ if (!redisPort) {
   throw new Error("REDIS_PORT environment variable is required.");
 }
 
+if (!redisPassword) {
+  throw new Error("REDIS_PASSWORD environment variable is required.");
+}
+
 const parsedPort = Number(redisPort);
 
 if (Number.isNaN(parsedPort)) {

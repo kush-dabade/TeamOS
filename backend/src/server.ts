@@ -4,6 +4,7 @@ import { createServer } from "node:http";
 import app from "./app.js";
 import { registerFatalErrorHandlers } from "./lib/fatal-error-handler.js";
 import { prisma } from "./lib/prisma.js";
+import { createShutdownGate } from "./lib/shutdown-gate.js";
 import {
   closeNotificationQueueEvents,
   initializeNotificationQueueEvents,
@@ -12,7 +13,7 @@ import { closeRealtime, initializeRealtime } from "./realtime/index.js";
 
 const PORT = process.env.PORT || 3000;
 
-let isShuttingDown = false;
+const shutdownGate = createShutdownGate();
 
 /**
  * exitCode defaults to 0 for the normal SIGTERM/SIGINT path below. A fatal
@@ -23,22 +24,19 @@ let isShuttingDown = false;
  * without error.
  *
  * If a fatal error fires while a SIGTERM-triggered shutdown is already in
- * progress, the isShuttingDown guard below means this second call returns
- * immediately without upgrading the exit code to 1. Deliberately not
- * handled further - the already-in-progress graceful shutdown still runs
- * to completion and Docker's restart policy recovers the container either
- * way, so adding state to cover this doesn't change the operational
- * outcome, just the exit code of an already-shutting-down process.
+ * progress, shutdownGate still only lets the cleanup sequence below run
+ * once (idempotent), but it upgrades the exit code process.exit()
+ * eventually uses to the highest one requested across every call - a
+ * fatal error can never get silently downgraded to a clean 0 exit just
+ * because a graceful shutdown happened to already be in flight.
  */
 async function shutdown(
   server: ReturnType<typeof createServer>,
   exitCode = 0,
 ): Promise<void> {
-  if (isShuttingDown) {
+  if (!shutdownGate.requestShutdown(exitCode)) {
     return;
   }
-
-  isShuttingDown = true;
 
   console.log("Shutting down TeamOS API...");
 
@@ -55,7 +53,7 @@ async function shutdown(
 
       console.log("Shutdown completed successfully.");
 
-      process.exit(exitCode);
+      process.exit(shutdownGate.getExitCode());
     } catch (error) {
       console.error("Error during shutdown:", error);
       process.exit(1);

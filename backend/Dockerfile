@@ -51,6 +51,11 @@ COPY --from=builder /usr/src/app/prisma ./prisma
 # schema.prisma directly - required at runtime for `prisma migrate deploy`
 # (run by the `migrate` service), not just at build time for `prisma generate`.
 COPY --from=builder /usr/src/app/prisma.config.ts ./
+# prisma.config.ts imports this directly (as TS source, not through dist/)
+# to build DATABASE_URL - same reason as the line above: the migrate
+# service invokes the Prisma CLI against prisma.config.ts itself at
+# runtime, so its one dependency needs to exist alongside it here too.
+COPY --from=builder /usr/src/app/src/config/database.config.ts ./src/config/database.config.ts
 
 # Create the uploads directory.
 RUN mkdir -p uploads \

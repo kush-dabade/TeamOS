@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { registerFatalErrorHandlers } from "../../src/lib/fatal-error-handler.js";
+import {
+  registerFatalErrorHandlers,
+  type FatalErrorEmitter,
+} from "../../src/lib/fatal-error-handler.js";
 
 /**
  * Commit 9: uncaughtException/unhandledRejection previously had no
@@ -16,21 +19,48 @@ import { registerFatalErrorHandlers } from "../../src/lib/fatal-error-handler.js
  * preventing an otherwise-unbounded hang.
  */
 describe("registerFatalErrorHandlers", () => {
-  type Handler = (...args: unknown[]) => void;
+  type UncaughtExceptionHandler = (
+    error: Error,
+    origin: NodeJS.UncaughtExceptionOrigin,
+  ) => void;
+  type UnhandledRejectionHandler = (
+    reason: unknown,
+    promise: Promise<unknown>,
+  ) => void;
 
-  let handlers: Map<string, Handler>;
-  let fakeProcess: { on: (event: string, handler: Handler) => void };
-  let shutdown: ReturnType<typeof vi.fn>;
+  let uncaughtExceptionHandler: UncaughtExceptionHandler | undefined;
+  let unhandledRejectionHandler: UnhandledRejectionHandler | undefined;
+  let fakeProcess: FatalErrorEmitter;
+  let shutdown: (exitCode: number) => void;
+  let shutdownCalls: number[];
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    handlers = new Map();
+    uncaughtExceptionHandler = undefined;
+    unhandledRejectionHandler = undefined;
+
     fakeProcess = {
-      on: (event, handler) => {
-        handlers.set(event, handler);
+      // Implementing an overloaded interface method requires the body to
+      // accept the union of every declared parameter type - TypeScript
+      // can't correlate `event`'s narrowed value with `listener`'s
+      // matching overload from inside one shared function body. Narrowing
+      // back down per-branch (the two casts below) is the standard
+      // pattern for implementing a TS overload, not a workaround.
+      on(event, listener) {
+        if (event === "uncaughtException") {
+          uncaughtExceptionHandler = listener as UncaughtExceptionHandler;
+        } else {
+          unhandledRejectionHandler = listener as UnhandledRejectionHandler;
+        }
+
+        return undefined;
       },
     };
-    shutdown = vi.fn();
+
+    shutdownCalls = [];
+    shutdown = (exitCode: number) => {
+      shutdownCalls.push(exitCode);
+    };
     consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
   });
 
@@ -41,34 +71,34 @@ describe("registerFatalErrorHandlers", () => {
   it("registers both uncaughtException and unhandledRejection handlers", () => {
     registerFatalErrorHandlers({ process: fakeProcess, shutdown });
 
-    expect(handlers.has("uncaughtException")).toBe(true);
-    expect(handlers.has("unhandledRejection")).toBe(true);
+    expect(uncaughtExceptionHandler).toBeDefined();
+    expect(unhandledRejectionHandler).toBeDefined();
   });
 
   it("logs and invokes shutdown(1) on uncaughtException", () => {
     registerFatalErrorHandlers({ process: fakeProcess, shutdown });
 
     const error = new Error("boom");
-    handlers.get("uncaughtException")!(error);
+    uncaughtExceptionHandler!(error, "uncaughtException");
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining("uncaughtException"),
       error,
     );
-    expect(shutdown).toHaveBeenCalledExactlyOnceWith(1);
+    expect(shutdownCalls).toEqual([1]);
   });
 
   it("logs and invokes shutdown(1) on unhandledRejection", () => {
     registerFatalErrorHandlers({ process: fakeProcess, shutdown });
 
     const reason = new Error("rejected");
-    handlers.get("unhandledRejection")!(reason);
+    unhandledRejectionHandler!(reason, Promise.reject(reason).catch(() => {}));
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining("unhandledRejection"),
       reason,
     );
-    expect(shutdown).toHaveBeenCalledExactlyOnceWith(1);
+    expect(shutdownCalls).toEqual([1]);
   });
 
   it("logs a non-Error rejection reason safely instead of assuming .message/.stack", () => {
@@ -76,28 +106,30 @@ describe("registerFatalErrorHandlers", () => {
 
     // A rejected promise's reason isn't required to be an Error - reject("some string")
     // or reject({ code: "X" }) are both valid, so the handler must not assume shape.
-    expect(() => handlers.get("unhandledRejection")!("plain string reason")).not.toThrow();
+    expect(() =>
+      unhandledRejectionHandler!("plain string reason", Promise.resolve()),
+    ).not.toThrow();
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining("unhandledRejection"),
       "plain string reason",
     );
-    expect(shutdown).toHaveBeenCalledExactlyOnceWith(1);
+    expect(shutdownCalls).toEqual([1]);
   });
 
   it("does not deduplicate across repeated fatal events - that's the injected shutdown's job", () => {
     // This module deliberately has no dedup state of its own: server.ts and
     // worker.ts's real shutdown() functions already guard against
-    // concurrent/repeated invocation (isShuttingDown), so duplicating that
-    // guard here would be redundant statefulness for no benefit. Two
-    // independent fatal events are expected to both reach the injected
-    // shutdown callback - it's shutdown()'s existing guard, not this
-    // module, that makes the second call a no-op in production.
+    // concurrent/repeated invocation, so duplicating that guard here would
+    // be redundant statefulness for no benefit. Two independent fatal
+    // events are expected to both reach the injected shutdown callback -
+    // it's shutdown()'s existing guard, not this module, that makes a
+    // repeated call a no-op in production.
     registerFatalErrorHandlers({ process: fakeProcess, shutdown });
 
-    handlers.get("uncaughtException")!(new Error("first"));
-    handlers.get("unhandledRejection")!(new Error("second"));
+    uncaughtExceptionHandler!(new Error("first"), "uncaughtException");
+    unhandledRejectionHandler!(new Error("second"), Promise.resolve());
 
-    expect(shutdown).toHaveBeenCalledTimes(2);
+    expect(shutdownCalls).toEqual([1, 1]);
   });
 });

@@ -63,8 +63,18 @@ services:
   migrate:
     image: teamos-backend
 
+    # Passed through as discrete values, not interpolated into a single
+    # DATABASE_URL string here - Compose's variable interpolation can't
+    # percent-encode arbitrary credential content (a password containing
+    # @, :, /, #, ?, or % would corrupt a raw-interpolated connection
+    # string), so assembly + encoding happens once, in application code
+    # (src/config/database.config.ts), shared by prisma.config.ts (used by
+    # this service's `prisma migrate deploy`) and lib/prisma.ts (backend/
+    # worker below) - not duplicated per service.
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-teamos}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_DB: ${POSTGRES_DB:-teamos}
 
     command: npx prisma migrate deploy
 
@@ -95,8 +105,23 @@ services:
     env_file:
       - ./backend/.env
 
+    # See the migrate service's comment above - discrete parts, not a
+    # pre-assembled DATABASE_URL, for the same URI-safety reason.
+    #
+    # DATABASE_URL is explicitly cleared here (empty string) rather than
+    # simply omitted: env_file above loads backend/.env, which has its own
+    # DATABASE_URL for local non-Docker development (pointing at
+    # localhost, not this network's `postgres` hostname). Compose's
+    # environment: always overrides env_file: for the same key, so an
+    # empty value here reliably wins and makes database.config.ts's
+    # "DATABASE_URL already set" branch fall through to building the URL
+    # from the POSTGRES_* parts below instead - the same single-source-of-
+    # truth override already used for REDIS_PASSWORD.
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-teamos}
+      DATABASE_URL: ""
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_DB: ${POSTGRES_DB:-teamos}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       # Sourced from the root .env (the same value used to start the redis
@@ -163,8 +188,23 @@ services:
     env_file:
       - ./backend/.env
 
+    # See the migrate service's comment above - discrete parts, not a
+    # pre-assembled DATABASE_URL, for the same URI-safety reason.
+    #
+    # DATABASE_URL is explicitly cleared here (empty string) rather than
+    # simply omitted: env_file above loads backend/.env, which has its own
+    # DATABASE_URL for local non-Docker development (pointing at
+    # localhost, not this network's `postgres` hostname). Compose's
+    # environment: always overrides env_file: for the same key, so an
+    # empty value here reliably wins and makes database.config.ts's
+    # "DATABASE_URL already set" branch fall through to building the URL
+    # from the POSTGRES_* parts below instead - the same single-source-of-
+    # truth override already used for REDIS_PASSWORD.
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-teamos}
+      DATABASE_URL: ""
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_DB: ${POSTGRES_DB:-teamos}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       # Sourced from the root .env (the same value used to start the redis

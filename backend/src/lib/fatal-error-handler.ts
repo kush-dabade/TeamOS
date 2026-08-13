@@ -1,5 +1,26 @@
+/**
+ * Only the two event registrations this module actually uses - narrower
+ * than Pick<NodeJS.Process, "on">, which pulls in every overload of
+ * Process.on (SIGTERM, exit, beforeExit, ...) even though only these two
+ * are ever registered here. Listener parameter shapes match Node's real
+ * UncaughtExceptionListener/UnhandledRejectionListener types (see
+ * @types/node/process.d.ts) so the real global `process` object satisfies
+ * this interface structurally, with no cast needed at the call site in
+ * server.ts/worker.ts.
+ */
+export interface FatalErrorEmitter {
+  on(
+    event: "uncaughtException",
+    listener: (error: Error, origin: NodeJS.UncaughtExceptionOrigin) => void,
+  ): unknown;
+  on(
+    event: "unhandledRejection",
+    listener: (reason: unknown, promise: Promise<unknown>) => void,
+  ): unknown;
+}
+
 export interface FatalErrorHandlerOptions {
-  process: Pick<NodeJS.Process, "on">;
+  process: FatalErrorEmitter;
   shutdown: (exitCode: number) => void | Promise<void>;
 }
 

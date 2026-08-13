@@ -1,24 +1,23 @@
 import "dotenv/config";
 
 import { registerFatalErrorHandlers } from "./lib/fatal-error-handler.js";
+import { createShutdownGate } from "./lib/shutdown-gate.js";
 import { closeEmailWorker } from "./queues/email/email.worker.js";
 import { closeNotificationWorker } from "./queues/notification/notification.worker.js";
 
-let isShuttingDown = false;
+const shutdownGate = createShutdownGate();
 
 /**
  * exitCode defaults to 0 for the normal SIGTERM/SIGINT path below. A fatal
  * uncaughtException/unhandledRejection (see registerFatalErrorHandlers
  * below) calls this with 1 instead - see server.ts's identical shutdown()
- * for the full reasoning (same pattern, same isShuttingDown-in-progress
- * tradeoff).
+ * for the full reasoning (same shutdownGate, same exit-code-upgrade
+ * behavior).
  */
 async function shutdown(exitCode = 0): Promise<void> {
-  if (isShuttingDown) {
+  if (!shutdownGate.requestShutdown(exitCode)) {
     return;
   }
-
-  isShuttingDown = true;
 
   console.log("Shutting down workers...");
 
@@ -28,7 +27,7 @@ async function shutdown(exitCode = 0): Promise<void> {
 
     console.log("Workers shut down successfully.");
 
-    process.exit(exitCode);
+    process.exit(shutdownGate.getExitCode());
   } catch (error) {
     console.error("Worker shutdown failed:", error);
     process.exit(1);

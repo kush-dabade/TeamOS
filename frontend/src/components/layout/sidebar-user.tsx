@@ -13,7 +13,7 @@ import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui
 import { UserAvatar } from "@/components/ux";
 import { logout, useAuth } from "@/features/auth";
 import { queryClient } from "@/lib";
-import { getAvatarUrl } from "@/utils";
+import { getAvatarUrl, getErrorMessage } from "@/utils";
 
 import { ThemeToggle } from "./theme-toggle";
 
@@ -33,9 +33,7 @@ export function SidebarUser() {
 
       navigate("/login", { replace: true });
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Something went wrong. Please try again.",
-      );
+      toast.error(getErrorMessage(error));
     }
   }
 

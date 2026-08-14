@@ -25,7 +25,7 @@ import searchRoutes from "./modules/search/search.routes.js";
 import userRoutes from "./modules/user/user.routes.js";
 import { notFoundHandler } from "./middleware/not-found.js";
 import { errorHandler } from "./middleware/error-handler.js";
-import { generalApiLimiter } from "./middleware/rate-limit.js";
+import { generalApiLimiter, verificationEmailLimiter } from "./middleware/rate-limit.js";
 import { securityHeaders } from "./middleware/security-headers.js";
 
 const app = express();
@@ -60,16 +60,24 @@ app.use(
   }),
 );
 
+// Mounted ahead of the Better Auth catch-all below, scoped to this one
+// path only. Better Auth's own built-in limiter is silently a no-op for
+// all of /api/auth/* in this deployment (see verificationEmailLimiter's
+// comment in middleware/rate-limit.ts for the confirmed reason), so this
+// specific endpoint - session-less and email-sending, the highest-risk
+// path under /api/auth/* - gets real, distributed-safe protection instead
+// of relying on a check that never fires. Sign-in/sign-up/etc. are left
+// alone: no evidence they're currently being abused, and duplicating
+// Express-level limiting across all of /api/auth/* would be a larger
+// rate-limiting refactor than this endpoint's real, reproduced gap calls for.
+app.post("/api/auth/send-verification-email", verificationEmailLimiter);
+
 app.all("/api/auth/*splat", toNodeHandler(auth));
 
 app.use(express.json());
 
 // Scoped to /api/v1 specifically (not a global app.use) so it never touches
-// /api/auth/* or /health below. Better Auth ships its own built-in rate
-// limiter (enabled by default whenever NODE_ENV=production, unconfigured
-// here) and already covers /api/auth/* with sensible defaults for
-// sign-in/sign-up/password-reset - deliberately not duplicated with a
-// second Express limiter on those same routes.
+// /api/auth/* or /health below.
 app.use("/api/v1", generalApiLimiter);
 
 // workspace resources

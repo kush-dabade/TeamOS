@@ -59,7 +59,7 @@ function isBackendErrorBody(data: unknown): data is BackendErrorBody {
   );
 }
 
-function typeFromStatus(status: number): AppErrorType {
+export function typeFromStatus(status: number): AppErrorType {
   if (status === 401) return "unauthorized";
   if (status === 403) return "forbidden";
   if (status === 404) return "not_found";

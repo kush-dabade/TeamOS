@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { getErrorMessage } from "@/utils";
 
 export function RegisterForm() {
   const navigate = useNavigate();
@@ -43,9 +44,7 @@ export function RegisterForm() {
       // intended destination the same way the "Sign in" link below does.
       navigate("/login", { replace: true, state: location.state });
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Something went wrong. Please try again.",
-      );
+      toast.error(getErrorMessage(error));
     }
   }
 

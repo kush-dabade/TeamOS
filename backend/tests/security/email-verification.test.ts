@@ -110,7 +110,12 @@ describe("email verification enforcement", () => {
       (job) => job.name === EMAIL_JOB_NAMES.EMAIL_VERIFICATION && job.data?.email === email,
     );
 
-    const token = new URL(job!.data.url).searchParams.get("token");
+    const verificationUrl = new URL(job!.data.url);
+    const token = verificationUrl.searchParams.get("token");
+
+    expect(verificationUrl.searchParams.get("callbackURL")).toBe(
+      `${process.env.FRONTEND_URL}/verify-email`,
+    );
 
     // Deliberately omitting callbackURL here: this proves the core
     // token -> emailVerified=true mechanism. The redirect-to-frontend

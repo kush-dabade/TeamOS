@@ -14,6 +14,7 @@ interface BackendTask {
   createdById: string;
   assigneeId: string | null;
   completedAt: string | null;
+  sprintId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -36,8 +37,7 @@ export interface UpdateTaskInput {
 }
 
 // The backend task resource never returns deletedAt (soft-deleted tasks are
-// simply excluded from list/detail results) or sprintId (not exposed by any
-// endpoint yet - populated once Sprints integration lands).
+// simply excluded from list/detail results).
 function toTask(task: BackendTask): Task {
   return {
     id: task.id,
@@ -52,7 +52,7 @@ function toTask(task: BackendTask): Task {
     assigneeId: task.assigneeId,
     completedAt: task.completedAt,
     deletedAt: null,
-    sprintId: null,
+    sprintId: task.sprintId,
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
   };

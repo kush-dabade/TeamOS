@@ -12,6 +12,7 @@ import {
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { UserAvatar } from "@/components/ux";
 import { logout, useAuth } from "@/features/auth";
+import { queryClient } from "@/lib";
 import { getAvatarUrl } from "@/utils";
 
 import { ThemeToggle } from "./theme-toggle";
@@ -27,6 +28,8 @@ export function SidebarUser() {
   async function handleSignOut() {
     try {
       await logout();
+
+      queryClient.clear();
 
       navigate("/login", { replace: true });
     } catch (error) {

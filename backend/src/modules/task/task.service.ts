@@ -47,6 +47,8 @@ function toTaskResponse(task: Task) {
 
     completedAt: task.completedAt,
 
+    sprintId: task.sprintId,
+
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
   };

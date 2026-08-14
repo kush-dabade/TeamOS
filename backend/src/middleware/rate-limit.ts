@@ -166,3 +166,29 @@ export const avatarLimiter = rateLimit({
   handler: handleRateLimitExceeded,
   ...FAIL_OPEN_ON_STORE_ERROR,
 });
+
+// 3/min per IP - matches Better Auth's own built-in default rule for this
+// exact path (getDefaultSpecialRules() in the installed better-auth
+// package), not an arbitrarily chosen number. Better Auth ships that rule
+// specifically because this endpoint is callable without a session (an
+// unverified user has none) and triggers a real outbound email - but its
+// built-in limiter's IP resolution only reads the x-forwarded-for header
+// (better-auth/dist/utils/get-request-ip.mjs) and nothing in this
+// deployment sets it (no reverse proxy in front of the API), so despite
+// being "enabled" whenever NODE_ENV=production, it silently never rate
+// limits anything here - confirmed via Better Auth's own "Rate limiting
+// skipped: could not determine client IP address" log warning, reproduced
+// against the real running stack. This uses the same Redis-backed
+// mechanism as the limiters above instead, keyed off Express's own req.ip
+// (already trust-proxy-aware via app.set("trust proxy", ...) in app.ts),
+// so it doesn't depend on that same header.
+export const verificationEmailLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: createRedisStore("rl:verify-email:"),
+  keyGenerator: (req) => ipKeyGenerator(req.ip ?? "unknown"),
+  handler: handleRateLimitExceeded,
+  ...FAIL_OPEN_ON_STORE_ERROR,
+});

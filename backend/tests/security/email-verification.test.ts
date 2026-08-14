@@ -95,4 +95,43 @@ describe("email verification enforcement", () => {
 
     expect(match).toBeTruthy();
   });
+
+  it("verifies the account when the emailed token is used against the real endpoint", async () => {
+    const email = `verify-endpoint-${crypto.randomUUID()}@example.com`;
+
+    await request(app)
+      .post("/api/auth/sign-up/email")
+      .send({ name: "Test User", email, password: "password1234" })
+      .expect(200);
+
+    const jobs = await emailQueue.getJobs(["waiting", "delayed", "active", "completed"]);
+
+    const job = jobs.find(
+      (job) => job.name === EMAIL_JOB_NAMES.EMAIL_VERIFICATION && job.data?.email === email,
+    );
+
+    const verificationUrl = new URL(job!.data.url);
+    const token = verificationUrl.searchParams.get("token");
+
+    expect(verificationUrl.searchParams.get("callbackURL")).toBe(
+      `${process.env.FRONTEND_URL}/verify-email`,
+    );
+
+    // Deliberately omitting callbackURL here: this proves the core
+    // token -> emailVerified=true mechanism. The redirect-to-frontend
+    // behavior (callbackURL) has no destination to redirect to until the
+    // /verify-email frontend route exists (a later commit), and exercising
+    // it here would depend on TRUSTED_ORIGINS matching FRONTEND_URL in the
+    // test environment, which is a separate, already-flagged concern.
+    const response = await request(app)
+      .get("/api/auth/verify-email")
+      .query({ token })
+      .expect(200);
+
+    expect(response.body.status).toBe(true);
+
+    const user = await prisma.user.findFirst({ where: { email } });
+
+    expect(user?.emailVerified).toBe(true);
+  });
 });

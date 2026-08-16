@@ -8,7 +8,7 @@ import { registerSchema, type RegisterFormData } from "../validation/register";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { getErrorMessage } from "@/utils";
 
@@ -108,6 +108,10 @@ export function RegisterForm() {
                   placeholder="Create a password"
                   aria-invalid={fieldState.invalid}
                 />
+
+                <FieldDescription>
+                  Password must contain: 8+ characters · uppercase · lowercase · number
+                </FieldDescription>
 
                 <FieldError errors={[fieldState.error]} />
               </Field>

@@ -31,10 +31,11 @@ interface TaskPreviewPanelProps {
   onClose: () => void;
   onCloseAutoFocus: () => void;
   onOpenTask: (taskId: string) => void;
-  onEdit: () => void;
-  // Optional so existing consumers that don't pass it (e.g. TasksPage today)
-  // render exactly as before - no delete button, no confirmation dialog.
-  onDelete?: () => void;
+  // Both optional so a caller without edit/delete permission can omit them
+  // to hide the control entirely, and so existing consumers that don't pass
+  // onDelete (e.g. TasksPage today) render exactly as before.
+  onEdit?: () => void;
+  onDelete?: () => void | Promise<void>;
   isDeleting?: boolean;
 }
 
@@ -89,9 +90,11 @@ export function TaskPreviewPanel({
 
         <SheetFooter className="flex-row items-center justify-between p-4">
           <div className="flex items-center gap-1">
-            <Button type="button" variant="ghost" onClick={onEdit}>
-              Edit
-            </Button>
+            {onEdit ? (
+              <Button type="button" variant="ghost" onClick={onEdit}>
+                Edit
+              </Button>
+            ) : null}
             {onDelete ? (
               <Button
                 type="button"
@@ -120,15 +123,23 @@ export function TaskPreviewPanel({
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 variant="destructive"
-                onClick={() => {
+                disabled={isDeleting}
+                onClick={async (event) => {
+                  // Prevent Radix's default auto-close so the dialog stays
+                  // open (showing the pending state, both actions disabled)
+                  // for the duration of the delete instead of closing
+                  // immediately into a state that looks finished while the
+                  // mutation is still in flight. onDelete's own caller
+                  // already catches its errors, so this always settles.
+                  event.preventDefault();
+                  await onDelete();
                   setIsConfirmOpen(false);
-                  onDelete();
                 }}
               >
-                Delete
+                {isDeleting ? "Deleting..." : "Delete"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

@@ -1,4 +1,16 @@
-import { Button } from "@/components/ui";
+import { useState } from "react";
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  Button,
+} from "@/components/ui";
 import { formatDate } from "@/utils";
 
 import { TaskPriorityBadge } from "../TaskPriorityBadge";
@@ -9,12 +21,13 @@ import type { TaskListItem } from "../../types";
 interface TaskHeaderProps {
   taskItem: TaskListItem;
   onEdit: (trigger: HTMLButtonElement) => void;
-  onDelete: () => void;
+  onDelete: () => void | Promise<void>;
   isDeleting: boolean;
 }
 
 export function TaskHeader({ taskItem, onEdit, onDelete, isDeleting }: TaskHeaderProps) {
   const { assignee, project, task } = taskItem;
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   return (
     <header className="flex flex-col gap-3 py-4 md:flex-row md:items-start md:justify-between">
@@ -45,10 +58,46 @@ export function TaskHeader({ taskItem, onEdit, onDelete, isDeleting }: TaskHeade
         <Button type="button" variant="outline" onClick={(event) => onEdit(event.currentTarget)}>
           Edit task
         </Button>
-        <Button type="button" variant="destructive" onClick={onDelete} disabled={isDeleting}>
+        <Button
+          type="button"
+          variant="destructive"
+          onClick={() => setIsConfirmOpen(true)}
+          disabled={isDeleting}
+        >
           {isDeleting ? "Deleting..." : "Delete task"}
         </Button>
       </div>
+
+      <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete task?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete &quot;{task.title}&quot;. This action cannot be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={isDeleting}
+              onClick={async (event) => {
+                // Prevent Radix's default auto-close so the dialog stays
+                // open (both actions disabled) for the duration of the
+                // delete instead of closing into a state that looks
+                // finished while the mutation is still in flight. onDelete
+                // already catches its own errors, so this always settles.
+                event.preventDefault();
+                await onDelete();
+                setIsConfirmOpen(false);
+              }}
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </header>
   );
 }

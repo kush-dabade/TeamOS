@@ -2,6 +2,7 @@ export * from "./pages/TaskWorkspacePage";
 export * from "./pages/TasksPage";
 export * from "./types";
 export { taskKeys } from "./lib/task-keys";
+export { canManageTasks } from "./lib/task-permissions";
 export { useTask } from "./hooks/use-task";
 export { useTasks } from "./hooks/use-tasks";
 export { useProjectTasks } from "./hooks/use-project-tasks";

@@ -7,4 +7,4 @@ export { OnboardingPage } from "./pages/OnboardingPage";
 export { WorkspaceSettingsPage } from "./pages/WorkspaceSettingsPage";
 export { WorkspaceGuard } from "./routes/workspace-guard";
 export { WorkspaceProvider } from "./providers/workspace-provider";
-export type { Workspace, WorkspaceMember } from "./types";
+export type { Workspace, WorkspaceMember, WorkspaceRole } from "./types";

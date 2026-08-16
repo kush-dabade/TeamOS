@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -6,6 +6,7 @@ import {
   TaskFormPanel,
   TaskPreviewPanel,
   TasksTable,
+  canManageTasks,
   useCreateTask,
   useDeleteTask,
   useProjectTasks,
@@ -15,7 +16,7 @@ import {
   type TaskListItem,
   type TaskProject,
 } from "@/features/tasks";
-import { useWorkspaceMembers } from "@/features/workspaces";
+import { useActiveWorkspace, useWorkspaceMembers } from "@/features/workspaces";
 
 interface ProjectTasksProps {
   project: TaskProject;
@@ -29,6 +30,7 @@ interface ProjectTasksProps {
 // to this project without any change to the shared form component.
 export function ProjectTasks({ project, workspaceId }: ProjectTasksProps) {
   const navigate = useNavigate();
+  const { workspace } = useActiveWorkspace();
 
   const tasksQuery = useProjectTasks(project.id);
   const membersQuery = useWorkspaceMembers(workspaceId);
@@ -40,6 +42,12 @@ export function ProjectTasks({ project, workspaceId }: ProjectTasksProps) {
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [isFormPanelOpen, setIsFormPanelOpen] = useState(false);
   const [formPanelTrigger, setFormPanelTrigger] = useState<HTMLButtonElement | null>(null);
+  // Stable focus target for after a task is deleted - the row that had
+  // focus is about to unmount once the list refetches, so restoring focus
+  // there would be pointless at best.
+  const createActionRef = useRef<HTMLButtonElement>(null);
+
+  const canManage = canManageTasks(workspace?.role);
 
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
@@ -161,6 +169,12 @@ export function ProjectTasks({ project, workspaceId }: ProjectTasksProps) {
     try {
       await deleteTask.mutateAsync({ taskId: selectedTaskId, projectId: project.id });
       toast.success("Task deleted");
+      // Redirect the existing close-auto-focus target to the persistent
+      // create action (a control guaranteed to still exist) instead of the
+      // just-deleted row's button, which is about to unmount once the task
+      // list refetches - reuses handlePreviewCloseAutoFocus's existing
+      // selectedTaskTrigger?.focus() rather than adding a second focus path.
+      setSelectedTaskTrigger(createActionRef.current);
       handlePreviewClose();
     } catch {
       // Failure feedback is already surfaced via the mutation's onError toast.
@@ -176,10 +190,11 @@ export function ProjectTasks({ project, workspaceId }: ProjectTasksProps) {
         error={errorMessage}
         hasActiveFilters={false}
         showProjectColumn={false}
+        showCreateAction
+        createActionRef={createActionRef}
         onTaskSelect={handleTaskSelect}
-        onCreateTask={handleCreateTask}
+        onCreateTask={canManage ? handleCreateTask : undefined}
         onRetry={handleRetry}
-        onClearFilters={() => {}}
       />
 
       <TaskPreviewPanel
@@ -189,8 +204,8 @@ export function ProjectTasks({ project, workspaceId }: ProjectTasksProps) {
         onClose={handlePreviewClose}
         onCloseAutoFocus={handlePreviewCloseAutoFocus}
         onOpenTask={handleOpenTask}
-        onEdit={handleEditTask}
-        onDelete={handleDeleteTask}
+        onEdit={canManage ? handleEditTask : undefined}
+        onDelete={canManage ? handleDeleteTask : undefined}
         isDeleting={deleteTask.isPending}
       />
 

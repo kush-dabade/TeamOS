@@ -80,7 +80,7 @@ export function ProjectsTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-[720px] w-full border-collapse text-sm">
+      <table aria-busy={isLoading} className="min-w-[720px] w-full border-collapse text-sm">
         <caption className="sr-only">Projects</caption>
         <thead className="sticky top-0 z-10 border-b bg-background/95 text-left text-xs font-medium text-muted-foreground backdrop-blur">
           <tr>

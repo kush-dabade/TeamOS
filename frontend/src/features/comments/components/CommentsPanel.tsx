@@ -53,7 +53,7 @@ export function CommentsPanel({ taskId }: CommentsPanelProps) {
         </h3>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="flex-1 min-h-64">
         <CommentList
           comments={commentsQuery.data ?? []}
           isLoading={commentsQuery.isLoading}
@@ -65,11 +65,11 @@ export function CommentsPanel({ taskId }: CommentsPanelProps) {
           onCancelEdit={() => setEditingCommentId(null)}
           onEditSubmit={handleEditSubmit}
           onDelete={handleDelete}
-          className="max-h-[20rem] overflow-y-auto pr-1"
+          className="h-full overflow-y-auto pr-1"
         />
       </CardContent>
 
-      <CardContent>
+      <CardContent className="mt-auto">
         <CommentForm
           mode="create"
           placeholder="Add a comment..."

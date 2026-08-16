@@ -69,11 +69,13 @@ export function CommentList({
 
   if (comments.length === 0) {
     return (
-      <EmptyState
-        icon={MessageSquare}
-        title="No comments yet"
-        description="Start the conversation about this task."
-      />
+      <div className="flex h-full items-center justify-center">
+        <EmptyState
+          icon={MessageSquare}
+          title="No comments yet"
+          description="Start the conversation about this task."
+        />
+      </div>
     );
   }
 

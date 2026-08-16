@@ -62,13 +62,8 @@ export function ActivityFeed({
 
   if (activities.length === 0) {
     return (
-      <div className={cn("flex min-h-48 items-center justify-center", className)}>
-        <EmptyState
-          icon={ActivityIcon}
-          title={emptyTitle}
-          description={emptyDescription}
-          iconClassName="size-12"
-        />
+      <div className={cn("flex items-center justify-center", className)}>
+        <EmptyState icon={ActivityIcon} title={emptyTitle} description={emptyDescription} />
       </div>
     );
   }

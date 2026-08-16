@@ -10,7 +10,13 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  Button,
+  Attachment,
+  AttachmentAction,
+  AttachmentActions,
+  AttachmentContent,
+  AttachmentDescription,
+  AttachmentMedia,
+  AttachmentTitle,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -20,17 +26,19 @@ import { formatFileSize, formatRelativeDate } from "@/utils";
 
 import { ATTACHMENT_FILE_TYPES, DEFAULT_ATTACHMENT_FILE_TYPE } from "../lib/attachment-file-type";
 import { getAttachmentDownloadUrl } from "../lib/attachment-url";
-import type { Attachment } from "../types";
+import type { Attachment as AttachmentRecord } from "../types";
 
 interface AttachmentItemProps {
-  attachment: Attachment;
+  attachment: AttachmentRecord;
   onDelete: () => void;
   isDeleting: boolean;
 }
 
-// Presentational building block for a single attachment row. Any workspace
-// member (not just the uploader) can delete an attachment - the backend
-// enforces membership/guest restrictions, so this never gates on ownership.
+// Presentational building block for a single attachment row, built on the
+// shadcn Attachment primitive (registry:ui, @/components/ui/attachment).
+// Any workspace member (not just the uploader) can delete an attachment -
+// the backend enforces membership/guest restrictions, so this never gates
+// on ownership.
 export function AttachmentItem({ attachment, onDelete, isDeleting }: AttachmentItemProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { icon: Icon, label } = ATTACHMENT_FILE_TYPES[attachment.mimeType] ?? DEFAULT_ATTACHMENT_FILE_TYPE;
@@ -41,33 +49,31 @@ export function AttachmentItem({ attachment, onDelete, isDeleting }: AttachmentI
   };
 
   return (
-    <div
-      className="group/attachment relative flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 transition-colors duration-150 hover:bg-muted/40"
-      title={formatRelativeDate(attachment.createdAt)}
-    >
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-        <Icon className="size-4" aria-hidden="true" />
-      </div>
+    <Attachment size="sm" className="w-full" title={formatRelativeDate(attachment.createdAt)}>
+      <AttachmentMedia>
+        <Icon aria-hidden="true" />
+      </AttachmentMedia>
 
-      <div className="min-w-0 flex-1 pr-7">
-        <p className="truncate text-sm font-medium">{attachment.originalName}</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
+      <AttachmentContent>
+        <AttachmentTitle>{attachment.originalName}</AttachmentTitle>
+        <AttachmentDescription>
           {label} &middot; {formatFileSize(attachment.size)}
-        </p>
-      </div>
+        </AttachmentDescription>
+      </AttachmentContent>
 
-      <div className="absolute top-1/2 right-1 -translate-y-1/2 opacity-0 transition-opacity duration-150 group-hover/attachment:opacity-100 group-focus-within/attachment:opacity-100 data-[state=open]:opacity-100">
+      {/* Uses AttachmentActions' own default treatment (always-visible flex
+          sibling, per the official example) instead of a hover-reveal
+          overlay - the row's own has-[>a,>button]:hover:bg-muted/50 (baked
+          into Attachment's base styles) already supplies hover feedback. */}
+      <AttachmentActions>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
+            <AttachmentAction
               aria-label={`Actions for ${attachment.originalName}`}
               disabled={isDeleting}
             >
               <MoreHorizontal />
-            </Button>
+            </AttachmentAction>
           </DropdownMenuTrigger>
 
           <DropdownMenuContent align="end">
@@ -105,7 +111,7 @@ export function AttachmentItem({ attachment, onDelete, isDeleting }: AttachmentI
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </div>
-    </div>
+      </AttachmentActions>
+    </Attachment>
   );
 }

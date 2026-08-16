@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { Card, CardAction, CardContent, CardHeader } from "@/components/ui";
+import { Card, CardContent, CardHeader } from "@/components/ui";
 
 import { AttachmentList } from "./AttachmentList";
 import { AttachmentUpload } from "./AttachmentUpload";
@@ -46,29 +46,13 @@ export function AttachmentsPanel({ taskId }: AttachmentsPanelProps) {
     }
   };
 
-  // Exactly one upload trigger is ever visible: the header action once
-  // attachments exist, the empty state's own CTA while the list is empty (or
-  // still loading, since we don't yet know which state applies).
-  const hasAttachments = (attachmentsQuery.data?.length ?? 0) > 0;
-
   return (
     <Card size="sm">
-      <CardHeader className="mb-3">
+      <CardHeader>
         <h3 className="text-sm font-medium">Attachments</h3>
-        {hasAttachments ? (
-          <CardAction>
-            <AttachmentUpload
-              onUpload={handleUpload}
-              isUploading={uploadAttachment.isPending}
-              label="Upload"
-              variant="outline"
-              icon
-            />
-          </CardAction>
-        ) : null}
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="flex-1 min-h-64">
         <AttachmentList
           attachments={attachmentsQuery.data ?? []}
           isLoading={attachmentsQuery.isLoading}
@@ -76,11 +60,12 @@ export function AttachmentsPanel({ taskId }: AttachmentsPanelProps) {
           onRetry={() => attachmentsQuery.refetch()}
           onDelete={handleDelete}
           deletingAttachmentIds={deletingAttachmentIds}
-          emptyAction={
-            <AttachmentUpload onUpload={handleUpload} isUploading={uploadAttachment.isPending} />
-          }
-          className="max-h-64 overflow-y-auto"
+          className="h-full overflow-y-auto"
         />
+      </CardContent>
+
+      <CardContent className="mt-auto">
+        <AttachmentUpload onUpload={handleUpload} isUploading={uploadAttachment.isPending} />
       </CardContent>
     </Card>
   );

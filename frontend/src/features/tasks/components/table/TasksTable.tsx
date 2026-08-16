@@ -14,6 +14,7 @@ interface TasksTableProps {
   isLoading: boolean;
   error: string | null;
   hasActiveFilters: boolean;
+  showProjectColumn?: boolean;
   onTaskSelect: (taskId: string, trigger: HTMLButtonElement | null) => void;
   onCreateTask: (trigger: HTMLButtonElement) => void;
   onRetry: () => void;
@@ -26,6 +27,7 @@ export function TasksTable({
   isLoading,
   error,
   hasActiveFilters,
+  showProjectColumn = true,
   onTaskSelect,
   onCreateTask,
   onRetry,
@@ -88,7 +90,9 @@ export function TasksTable({
             <th scope="col" className="w-28 px-3 py-2 font-medium">Status</th>
             <th scope="col" className="w-28 px-3 py-2 font-medium">Priority</th>
             <th scope="col" className="w-40 px-3 py-2 font-medium">Assignee</th>
-            <th scope="col" className="w-40 px-3 py-2 font-medium">Project</th>
+            {showProjectColumn ? (
+              <th scope="col" className="w-40 px-3 py-2 font-medium">Project</th>
+            ) : null}
             <th scope="col" className="w-32 px-3 py-2 font-medium">Due Date</th>
             <th scope="col" className="w-28 px-3 py-2 font-medium">Updated</th>
           </tr>
@@ -101,6 +105,7 @@ export function TasksTable({
                   key={taskItem.task.id}
                   taskItem={taskItem}
                   isSelected={taskItem.task.id === selectedTaskId}
+                  showProjectColumn={showProjectColumn}
                   onSelect={onTaskSelect}
                 />
               ))

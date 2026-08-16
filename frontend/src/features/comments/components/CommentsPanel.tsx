@@ -43,7 +43,7 @@ export function CommentsPanel({ taskId }: CommentsPanelProps) {
   const count = commentsQuery.data?.length ?? 0;
 
   return (
-    <Card className="[--card-spacing:1.375rem]">
+    <Card size="sm">
       <CardHeader>
         <h3 className="flex items-center gap-2 text-sm font-medium">
           Comments

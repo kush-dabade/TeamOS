@@ -18,15 +18,18 @@ export function ProjectNavigation({ activeTab, onTabChange }: ProjectNavigationP
       className="sticky top-0 z-10 -mx-5 border-y bg-background/95 px-5 backdrop-blur"
     >
       <div className="overflow-x-auto">
-        <div className="flex w-max items-center gap-1">
+        <div role="tablist" className="flex w-max items-center gap-1">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
 
             return (
               <button
                 key={tab.id}
+                id={`project-tab-${tab.id}`}
                 type="button"
-                aria-pressed={isActive}
+                role="tab"
+                aria-selected={isActive}
+                aria-controls={`project-tabpanel-${tab.id}`}
                 onClick={() => onTabChange(tab.id)}
                 className={`border-b-2 px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   isActive

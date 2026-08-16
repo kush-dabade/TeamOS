@@ -1,12 +1,12 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
 import { Mail } from "lucide-react";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
-import { login, resendVerificationEmail } from "../api/auth.api";
+import { login } from "../api/auth.api";
+import { useResendVerificationEmail } from "../hooks/use-resend-verification-email";
 import { getPostAuthRedirect } from "../lib/redirect";
 import { loginSchema, type LoginFormData } from "../validation/login";
 
@@ -38,15 +38,7 @@ export function LoginForm() {
 
   const isSubmitting = form.formState.isSubmitting;
 
-  const resendVerification = useMutation({
-    mutationFn: resendVerificationEmail,
-    onSuccess: () => {
-      toast.success("Verification email sent. Check your inbox.");
-    },
-    onError: (error) => {
-      toast.error(getErrorMessage(error));
-    },
-  });
+  const resendVerification = useResendVerificationEmail();
 
   async function onSubmit(data: LoginFormData) {
     setUnverifiedEmail(null);

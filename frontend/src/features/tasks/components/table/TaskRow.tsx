@@ -10,10 +10,11 @@ import type { TaskListItem } from "../../types";
 interface TaskRowProps {
   taskItem: TaskListItem;
   isSelected: boolean;
+  showProjectColumn?: boolean;
   onSelect: (taskId: string, trigger: HTMLButtonElement | null) => void;
 }
 
-export function TaskRow({ taskItem, isSelected, onSelect }: TaskRowProps) {
+export function TaskRow({ taskItem, isSelected, showProjectColumn = true, onSelect }: TaskRowProps) {
   const { assignee, project, task } = taskItem;
   const taskTitleButtonRef = useRef<HTMLButtonElement>(null);
   const selectTask = () => onSelect(task.id, taskTitleButtonRef.current);
@@ -63,9 +64,11 @@ export function TaskRow({ taskItem, isSelected, onSelect }: TaskRowProps) {
           <span className="text-sm text-muted-foreground">Unassigned</span>
         )}
       </td>
-      <td className="max-w-40 truncate px-3 py-1.5 text-sm text-muted-foreground">
-        {project.name}
-      </td>
+      {showProjectColumn ? (
+        <td className="max-w-40 truncate px-3 py-1.5 text-sm text-muted-foreground">
+          {project.name}
+        </td>
+      ) : null}
       <td className="px-3 py-1.5 text-sm whitespace-nowrap text-muted-foreground">
         {task.dueDate ? formatDate(task.dueDate, "MMM d, yyyy") : "—"}
       </td>

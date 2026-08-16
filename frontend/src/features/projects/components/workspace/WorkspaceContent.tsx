@@ -1,5 +1,6 @@
 import { ProjectActivity } from "./ProjectActivity";
 import { ProjectSprints } from "./ProjectSprints";
+import { ProjectTasks } from "./ProjectTasks";
 
 import type { ProjectListItem, ProjectWorkspaceTab } from "../../types";
 
@@ -8,16 +9,6 @@ interface WorkspaceContentProps {
   workspaceId: string;
   activeTab: ProjectWorkspaceTab;
 }
-
-const placeholderContentByTab: Record<
-  Exclude<ProjectWorkspaceTab, "activity" | "sprints">,
-  { title: string; description: string }
-> = {
-  tasks: {
-    title: "Tasks",
-    description: "Tasks for this project will appear here.",
-  },
-};
 
 export function WorkspaceContent({ project, workspaceId, activeTab }: WorkspaceContentProps) {
   if (activeTab === "activity") {
@@ -39,12 +30,9 @@ export function WorkspaceContent({ project, workspaceId, activeTab }: WorkspaceC
     );
   }
 
-  const content = placeholderContentByTab[activeTab];
-
   return (
-    <section className="py-5" aria-label={`${content.title} for ${project.project.name}`}>
-      <h2 className="text-sm font-medium">{content.title}</h2>
-      <p className="mt-1 text-sm text-muted-foreground">{content.description}</p>
+    <section className="py-5" aria-label={`Tasks for ${project.project.name}`}>
+      <ProjectTasks project={project.project} workspaceId={workspaceId} />
     </section>
   );
 }

@@ -76,8 +76,22 @@ function throwIfAuthError(error: unknown): void {
 
   const { message, code, status, error: nested } = error as BetterAuthErrorLike;
 
+  // No numeric status means no HTTP response was ever received (offline,
+  // DNS failure, etc.) - the same distinction lib/api/error.ts's
+  // normalizeError makes via axios's `!error.response`, so this produces
+  // the same "network" AppError and message rather than falling through to
+  // the generic "unknown" case below.
+  if (typeof status !== "number") {
+    const networkError: AppError = {
+      type: "network",
+      message: "Unable to reach the server. Check your connection and try again.",
+    };
+
+    throw networkError;
+  }
+
   const appError: AppError = {
-    type: typeof status === "number" ? typeFromStatus(status) : "unknown",
+    type: typeFromStatus(status),
     message: message ?? nested?.message ?? "Something went wrong. Please try again.",
     status,
     code: code ?? nested?.code,

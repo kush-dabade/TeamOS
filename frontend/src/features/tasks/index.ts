@@ -7,6 +7,7 @@ export { useTasks } from "./hooks/use-tasks";
 export { useProjectTasks } from "./hooks/use-project-tasks";
 export { useCreateTask } from "./hooks/use-create-task";
 export { useUpdateTask } from "./hooks/use-update-task";
+export { useDeleteTask } from "./hooks/use-delete-task";
 export { TaskFormPanel } from "./components/form";
 export { TaskPreviewPanel } from "./components/preview";
 export { TasksTable } from "./components/table";

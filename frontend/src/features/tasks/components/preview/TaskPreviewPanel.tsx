@@ -1,4 +1,14 @@
+import { useState } from "react";
+
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
   Button,
   Separator,
   Sheet,
@@ -22,6 +32,10 @@ interface TaskPreviewPanelProps {
   onCloseAutoFocus: () => void;
   onOpenTask: (taskId: string) => void;
   onEdit: () => void;
+  // Optional so existing consumers that don't pass it (e.g. TasksPage today)
+  // render exactly as before - no delete button, no confirmation dialog.
+  onDelete?: () => void;
+  isDeleting?: boolean;
 }
 
 export function TaskPreviewPanel({
@@ -32,7 +46,11 @@ export function TaskPreviewPanel({
   onCloseAutoFocus,
   onOpenTask,
   onEdit,
+  onDelete,
+  isDeleting = false,
 }: TaskPreviewPanelProps) {
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+
   if (!taskItem) {
     return null;
   }
@@ -74,12 +92,48 @@ export function TaskPreviewPanel({
             <Button type="button" variant="ghost" onClick={onEdit}>
               Edit
             </Button>
+            {onDelete ? (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => setIsConfirmOpen(true)}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </Button>
+            ) : null}
           </div>
           <Button type="button" onClick={() => onOpenTask(task.id)}>
             Open task
           </Button>
         </SheetFooter>
       </SheetContent>
+
+      {onDelete ? (
+        <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+          <AlertDialogContent size="sm">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete task?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete &quot;{task.title}&quot;. This action cannot be
+                undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                onClick={() => {
+                  setIsConfirmOpen(false);
+                  onDelete();
+                }}
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      ) : null}
     </Sheet>
   );
 }

@@ -52,7 +52,7 @@ export function AttachmentsPanel({ taskId }: AttachmentsPanelProps) {
         <h3 className="text-sm font-medium">Attachments</h3>
       </CardHeader>
 
-      <CardContent className="flex-1 min-h-64">
+      <CardContent className="flex-1 min-h-64 max-h-96">
         <AttachmentList
           attachments={attachmentsQuery.data ?? []}
           isLoading={attachmentsQuery.isLoading}

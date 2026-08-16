@@ -167,7 +167,7 @@ export function AttachmentUpload({ onUpload, isUploading }: AttachmentUploadProp
       className={cn(
         "flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed bg-muted/30 px-3.5 py-3 text-center transition-colors",
         isDragActive && "border-primary bg-primary/5",
-        isBusy && "pointer-events-none opacity-60",
+        isBusy && "opacity-60",
       )}
     >
       <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">

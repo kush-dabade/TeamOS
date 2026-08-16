@@ -19,7 +19,7 @@ export function TaskActivity({ workspaceId, taskId }: TaskActivityProps) {
           </span>
         </h3>
       </CardHeader>
-      <CardContent className="flex-1 min-h-64">
+      <CardContent className="flex-1 min-h-64 max-h-96">
         <ActivityFeed
           activities={data}
           isLoading={isLoading}

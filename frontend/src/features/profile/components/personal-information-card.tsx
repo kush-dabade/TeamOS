@@ -1,13 +1,15 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldContent, FieldTitle } from "@/components/ui/field";
-import { formatDate } from "@/utils";
+import { cn, formatDate } from "@/utils";
 
 import { AvatarUploadControl } from "./avatar-upload-control";
+import { EmailVerificationStatus } from "./email-verification-status";
 import { ProfileNameForm } from "./profile-name-form";
 
 interface PersonalInformationCardProps {
   name: string;
   email: string;
+  emailVerified: boolean;
   image?: string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
@@ -16,6 +18,7 @@ interface PersonalInformationCardProps {
 export function PersonalInformationCard({
   name,
   email,
+  emailVerified,
   image,
   createdAt,
   updatedAt,
@@ -38,7 +41,15 @@ export function PersonalInformationCard({
           <Field orientation="horizontal">
             <FieldTitle className="text-muted-foreground">Email</FieldTitle>
             <FieldContent className="flex-none">
-              <p className="text-sm">{email}</p>
+              <div
+                className={cn(
+                  "flex gap-2",
+                  emailVerified ? "flex-row flex-wrap items-center" : "flex-col items-start",
+                )}
+              >
+                <p className="text-sm">{email}</p>
+                <EmailVerificationStatus email={email} emailVerified={emailVerified} />
+              </div>
             </FieldContent>
           </Field>
 

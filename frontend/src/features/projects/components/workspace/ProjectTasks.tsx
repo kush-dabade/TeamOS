@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
+import { Button } from "@/components/ui";
 import {
   TaskFormPanel,
   TaskPreviewPanel,
@@ -183,19 +184,32 @@ export function ProjectTasks({ project, workspaceId }: ProjectTasksProps) {
 
   return (
     <>
-      <TasksTable
-        tasks={taskItems}
-        selectedTaskId={selectedTaskId}
-        isLoading={isLoading}
-        error={errorMessage}
-        hasActiveFilters={false}
-        showProjectColumn={false}
-        showCreateAction
-        createActionRef={createActionRef}
-        onTaskSelect={handleTaskSelect}
-        onCreateTask={canManage ? handleCreateTask : undefined}
-        onRetry={handleRetry}
-      />
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-medium">Tasks</h2>
+        {canManage ? (
+          <Button
+            type="button"
+            ref={createActionRef}
+            onClick={(event) => handleCreateTask(event.currentTarget)}
+          >
+            Create task
+          </Button>
+        ) : null}
+      </div>
+
+      <div className="mt-3">
+        <TasksTable
+          tasks={taskItems}
+          selectedTaskId={selectedTaskId}
+          isLoading={isLoading}
+          error={errorMessage}
+          hasActiveFilters={false}
+          showProjectColumn={false}
+          onTaskSelect={handleTaskSelect}
+          onCreateTask={canManage ? handleCreateTask : undefined}
+          onRetry={handleRetry}
+        />
+      </div>
 
       <TaskPreviewPanel
         taskItem={selectedTask}

@@ -29,7 +29,7 @@ export function WorkspaceInvitationsCard({ workspace }: WorkspaceInvitationsCard
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Pending Invitations</CardTitle>
+        <CardTitle>Pending invitations</CardTitle>
       </CardHeader>
 
       <CardContent className="flex min-h-48 flex-col">

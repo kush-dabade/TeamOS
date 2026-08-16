@@ -1,4 +1,3 @@
-import type { RefObject } from "react";
 import { ListTodo, SearchX, TriangleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui";
@@ -16,16 +15,6 @@ interface TasksTableProps {
   error: string | null;
   hasActiveFilters: boolean;
   showProjectColumn?: boolean;
-  // Renders a persistent "Tasks" header row with a create action above the
-  // table whenever it's showing rows (loading or loaded) - for consumers
-  // that don't already have their own toolbar create button (TasksPage does,
-  // so it leaves this false and is unaffected).
-  showCreateAction?: boolean;
-  // Ref to the persistent create button so a caller can restore focus to a
-  // stable control (e.g. after deleting the row that previously had focus)
-  // instead of a DOM node that may no longer exist. Only attached when
-  // showCreateAction is true.
-  createActionRef?: RefObject<HTMLButtonElement | null>;
   onTaskSelect: (taskId: string, trigger: HTMLButtonElement | null) => void;
   // Optional so callers without create permission can omit it entirely,
   // hiding every create affordance (empty state and persistent header) - the
@@ -45,8 +34,6 @@ export function TasksTable({
   error,
   hasActiveFilters,
   showProjectColumn = true,
-  showCreateAction = false,
-  createActionRef,
   onTaskSelect,
   onCreateTask,
   onRetry,
@@ -102,54 +89,37 @@ export function TasksTable({
   }
 
   return (
-    <div>
-      {showCreateAction ? (
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-medium">Tasks</h2>
-          {onCreateTask ? (
-            <Button
-              type="button"
-              ref={createActionRef}
-              onClick={(event) => onCreateTask(event.currentTarget)}
-            >
-              Create task
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
-
-      <div className="overflow-x-auto">
-        <table aria-busy={isLoading} className="min-w-[960px] w-full border-collapse text-sm">
-          <caption className="sr-only">Tasks</caption>
-          <thead className="sticky top-0 z-10 border-b bg-background/95 text-left text-xs font-medium text-muted-foreground backdrop-blur">
-            <tr>
-              <th scope="col" className="w-[30%] px-3 py-2 font-medium">Task</th>
-              <th scope="col" className="w-28 px-3 py-2 font-medium">Status</th>
-              <th scope="col" className="w-28 px-3 py-2 font-medium">Priority</th>
-              <th scope="col" className="w-40 px-3 py-2 font-medium">Assignee</th>
-              {showProjectColumn ? (
-                <th scope="col" className="w-40 px-3 py-2 font-medium">Project</th>
-              ) : null}
-              <th scope="col" className="w-32 px-3 py-2 font-medium">Due Date</th>
-              <th scope="col" className="w-28 px-3 py-2 font-medium">Updated</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? <TasksTableSkeleton /> : null}
-            {!isLoading
-              ? tasks.map((taskItem) => (
-                  <TaskRow
-                    key={taskItem.task.id}
-                    taskItem={taskItem}
-                    isSelected={taskItem.task.id === selectedTaskId}
-                    showProjectColumn={showProjectColumn}
-                    onSelect={onTaskSelect}
-                  />
-                ))
-              : null}
-          </tbody>
-        </table>
-      </div>
+    <div className="overflow-x-auto">
+      <table aria-busy={isLoading} className="min-w-[960px] w-full border-collapse text-sm">
+        <caption className="sr-only">Tasks</caption>
+        <thead className="sticky top-0 z-10 border-b bg-background/95 text-left text-xs font-medium text-muted-foreground backdrop-blur">
+          <tr>
+            <th scope="col" className="w-[30%] px-3 py-2 font-medium">Task</th>
+            <th scope="col" className="w-28 px-3 py-2 font-medium">Status</th>
+            <th scope="col" className="w-28 px-3 py-2 font-medium">Priority</th>
+            <th scope="col" className="w-40 px-3 py-2 font-medium">Assignee</th>
+            {showProjectColumn ? (
+              <th scope="col" className="w-40 px-3 py-2 font-medium">Project</th>
+            ) : null}
+            <th scope="col" className="w-32 px-3 py-2 font-medium">Due Date</th>
+            <th scope="col" className="w-28 px-3 py-2 font-medium">Updated</th>
+          </tr>
+        </thead>
+        <tbody>
+          {isLoading ? <TasksTableSkeleton /> : null}
+          {!isLoading
+            ? tasks.map((taskItem) => (
+                <TaskRow
+                  key={taskItem.task.id}
+                  taskItem={taskItem}
+                  isSelected={taskItem.task.id === selectedTaskId}
+                  showProjectColumn={showProjectColumn}
+                  onSelect={onTaskSelect}
+                />
+              ))
+            : null}
+        </tbody>
+      </table>
     </div>
   );
 }

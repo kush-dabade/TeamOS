@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
-import { PageLayout } from "@/components/layout";
+import { PageHeader, PageLayout } from "@/components/layout";
 import { useProjects } from "@/features/projects";
 import { useActiveWorkspace, useWorkspaceMembers } from "@/features/workspaces";
 
@@ -192,6 +192,8 @@ export function TasksPage() {
 
   return (
     <PageLayout>
+      <PageHeader title="Tasks" />
+
       <div className="mt-3">
         <TasksToolbar
           searchQuery={searchQuery}

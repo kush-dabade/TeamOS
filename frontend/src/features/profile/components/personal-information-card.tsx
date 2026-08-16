@@ -26,7 +26,7 @@ export function PersonalInformationCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Personal Information</CardTitle>
+        <CardTitle>Personal information</CardTitle>
         <CardDescription>
           Your name is visible to your teammates across TeamOS.
         </CardDescription>

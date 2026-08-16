@@ -66,7 +66,7 @@ export function CommentForm({
             <textarea
               {...field}
               id={field.name}
-              rows={3}
+              rows={isComposer ? 1 : 3}
               placeholder={placeholder}
               aria-invalid={fieldState.invalid}
               aria-describedby={fieldState.error ? errorId : undefined}
@@ -108,13 +108,13 @@ export function CommentForm({
       <form
         onSubmit={form.handleSubmit(handleValid)}
         noValidate
-        className="rounded-lg bg-card ring-1 ring-foreground/10 transition-shadow focus-within:ring-3 focus-within:ring-ring/50 has-[textarea[aria-invalid=true]]:ring-3 has-[textarea[aria-invalid=true]]:ring-destructive/20 dark:has-[textarea[aria-invalid=true]]:ring-destructive/40"
+        className="flex flex-col gap-1 rounded-lg bg-card px-3.5 py-3 ring-1 ring-foreground/10 transition-shadow focus-within:ring-3 focus-within:ring-ring/50 has-[textarea[aria-invalid=true]]:ring-3 has-[textarea[aria-invalid=true]]:ring-destructive/20 dark:has-[textarea[aria-invalid=true]]:ring-destructive/40"
       >
-        <div className="px-3.5 pt-3.5">{textarea}</div>
+        {textarea}
 
-        <FieldError errors={[form.formState.errors.root]} className="px-3.5" />
+        <FieldError errors={[form.formState.errors.root]} />
 
-        <div className="flex items-center justify-end px-3.5 pb-3.5 pt-1">{actions}</div>
+        <div className="flex items-center justify-end">{actions}</div>
       </form>
     );
   }

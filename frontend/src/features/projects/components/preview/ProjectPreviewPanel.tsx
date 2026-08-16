@@ -1,4 +1,14 @@
+import { useState } from "react";
+
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
   Button,
   Separator,
   Sheet,
@@ -24,7 +34,7 @@ interface ProjectPreviewPanelProps {
   onCloseAutoFocus: () => void;
   onOpenProject: (slug: string) => void;
   onEdit: (trigger: HTMLButtonElement) => void;
-  onArchive: () => void;
+  onArchive: () => void | Promise<void>;
 }
 
 export function ProjectPreviewPanel({
@@ -39,6 +49,8 @@ export function ProjectPreviewPanel({
   onEdit,
   onArchive,
 }: ProjectPreviewPanelProps) {
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+
   if (!project) {
     return null;
   }
@@ -124,8 +136,8 @@ export function ProjectPreviewPanel({
             </Button>
             <Button
               type="button"
-              variant="ghost"
-              onClick={onArchive}
+              variant="destructive"
+              onClick={() => setIsConfirmOpen(true)}
               disabled={isArchiving || projectDetails.status === "ARCHIVED"}
             >
               {isArchiving ? "Archiving..." : "Archive"}
@@ -134,6 +146,39 @@ export function ProjectPreviewPanel({
           <Button type="button" onClick={() => onOpenProject(projectDetails.slug)}>Open project</Button>
         </SheetFooter>
       </SheetContent>
+
+      <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+        <AlertDialogContent size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive project?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will archive &quot;{projectDetails.name}&quot;. Archived projects can no longer
+              be edited, and their tasks can no longer be created, updated, or deleted. This
+              action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isArchiving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={isArchiving}
+              onClick={async (event) => {
+                // Prevent Radix's default auto-close so the dialog stays
+                // open (showing the pending state, both actions disabled)
+                // for the duration of the archive instead of closing
+                // immediately into a state that looks finished while the
+                // mutation is still in flight. onArchive's own caller
+                // already catches its errors, so this always settles.
+                event.preventDefault();
+                await onArchive();
+                setIsConfirmOpen(false);
+              }}
+            >
+              {isArchiving ? "Archiving..." : "Archive"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sheet>
   );
 }

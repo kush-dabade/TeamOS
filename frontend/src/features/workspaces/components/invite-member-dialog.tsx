@@ -28,13 +28,13 @@ export function InviteMemberDialog({ workspaceId, actorRole }: InviteMemberDialo
       <DialogTrigger asChild>
         <Button type="button" size="sm">
           <UserPlus />
-          Invite Member
+          Invite member
         </Button>
       </DialogTrigger>
 
       <DialogContent className="gap-6 p-6 sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Invite Member</DialogTitle>
+          <DialogTitle>Invite member</DialogTitle>
           <DialogDescription>
             They&apos;ll receive an email invitation to join this workspace with the role you
             choose below.

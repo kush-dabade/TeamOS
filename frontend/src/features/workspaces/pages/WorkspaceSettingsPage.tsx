@@ -1,6 +1,6 @@
 import { TriangleAlert } from "lucide-react";
 
-import { PageLayout } from "@/components/layout";
+import { PageHeader, PageLayout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { ErrorState, PageError } from "@/components/ux";
 
@@ -25,6 +25,11 @@ export function WorkspaceSettingsPage() {
 
   return (
     <PageLayout>
+      <PageHeader
+        title="Workspace settings"
+        description="Manage this workspace's details, members, and invitations."
+      />
+
       {isError ? (
         <PageError>
           <ErrorState

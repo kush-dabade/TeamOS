@@ -27,13 +27,13 @@ export function EditWorkspaceDialog({ workspace }: EditWorkspaceDialogProps) {
       <DialogTrigger asChild>
         <Button type="button" variant="outline" size="sm">
           <Pencil />
-          Edit Workspace
+          Edit workspace
         </Button>
       </DialogTrigger>
 
       <DialogContent className="gap-6 p-6 sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Edit Workspace</DialogTitle>
+          <DialogTitle>Edit workspace</DialogTitle>
           <DialogDescription>
             Update your workspace name. This change is visible to everyone in the workspace.
           </DialogDescription>

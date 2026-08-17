@@ -1,6 +1,6 @@
 import { Bell } from "lucide-react";
 
-import { Skeleton } from "@/components/ui";
+import { Button, Skeleton } from "@/components/ui";
 import { EmptyState, ListErrorState } from "@/components/ux";
 
 import { NotificationItem } from "./NotificationItem";
@@ -13,6 +13,9 @@ interface NotificationListProps {
   onRetry: () => void;
   onMarkRead: (notificationId: string) => void;
   onNavigate: (destination: string) => void;
+  hasMore: boolean;
+  isLoadingMore: boolean;
+  onLoadMore: () => void;
 }
 
 const skeletonRows = Array.from({ length: 3 }, (_, index) => index);
@@ -28,6 +31,9 @@ export function NotificationList({
   onRetry,
   onMarkRead,
   onNavigate,
+  hasMore,
+  isLoadingMore,
+  onLoadMore,
 }: NotificationListProps) {
   if (isError) {
     return (
@@ -79,6 +85,19 @@ export function NotificationList({
           onNavigate={onNavigate}
         />
       ))}
+
+      {hasMore ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="w-full"
+          onClick={onLoadMore}
+          disabled={isLoadingMore}
+        >
+          {isLoadingMore ? "Loading..." : "Load more"}
+        </Button>
+      ) : null}
     </div>
   );
 }

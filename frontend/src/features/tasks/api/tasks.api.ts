@@ -36,6 +36,35 @@ export interface UpdateTaskInput {
   dueDate?: string | null;
 }
 
+export interface TaskPagination {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
+
+// The task list endpoint's envelope nests results under `data.tasks` with a
+// sibling `pagination` block, unlike the flat `ApiSuccess<T>` envelope other
+// task endpoints use - mirrors the Activity list endpoint's own local
+// response shape for the same reason.
+interface TaskListResponse {
+  success: true;
+  data: {
+    tasks: BackendTask[];
+  };
+  pagination: TaskPagination;
+}
+
+export interface ListProjectTasksParams {
+  page?: number;
+  limit?: number;
+}
+
+export interface ListProjectTasksResult {
+  tasks: Task[];
+  pagination: TaskPagination;
+}
+
 // The backend task resource never returns deletedAt (soft-deleted tasks are
 // simply excluded from list/detail results).
 function toTask(task: BackendTask): Task {
@@ -58,12 +87,18 @@ function toTask(task: BackendTask): Task {
   };
 }
 
-export async function fetchProjectTasks(projectId: string): Promise<Task[]> {
-  const response = await apiClient.get<ApiSuccess<BackendTask[]>>(
-    `/projects/${projectId}/tasks`,
-  );
+export async function fetchProjectTasks(
+  projectId: string,
+  params: ListProjectTasksParams = {},
+): Promise<ListProjectTasksResult> {
+  const response = await apiClient.get<TaskListResponse>(`/projects/${projectId}/tasks`, {
+    params,
+  });
 
-  return response.data.data.map(toTask);
+  return {
+    tasks: response.data.data.tasks.map(toTask),
+    pagination: response.data.pagination,
+  };
 }
 
 export async function fetchTask(taskId: string): Promise<Task> {

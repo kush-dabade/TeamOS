@@ -20,7 +20,13 @@ export const createTaskSchema = z.object({
   assigneeId: z.string().trim().min(1, "Assignee ID is required").optional(),
 });
 
-export const listTasksQuerySchema = z.object({});
+export const listTasksQuerySchema = z
+  .object({
+    page: z.coerce.number().int().positive().default(1),
+
+    limit: z.coerce.number().int().positive().max(100).default(20),
+  })
+  .strict();
 
 export const updateTaskSchema = z
   .object({

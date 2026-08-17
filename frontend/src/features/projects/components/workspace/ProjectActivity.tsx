@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+
 import { ActivityFeed, useProjectActivity } from "@/features/activity";
 
 interface ProjectActivityProps {
@@ -6,16 +8,26 @@ interface ProjectActivityProps {
 }
 
 export function ProjectActivity({ workspaceId, projectId }: ProjectActivityProps) {
-  const { data, isLoading, isError, refetch } = useProjectActivity(workspaceId, projectId);
+  const activityQuery = useProjectActivity(workspaceId, projectId);
+
+  // ActivityFeed stays pagination-unaware - flattening happens here, at the
+  // hook/container boundary, mirroring NotificationsPopover for Notifications.
+  const activities = useMemo(
+    () => activityQuery.data?.pages.flatMap((page) => page.activities) ?? [],
+    [activityQuery.data],
+  );
 
   return (
     <ActivityFeed
-      activities={data}
-      isLoading={isLoading}
-      isError={isError}
-      onRetry={refetch}
+      activities={activities}
+      isLoading={activityQuery.isLoading}
+      isError={activityQuery.isError && !activityQuery.data}
+      onRetry={() => activityQuery.refetch()}
       emptyTitle="No activity yet"
       emptyDescription="Updates to this project will appear here."
+      hasMore={activityQuery.hasNextPage}
+      isLoadingMore={activityQuery.isFetchingNextPage}
+      onLoadMore={() => activityQuery.fetchNextPage()}
     />
   );
 }

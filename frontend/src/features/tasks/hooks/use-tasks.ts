@@ -19,10 +19,16 @@ export function useTasks(workspaceId: string | undefined) {
 
   const projects = useMemo(() => projectsQuery.data ?? [], [projectsQuery.data]);
 
+  // Tasks are paginated server-side (20/page by default) - fetching the
+  // maximum page size here keeps this fan-out's current behavior for any
+  // project at or under 100 tasks without page-walking through the rest.
+  // Projects beyond 100 tasks are a known, accepted gap: this page is fed by
+  // an unrelated N-requests-per-project architecture that isn't being fixed
+  // as part of Task pagination.
   const taskQueries = useQueries({
     queries: projects.map(({ project }) => ({
-      queryKey: taskKeys.list(project.id),
-      queryFn: () => fetchProjectTasks(project.id),
+      queryKey: taskKeys.listPage(project.id, 1, 100),
+      queryFn: () => fetchProjectTasks(project.id, { page: 1, limit: 100 }),
       enabled: Boolean(workspaceId),
     })),
   });
@@ -49,7 +55,7 @@ export function useTasks(workspaceId: string | undefined) {
 
     const items = projects.flatMap(({ project }, index): TaskListItem[] => {
       const taskProject: TaskProject = { id: project.id, slug: project.slug, name: project.name };
-      const projectTasks = taskQueries[index]?.data ?? [];
+      const projectTasks = taskQueries[index]?.data?.tasks ?? [];
 
       return projectTasks.map((task) => ({
         task,

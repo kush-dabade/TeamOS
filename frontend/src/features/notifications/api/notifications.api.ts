@@ -15,6 +15,27 @@ interface BackendNotification {
   createdAt: string;
 }
 
+interface NotificationPagination {
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+interface NotificationListResponse {
+  success: true;
+  data: { notifications: BackendNotification[] };
+  pagination: NotificationPagination;
+}
+
+export interface ListNotificationsParams {
+  limit?: number;
+  cursor?: string;
+}
+
+export interface ListNotificationsResult {
+  notifications: Notification[];
+  pagination: NotificationPagination;
+}
+
 function toNotification(notification: BackendNotification): Notification {
   return {
     id: notification.id,
@@ -27,10 +48,15 @@ function toNotification(notification: BackendNotification): Notification {
   };
 }
 
-export async function fetchNotifications(): Promise<Notification[]> {
-  const response = await apiClient.get<ApiSuccess<BackendNotification[]>>("/notifications");
+export async function fetchNotifications(
+  params: ListNotificationsParams = {},
+): Promise<ListNotificationsResult> {
+  const response = await apiClient.get<NotificationListResponse>("/notifications", { params });
 
-  return response.data.data.map(toNotification);
+  return {
+    notifications: response.data.data.notifications.map(toNotification),
+    pagination: response.data.pagination,
+  };
 }
 
 export async function fetchUnreadNotificationCount(): Promise<number> {

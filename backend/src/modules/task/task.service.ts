@@ -180,18 +180,32 @@ export async function listTasks(actorId: string, options: ListTasksOptions) {
 
   await requireWorkspaceMembership(project.workspaceId, actorId);
 
-  const tasks = await prisma.task.findMany({
-    where: {
-      projectId: options.projectId,
-      deletedAt: null,
-    },
+  const where = {
+    projectId: options.projectId,
+    deletedAt: null,
+  };
 
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+  const skip = (options.page - 1) * options.limit;
 
-  return tasks.map(toTaskResponse);
+  const [total, tasks] = await Promise.all([
+    prisma.task.count({
+      where,
+    }),
+
+    prisma.task.findMany({
+      where,
+
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+
+      skip,
+      take: options.limit,
+    }),
+  ]);
+
+  return {
+    tasks: tasks.map(toTaskResponse),
+    total,
+  };
 }
 
 export async function getTaskById(actorId: string, taskId: string) {

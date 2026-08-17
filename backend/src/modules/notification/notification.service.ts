@@ -1,8 +1,12 @@
 import { Prisma, type Notification } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
 
+import { notificationCursorSchema } from "./notification.schema.js";
 import type {
   CreateNotificationData,
+  ListNotificationsOptions,
+  ListNotificationsResult,
+  NotificationCursorData,
   NotificationResponse,
 } from "./notification.types.js";
 
@@ -11,6 +15,7 @@ import { REALTIME_EVENTS } from "../../realtime/realtime.constants.js";
 
 import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
 import { NotFoundError } from "../../shared/errors/not-found-error.js";
+import { ValidationError } from "../../shared/errors/validation-error.js";
 
 async function findNotificationById(notificationId: string) {
   return prisma.notification.findUnique({
@@ -43,6 +48,35 @@ function toNotificationResponse(
   };
 }
 
+// Opaque to the frontend by design - callers only ever echo back the
+// `nextCursor` a previous response gave them, never construct one.
+// Base64 of {createdAt, id} is enough to reconstruct the keyset condition
+// below without exposing (or depending on) any particular encoding.
+function encodeNotificationCursor(cursor: NotificationCursorData): string {
+  return Buffer.from(
+    JSON.stringify({ createdAt: cursor.createdAt.toISOString(), id: cursor.id }),
+  ).toString("base64");
+}
+
+// A cursor that isn't valid Base64/JSON can't reach notificationCursorSchema
+// at all, so it's reported via the same ValidationError -> 400
+// VALIDATION_ERROR path the rest of the module already uses (see
+// attachment.service.ts, sprint-task.service.ts) rather than a new error
+// type. A cursor that decodes but has the wrong shape (e.g. missing `id`)
+// is instead reported by notificationCursorSchema.parse itself throwing a
+// ZodError, already handled globally the same way.
+function decodeNotificationCursor(cursor: string): NotificationCursorData {
+  let decoded: unknown;
+
+  try {
+    decoded = JSON.parse(Buffer.from(cursor, "base64").toString("utf8"));
+  } catch {
+    throw new ValidationError("Invalid pagination cursor");
+  }
+
+  return notificationCursorSchema.parse(decoded);
+}
+
 export async function createNotification(
   data: CreateNotificationData,
 ): Promise<NotificationResponse> {
@@ -69,21 +103,51 @@ export async function createNotification(
 
 export async function listNotifications(
   actorId: string,
-): Promise<NotificationResponse[]> {
-  const notifications = await prisma.notification.findMany({
-    where: {
-      recipientId: actorId,
-      deletedAt: null,
-    },
+  options: ListNotificationsOptions,
+): Promise<ListNotificationsResult> {
+  const where: Prisma.NotificationWhereInput = {
+    recipientId: actorId,
+    deletedAt: null,
+  };
 
-    orderBy: {
-      createdAt: "desc",
-    },
+  // The cursor only ever narrows further within the recipient/deletedAt
+  // filter already set above - it's ANDed in alongside them (Prisma merges
+  // top-level where fields with AND), so a tampered or forged cursor can
+  // never widen the query past the authenticated actor's own notifications.
+  if (options.cursor) {
+    const cursor = decodeNotificationCursor(options.cursor);
 
-    take: 50,
+    where.OR = [
+      { createdAt: { lt: cursor.createdAt } },
+      { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+    ];
+  }
+
+  // Fetches one extra row (limit + 1) to determine hasMore without a
+  // separate COUNT(*) - if the extra row comes back, it's dropped below
+  // and never reaches the client or the cursor derivation.
+  const rows = await prisma.notification.findMany({
+    where,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: options.limit + 1,
   });
 
-  return notifications.map(toNotificationResponse);
+  const hasMore = rows.length > options.limit;
+  const page = hasMore ? rows.slice(0, options.limit) : rows;
+  const lastNotification = page[page.length - 1];
+
+  const nextCursor =
+    hasMore && lastNotification
+      ? encodeNotificationCursor({
+          createdAt: lastNotification.createdAt,
+          id: lastNotification.id,
+        })
+      : null;
+
+  return {
+    notifications: page.map(toNotificationResponse),
+    pagination: { nextCursor, hasMore },
+  };
 }
 
 export async function markNotificationAsRead(

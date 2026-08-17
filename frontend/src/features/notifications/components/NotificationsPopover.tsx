@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { BellIcon } from "lucide-react";
 
@@ -28,6 +28,14 @@ export function NotificationsPopover() {
   const markAllReadMutation = useMarkAllNotificationsRead();
 
   const unreadCount = unreadCountQuery.data ?? 0;
+
+  // NotificationList/NotificationItem stay unaware of pagination - flattening
+  // happens here, at the hook/container boundary, so they keep receiving the
+  // same simple Notification[] they always have.
+  const notifications = useMemo(
+    () => notificationsQuery.data?.pages.flatMap((page) => page.notifications) ?? [],
+    [notificationsQuery.data],
+  );
 
   function handleNavigate(destination: string) {
     setOpen(false);
@@ -77,12 +85,15 @@ export function NotificationsPopover() {
 
         <div className="border-t border-border/50">
           <NotificationList
-            notifications={notificationsQuery.data ?? []}
+            notifications={notifications}
             isLoading={notificationsQuery.isLoading}
             isError={notificationsQuery.isError}
             onRetry={() => notificationsQuery.refetch()}
             onMarkRead={(notificationId) => markReadMutation.mutate(notificationId)}
             onNavigate={handleNavigate}
+            hasMore={notificationsQuery.hasNextPage}
+            isLoadingMore={notificationsQuery.isFetchingNextPage}
+            onLoadMore={() => notificationsQuery.fetchNextPage()}
           />
         </div>
       </PopoverContent>

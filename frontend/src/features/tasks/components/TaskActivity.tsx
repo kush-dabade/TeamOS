@@ -32,7 +32,7 @@ export function TaskActivity({ workspaceId, taskId }: TaskActivityProps) {
         <ActivityFeed
           activities={activities}
           isLoading={activityQuery.isLoading}
-          isError={activityQuery.isError}
+          isError={activityQuery.isError && !activityQuery.data}
           onRetry={() => activityQuery.refetch()}
           emptyTitle="No activity yet"
           emptyDescription="Updates to this task will appear here."

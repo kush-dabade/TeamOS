@@ -1,5 +1,12 @@
--- DropIndex
-DROP INDEX "Notification_recipientId_createdAt_idx";
-
 -- CreateIndex
-CREATE INDEX "Notification_recipientId_createdAt_id_idx" ON "Notification"("recipientId", "createdAt" DESC, "id" DESC);
+-- Uses CONCURRENTLY so this build doesn't hold the ACCESS EXCLUSIVE-adjacent
+-- lock a plain CREATE INDEX takes against concurrent writes to Notification.
+-- The old index is dropped separately, in its own later migration
+-- (20260817170432_drop_notification_recipientid_createdat_idx) rather than
+-- here, because Postgres rejects CONCURRENTLY inside a transaction and
+-- Prisma Migrate only skips wrapping a migration file in a transaction when
+-- it contains exactly one statement - a combined create+drop file would
+-- still get wrapped and fail. Creating the new (superset) index before
+-- dropping the old one also means there's never a window with neither index
+-- present.
+CREATE INDEX CONCURRENTLY "Notification_recipientId_createdAt_id_idx" ON "Notification"("recipientId", "createdAt" DESC, "id" DESC);

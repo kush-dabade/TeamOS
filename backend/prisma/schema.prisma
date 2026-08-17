@@ -462,7 +462,7 @@ model Notification {
   recipient User @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
 
   @@index([recipientId, isRead])
-  @@index([recipientId, createdAt(sort: Desc)])
+  @@index([recipientId, createdAt(sort: Desc), id(sort: Desc)])
   @@index([workspaceId])
   @@index([deletedAt])
 }

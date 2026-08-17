@@ -31,3 +31,23 @@ export interface CreateNotificationData {
 
   metadata?: Record<string, unknown>;
 }
+
+export interface ListNotificationsOptions {
+  limit: number;
+  cursor?: string | undefined;
+}
+
+export interface NotificationCursorData {
+  createdAt: Date;
+  id: string;
+}
+
+export interface NotificationPagination {
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+export interface ListNotificationsResult {
+  notifications: NotificationResponse[];
+  pagination: NotificationPagination;
+}

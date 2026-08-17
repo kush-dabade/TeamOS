@@ -1,6 +1,9 @@
 import type { Request, Response } from "express";
 
-import { notificationParamsSchema } from "./notification.schema.js";
+import {
+  listNotificationsQuerySchema,
+  notificationParamsSchema,
+} from "./notification.schema.js";
 
 import {
   listNotifications,
@@ -10,11 +13,17 @@ import {
 } from "./notification.service.js";
 
 export async function listNotificationsHandler(req: Request, res: Response) {
-  const notifications = await listNotifications(req.user!.id);
+  const query = listNotificationsQuerySchema.parse(req.query);
+
+  const result = await listNotifications(req.user!.id, {
+    limit: query.limit,
+    cursor: query.cursor,
+  });
 
   return res.status(200).json({
     success: true,
-    data: notifications,
+    data: { notifications: result.notifications },
+    pagination: result.pagination,
   });
 }
 

@@ -17,6 +17,9 @@ export interface CreateTaskData {
 
 export interface ListTasksOptions {
   projectId: string;
+
+  page: number;
+  limit: number;
 }
 
 export interface UpdateTaskData {

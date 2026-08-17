@@ -1,7 +1,10 @@
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui";
-import { useProjectTasks } from "@/features/tasks";
+import { taskKeys } from "@/features/tasks";
+import { fetchProjectTasks, type ListProjectTasksResult } from "@/features/tasks/api/tasks.api";
+import type { AppError } from "@/lib/api";
 
 import { useAssignTaskToSprint } from "../hooks/use-assign-task-to-sprint";
 import { useCompleteSprint } from "../hooks/use-complete-sprint";
@@ -63,10 +66,16 @@ export function SprintsView({ projectId }: SprintsViewProps) {
   // (which does carry a real sprintId, since it comes from the raw-row
   // sprint-task endpoints) - never by reading .sprintId off a projectTasks
   // entry, which is always null.
-  const projectTasksQuery = useProjectTasks(projectId);
+  // Needs every project task to pick from, not one page of them - requests
+  // the paginated endpoint's max page size rather than page-walking. Same
+  // known, accepted >100-task limitation as the All Tasks page (use-tasks.ts).
+  const projectTasksQuery = useQuery<ListProjectTasksResult, AppError>({
+    queryKey: taskKeys.listPage(projectId, 1, 100),
+    queryFn: () => fetchProjectTasks(projectId, { limit: 100 }),
+  });
   const assignableTasks = useMemo(() => {
     const sprintTaskIds = new Set((sprintTasksQuery.data ?? []).map((task) => task.id));
-    return (projectTasksQuery.data ?? []).filter((task) => !sprintTaskIds.has(task.id));
+    return (projectTasksQuery.data?.tasks ?? []).filter((task) => !sprintTaskIds.has(task.id));
   }, [projectTasksQuery.data, sprintTasksQuery.data]);
 
   const handleSprintSelect = (sprintId: string, trigger: HTMLButtonElement | null) => {

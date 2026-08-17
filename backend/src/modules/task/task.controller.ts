@@ -36,15 +36,26 @@ export async function createTaskHandler(req: Request, res: Response) {
 }
 
 export async function listTasksHandler(req: Request, res: Response) {
-  listTasksQuerySchema.parse(req.query);
+  const query = listTasksQuerySchema.parse(req.query);
 
-  const tasks = await listTasks(req.user!.id, {
+  const result = await listTasks(req.user!.id, {
     projectId: req.params.projectId as string,
+
+    page: query.page,
+    limit: query.limit,
   });
 
   return res.status(200).json({
     success: true,
-    data: tasks,
+    data: {
+      tasks: result.tasks,
+    },
+    pagination: {
+      page: query.page,
+      limit: query.limit,
+      total: result.total,
+      pages: Math.ceil(result.total / query.limit),
+    },
   });
 }
 

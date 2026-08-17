@@ -21,10 +21,14 @@ export function useProjectsWithTaskCounts(workspaceId: string | undefined, statu
   const projectsQuery = useProjects(workspaceId, status);
   const projects = useMemo(() => projectsQuery.data ?? [], [projectsQuery.data]);
 
+  // Task counts need every task, not one page of them - requests the
+  // paginated endpoint's max page size rather than page-walking. Projects
+  // beyond 100 tasks are a known, accepted gap (same limitation accepted for
+  // the All Tasks page's fan-out - see use-tasks.ts).
   const taskQueries = useQueries({
     queries: projects.map(({ project }) => ({
-      queryKey: taskKeys.list(project.id),
-      queryFn: () => fetchProjectTasks(project.id),
+      queryKey: taskKeys.listPage(project.id, 1, 100),
+      queryFn: () => fetchProjectTasks(project.id, { limit: 100 }),
       enabled: Boolean(workspaceId),
     })),
   });
@@ -36,7 +40,7 @@ export function useProjectsWithTaskCounts(workspaceId: string | undefined, statu
 
     return projects.map((item, index) => ({
       ...item,
-      ...countTasks(taskQueries[index]?.data ?? []),
+      ...countTasks(taskQueries[index]?.data?.tasks ?? []),
     }));
   }, [projectsQuery.data, projects, taskQueries]);
 

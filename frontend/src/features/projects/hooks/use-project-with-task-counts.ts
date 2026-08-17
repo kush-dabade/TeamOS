@@ -19,9 +19,13 @@ import { useProject } from "./use-project";
 export function useProjectWithTaskCounts(projectId: string | undefined) {
   const projectQuery = useProject(projectId);
 
+  // Task counts need every task, not one page of them - requests the
+  // paginated endpoint's max page size rather than page-walking. Projects
+  // beyond 100 tasks are a known, accepted gap (same limitation accepted for
+  // the All Tasks page's fan-out - see use-tasks.ts).
   const tasksQuery = useQuery<Task[], AppError>({
-    queryKey: taskKeys.list(projectId ?? ""),
-    queryFn: () => fetchProjectTasks(projectId as string),
+    queryKey: taskKeys.listPage(projectId ?? "", 1, 100),
+    queryFn: async () => (await fetchProjectTasks(projectId as string, { limit: 100 })).tasks,
     enabled: Boolean(projectId),
   });
 

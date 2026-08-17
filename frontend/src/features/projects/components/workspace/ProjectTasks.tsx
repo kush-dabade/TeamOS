@@ -33,7 +33,8 @@ export function ProjectTasks({ project, workspaceId }: ProjectTasksProps) {
   const navigate = useNavigate();
   const { workspace } = useActiveWorkspace();
 
-  const tasksQuery = useProjectTasks(project.id);
+  const [page, setPage] = useState(1);
+  const tasksQuery = useProjectTasks(project.id, page);
   const membersQuery = useWorkspaceMembers(workspaceId);
 
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -72,13 +73,39 @@ export function ProjectTasks({ project, workspaceId }: ProjectTasksProps) {
 
   const taskItems: TaskListItem[] = useMemo(
     () =>
-      (tasksQuery.data ?? []).map((task) => ({
+      (tasksQuery.data?.tasks ?? []).map((task) => ({
         task,
         assignee: task.assigneeId ? (assigneesByUserId.get(task.assigneeId) ?? null) : null,
         project,
       })),
     [tasksQuery.data, assigneesByUserId, project],
   );
+
+  const pagination = tasksQuery.data?.pagination;
+
+  // A mutation (e.g. deleting the last task on this page) can shrink
+  // `pagination.pages` below the currently-viewed page, or to 0 for an
+  // empty project. Left uncorrected, the table would keep requesting a page
+  // that no longer exists and render as permanently, misleadingly empty.
+  // Adjusts `page` directly during render (React's documented alternative to
+  // an Effect for this exact "correct state in response to new data" case:
+  // https://react.dev/learn/you-might-not-need-an-effect) rather than in a
+  // useEffect, which the repo's lint config flags as cascading-render-prone.
+  // `lastPagination` only tracks which pagination result has already been
+  // reconciled, so this block runs at most once per distinct fetch result.
+  const [lastPagination, setLastPagination] = useState(pagination);
+
+  if (pagination && pagination !== lastPagination) {
+    setLastPagination(pagination);
+
+    if (pagination.pages === 0) {
+      if (page !== 1) {
+        setPage(1);
+      }
+    } else if (page > pagination.pages) {
+      setPage(pagination.pages);
+    }
+  }
 
   const isLoading = tasksQuery.isLoading || membersQuery.isLoading;
   const errorMessage = tasksQuery.error?.message ?? membersQuery.error?.message ?? null;
@@ -87,6 +114,9 @@ export function ProjectTasks({ project, workspaceId }: ProjectTasksProps) {
     tasksQuery.refetch();
     membersQuery.refetch();
   };
+
+  const handlePreviousPage = () => setPage((current) => Math.max(1, current - 1));
+  const handleNextPage = () => setPage((current) => current + 1);
 
   const handleTaskSelect = (taskId: string, trigger: HTMLButtonElement | null) => {
     setSelectedTaskId(taskId);
@@ -210,6 +240,34 @@ export function ProjectTasks({ project, workspaceId }: ProjectTasksProps) {
           onRetry={handleRetry}
         />
       </div>
+
+      {pagination && pagination.pages > 1 ? (
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <span className="text-sm text-muted-foreground">
+            Page {pagination.page} of {pagination.pages}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handlePreviousPage}
+              disabled={page <= 1}
+            >
+              Previous
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleNextPage}
+              disabled={page >= pagination.pages}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       <TaskPreviewPanel
         taskItem={selectedTask}

@@ -1,42 +1,33 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 
 import type { AppError } from "@/lib/api";
 
-import { fetchWorkspaceActivities } from "../api/activity.api";
+import { fetchWorkspaceActivities, type ListActivitiesResult } from "../api/activity.api";
 import { activityKeys } from "../lib/activity-keys";
-import type { Activity } from "../types";
 
-interface UseProjectActivityResult {
-  data: Activity[];
-  isLoading: boolean;
-  isError: boolean;
-  refetch: () => void;
-}
-
+// Offset-paginated feed (page/limit, unlike Notification's cursor design),
+// but consumed the same way: useInfiniteQuery keeps every fetched page under
+// the single activityKeys.list() cache entry (no page in the key), so
+// realtime invalidation (realtime-handlers.ts) keeps targeting the same key
+// unchanged and refetches every loaded page. Flattening into a plain
+// Activity[] happens in the consuming component (ProjectActivity), same
+// boundary as NotificationsPopover for the Notification feed.
 export function useProjectActivity(
   workspaceId: string | undefined,
   projectId: string | undefined,
-): UseProjectActivityResult {
-  const activityQuery = useQuery<Activity[], AppError>({
+) {
+  return useInfiniteQuery<ListActivitiesResult, AppError>({
     queryKey: activityKeys.list(workspaceId ?? "", "PROJECT", projectId ?? ""),
-    queryFn: async () => {
-      const result = await fetchWorkspaceActivities(workspaceId as string, {
+    queryFn: ({ pageParam }) =>
+      fetchWorkspaceActivities(workspaceId as string, {
         projectId: projectId as string,
-      });
-
-      return result.activities;
-    },
+        page: pageParam as number,
+      }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) =>
+      lastPage.pagination.page < lastPage.pagination.pages
+        ? lastPage.pagination.page + 1
+        : undefined,
     enabled: Boolean(workspaceId) && Boolean(projectId),
   });
-
-  const refetch = () => {
-    activityQuery.refetch();
-  };
-
-  return {
-    data: activityQuery.data ?? [],
-    isLoading: activityQuery.isLoading,
-    isError: activityQuery.isError,
-    refetch,
-  };
 }

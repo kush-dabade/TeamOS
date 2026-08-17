@@ -1,6 +1,6 @@
 import { Activity as ActivityIcon } from "lucide-react";
 
-import { Skeleton } from "@/components/ui";
+import { Button, Skeleton } from "@/components/ui";
 import { EmptyState, ListErrorState } from "@/components/ux";
 import { cn } from "@/utils";
 
@@ -15,6 +15,9 @@ interface ActivityFeedProps {
   emptyTitle: string;
   emptyDescription: string;
   className?: string;
+  hasMore: boolean;
+  isLoadingMore: boolean;
+  onLoadMore: () => void;
 }
 
 const skeletonRows = Array.from({ length: 3 }, (_, index) => index);
@@ -30,6 +33,9 @@ export function ActivityFeed({
   emptyTitle,
   emptyDescription,
   className,
+  hasMore,
+  isLoadingMore,
+  onLoadMore,
 }: ActivityFeedProps) {
   if (isError) {
     return (
@@ -73,6 +79,19 @@ export function ActivityFeed({
       {activities.map((activity) => (
         <ActivityItem key={activity.id} activity={activity} />
       ))}
+
+      {hasMore ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="w-full"
+          onClick={onLoadMore}
+          disabled={isLoadingMore}
+        >
+          {isLoadingMore ? "Loading..." : "Load more"}
+        </Button>
+      ) : null}
     </div>
   );
 }

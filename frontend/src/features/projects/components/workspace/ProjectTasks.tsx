@@ -17,6 +17,7 @@ import {
   type TaskListItem,
   type TaskProject,
 } from "@/features/tasks";
+import { useSprints } from "@/features/sprints";
 import { useActiveWorkspace, useWorkspaceMembers } from "@/features/workspaces";
 
 interface ProjectTasksProps {
@@ -36,6 +37,7 @@ export function ProjectTasks({ project, workspaceId }: ProjectTasksProps) {
   const [page, setPage] = useState(1);
   const tasksQuery = useProjectTasks(project.id, page);
   const membersQuery = useWorkspaceMembers(workspaceId);
+  const sprintsQuery = useSprints(project.id);
 
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
@@ -127,6 +129,10 @@ export function ProjectTasks({ project, workspaceId }: ProjectTasksProps) {
   const selectedTask = taskItems.find((taskItem) => taskItem.task.id === selectedTaskId) ?? null;
   const selectedTaskCreator: TaskAssignee | null = selectedTask
     ? (assigneesByUserId.get(selectedTask.task.createdById) ?? null)
+    : null;
+  const selectedTaskSprintName = selectedTask?.task.sprintId
+    ? ((sprintsQuery.data ?? []).find((sprint) => sprint.id === selectedTask.task.sprintId)?.name ??
+      null)
     : null;
 
   const handleOpenTask = (taskId: string) => navigate(`/tasks/${taskId}`);
@@ -272,6 +278,7 @@ export function ProjectTasks({ project, workspaceId }: ProjectTasksProps) {
       <TaskPreviewPanel
         taskItem={selectedTask}
         createdBy={selectedTaskCreator}
+        sprintName={selectedTaskSprintName}
         open={isPreviewOpen}
         onClose={handlePreviewClose}
         onCloseAutoFocus={handlePreviewCloseAutoFocus}

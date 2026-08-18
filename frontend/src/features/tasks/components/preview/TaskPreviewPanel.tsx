@@ -27,6 +27,7 @@ import type { TaskAssignee, TaskListItem } from "../../types";
 interface TaskPreviewPanelProps {
   taskItem: TaskListItem | null;
   createdBy: TaskAssignee | null;
+  sprintName: string | null;
   open: boolean;
   onClose: () => void;
   onCloseAutoFocus: () => void;
@@ -42,6 +43,7 @@ interface TaskPreviewPanelProps {
 export function TaskPreviewPanel({
   taskItem,
   createdBy,
+  sprintName,
   open,
   onClose,
   onCloseAutoFocus,
@@ -82,7 +84,12 @@ export function TaskPreviewPanel({
           ) : null}
 
           <div className={task.description ? "mt-5" : undefined}>
-            <TaskProperties taskItem={taskItem} createdBy={createdBy} showTimestamps={false} />
+            <TaskProperties
+              taskItem={taskItem}
+              createdBy={createdBy}
+              sprintName={sprintName}
+              showTimestamps={false}
+            />
           </div>
         </div>
 

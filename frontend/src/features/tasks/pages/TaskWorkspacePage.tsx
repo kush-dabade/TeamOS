@@ -7,6 +7,15 @@ import { Button, Skeleton } from "@/components/ui";
 import { PageLayout } from "@/components/layout";
 import { ErrorState, PageError } from "@/components/ux";
 import { useProjects } from "@/features/projects";
+// Direct module path (not the "@/features/sprints" barrel) deliberately -
+// that barrel re-exports SprintsView, which imports taskKeys from
+// "@/features/tasks" at runtime. This file lives inside the tasks feature
+// itself, so importing the barrel here would create a real circular module
+// dependency (tasks -> sprints -> tasks). use-sprints.ts's own dependency
+// chain (sprints.api.ts, sprint-keys.ts) has no runtime import back into
+// tasks - only a type-only one, which is erased at compile time - so this
+// path is cycle-free.
+import { useSprints } from "@/features/sprints/hooks/use-sprints";
 import { useWorkspaceMembers } from "@/features/workspaces";
 
 import { useDeleteTask } from "../hooks/use-delete-task";
@@ -26,6 +35,7 @@ export function TaskWorkspacePage() {
   const workspaceId = taskDetail?.taskItem.task.workspaceId;
   const projectsQuery = useProjects(workspaceId);
   const membersQuery = useWorkspaceMembers(workspaceId);
+  const sprintsQuery = useSprints(taskDetail?.taskItem.task.projectId);
 
   const [isFormPanelOpen, setIsFormPanelOpen] = useState(false);
   const [formPanelTrigger, setFormPanelTrigger] = useState<HTMLButtonElement | null>(null);
@@ -79,6 +89,10 @@ export function TaskWorkspacePage() {
   }
 
   const { taskItem, createdBy } = taskDetail;
+
+  const sprintName = taskItem.task.sprintId
+    ? (sprintsQuery.data ?? []).find((sprint) => sprint.id === taskItem.task.sprintId)?.name ?? null
+    : null;
 
   const projects: TaskProject[] = (projectsQuery.data ?? []).map(({ project }) => ({
     id: project.id,
@@ -138,11 +152,12 @@ export function TaskWorkspacePage() {
     <PageLayout>
       <TaskHeader
         taskItem={taskItem}
+        sprintName={sprintName}
         onEdit={handleEdit}
         onDelete={handleDelete}
         isDeleting={deleteTask.isPending}
       />
-      <TaskWorkspace taskItem={taskItem} createdBy={createdBy} />
+      <TaskWorkspace taskItem={taskItem} createdBy={createdBy} sprintName={sprintName} />
 
       <TaskFormPanel
         mode="edit"

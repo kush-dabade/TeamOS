@@ -60,12 +60,13 @@ export function SprintsView({ projectId }: SprintsViewProps) {
   const sprintTasksQuery = useSprintTasks(selectedSprintId ?? undefined);
   const sprintTasks = sprintTasksQuery.data ?? [];
 
-  // The standard project-task endpoint never returns sprintId (verified
-  // against task.service.ts's toTaskResponse), so "already in this sprint"
-  // can only be determined by id, cross-referenced against sprintTasksQuery
-  // (which does carry a real sprintId, since it comes from the raw-row
-  // sprint-task endpoints) - never by reading .sprintId off a projectTasks
-  // entry, which is always null.
+  // The project-task endpoint does return sprintId (task.service.ts's
+  // toTaskResponse includes it), but "already in this sprint" is still
+  // determined by cross-referencing task id against sprintTasksQuery (which
+  // comes from the raw-row sprint-task endpoints), not by reading .sprintId
+  // off a projectTasks entry - the two queries are independent caches that
+  // can be momentarily out of sync with each other, so the sprint's own
+  // task list stays the more trustworthy source for current membership.
   // Needs every project task to pick from, not one page of them - requests
   // the paginated endpoint's max page size rather than page-walking. Same
   // known, accepted >100-task limitation as the All Tasks page (use-tasks.ts).

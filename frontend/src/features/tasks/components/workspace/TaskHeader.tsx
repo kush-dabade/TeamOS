@@ -20,12 +20,13 @@ import type { TaskListItem } from "../../types";
 
 interface TaskHeaderProps {
   taskItem: TaskListItem;
+  sprintName: string | null;
   onEdit: (trigger: HTMLButtonElement) => void;
   onDelete: () => void | Promise<void>;
   isDeleting: boolean;
 }
 
-export function TaskHeader({ taskItem, onEdit, onDelete, isDeleting }: TaskHeaderProps) {
+export function TaskHeader({ taskItem, sprintName, onEdit, onDelete, isDeleting }: TaskHeaderProps) {
   const { assignee, project, task } = taskItem;
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
@@ -47,7 +48,7 @@ export function TaskHeader({ taskItem, onEdit, onDelete, isDeleting }: TaskHeade
             <span aria-hidden="true">•</span>
             <span>{project.name}</span>
             <span aria-hidden="true">•</span>
-            <span>{task.sprintId ?? "No sprint"}</span>
+            <span>{sprintName ?? "No sprint"}</span>
             <span aria-hidden="true">•</span>
             <span>{task.dueDate ? formatDate(task.dueDate, "MMM d") : "No due date"}</span>
           </div>

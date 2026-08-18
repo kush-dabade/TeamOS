@@ -110,3 +110,62 @@ export async function addWorkspaceMember(
     },
   });
 }
+
+/**
+ * Direct Prisma insert, same rationale as createWorkspaceWithMember -
+ * project rows have no security-sensitive internals worth exercising
+ * through the HTTP/service layer just to set up a test fixture.
+ */
+export async function createProjectDirect(
+  workspaceId: string,
+  ownerId: string,
+  name = "Test Project",
+) {
+  return prisma.project.create({
+    data: {
+      workspaceId,
+      ownerId,
+      name,
+      slug: `test-project-${crypto.randomUUID()}`,
+    },
+  });
+}
+
+/**
+ * Direct Prisma insert, same rationale as createProjectDirect.
+ */
+export async function createTaskDirect(
+  workspaceId: string,
+  projectId: string,
+  createdById: string,
+  title = "Test Task",
+) {
+  return prisma.task.create({
+    data: {
+      workspaceId,
+      projectId,
+      title,
+      createdById,
+    },
+  });
+}
+
+/**
+ * Direct Prisma insert, same rationale as createProjectDirect. Sprint
+ * names only need to be unique within a project (see the
+ * @@unique([projectId, name]) constraint), so a random suffix avoids
+ * collisions across tests without needing a caller-supplied name.
+ */
+export async function createSprintDirect(
+  workspaceId: string,
+  projectId: string,
+  name = `Test Sprint ${crypto.randomUUID().slice(0, 8)}`,
+) {
+  return prisma.sprint.create({
+    data: {
+      workspaceId,
+      projectId,
+      name,
+    },
+  });
+}

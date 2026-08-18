@@ -1,15 +1,8 @@
 import { useMemo, useRef, useState } from "react";
-import { BriefcaseBusiness, Building2, ListTodo, PlusIcon, Rocket } from "lucide-react";
+import { BriefcaseBusiness, ListTodo, PlusIcon, Rocket } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,11 +23,11 @@ import {
   type TaskFormData,
   type TaskProject,
 } from "@/features/tasks";
-import { CreateWorkspaceForm, useActiveWorkspace, useWorkspaceMembers } from "@/features/workspaces";
+import { useActiveWorkspace, useWorkspaceMembers } from "@/features/workspaces";
 
 import { CreateSprintFlow } from "./create-sprint-flow";
 
-type CreatePanel = "project" | "task" | "sprint" | "workspace" | null;
+type CreatePanel = "project" | "task" | "sprint" | null;
 
 export function HeaderCreate() {
   const { user } = useAuth();
@@ -132,11 +125,6 @@ export function HeaderCreate() {
             <Rocket className="size-4" />
             Sprint
           </DropdownMenuItem>
-
-          <DropdownMenuItem onSelect={() => setActivePanel("workspace")}>
-            <Building2 className="size-4" />
-            Workspace
-          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -169,19 +157,6 @@ export function HeaderCreate() {
         isProjectsError={projectsQuery.isError}
         onRetryProjects={() => projectsQuery.refetch()}
       />
-
-      <Dialog open={activePanel === "workspace"} onOpenChange={(open) => !open && closePanel()}>
-        <DialogContent className="gap-6 p-6 sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>New workspace</DialogTitle>
-            <DialogDescription>
-              Create a separate workspace to organize a different team&apos;s projects and tasks.
-            </DialogDescription>
-          </DialogHeader>
-
-          <CreateWorkspaceForm onSuccess={closePanel} />
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

@@ -1,14 +1,23 @@
-import { AlertCircle, Check, ChevronDown } from "lucide-react";
+import { useState } from "react";
+import { AlertCircle, Check, ChevronDown, Plus } from "lucide-react";
 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
-import { useActiveWorkspace, useWorkspaceResolution } from "@/features/workspaces";
+import { CreateWorkspaceForm, useActiveWorkspace, useWorkspaceResolution } from "@/features/workspaces";
 
 export function WorkspaceSwitcher() {
   const {
@@ -18,6 +27,7 @@ export function WorkspaceSwitcher() {
     switchWorkspace,
   } = useActiveWorkspace();
   const { isLoading, isError, refetch } = useWorkspaceResolution();
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -97,9 +107,37 @@ export function WorkspaceSwitcher() {
                 {item.id === activeWorkspaceId && <Check className="size-4 shrink-0" />}
               </DropdownMenuItem>
             ))}
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuItem
+              onSelect={(event) => {
+                event.preventDefault();
+                setIsCreateOpen(true);
+              }}
+            >
+              <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted">
+                <Plus className="size-3.5" />
+              </div>
+
+              <span className="min-w-0 flex-1 truncate">Create workspace</span>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>
+
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent className="gap-6 p-6 sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>New workspace</DialogTitle>
+            <DialogDescription>
+              Create a separate workspace to organize a different team&apos;s projects and tasks.
+            </DialogDescription>
+          </DialogHeader>
+
+          <CreateWorkspaceForm onSuccess={() => setIsCreateOpen(false)} />
+        </DialogContent>
+      </Dialog>
     </SidebarMenu>
   );
 }

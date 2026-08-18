@@ -10,9 +10,10 @@ import type { TaskAssignee, TaskListItem } from "../../types";
 interface TaskWorkspaceProps {
   taskItem: TaskListItem;
   createdBy: TaskAssignee | null;
+  sprintName: string | null;
 }
 
-export function TaskWorkspace({ taskItem, createdBy }: TaskWorkspaceProps) {
+export function TaskWorkspace({ taskItem, createdBy, sprintName }: TaskWorkspaceProps) {
   return (
     <div className="space-y-5 py-5">
         <section aria-labelledby="task-overview-heading">
@@ -28,7 +29,7 @@ export function TaskWorkspace({ taskItem, createdBy }: TaskWorkspaceProps) {
           <h2 id="task-properties-heading" className="text-sm font-medium">Properties</h2>
           <Card size="sm" className="mt-3">
             <CardContent>
-              <TaskProperties taskItem={taskItem} createdBy={createdBy} />
+              <TaskProperties taskItem={taskItem} createdBy={createdBy} sprintName={sprintName} />
             </CardContent>
           </Card>
         </section>

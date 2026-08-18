@@ -4,6 +4,12 @@ import { toast } from "sonner";
 
 import { PageHeader, PageLayout } from "@/components/layout";
 import { useProjects } from "@/features/projects";
+// Direct module path, not the "@/features/sprints" barrel - see the same
+// note in TaskWorkspacePage.tsx. This file is part of the tasks feature
+// barrel, and the sprints barrel re-exports SprintsView, which imports
+// taskKeys from "@/features/tasks" at runtime - going through it here would
+// create a circular module dependency.
+import { useSprints } from "@/features/sprints/hooks/use-sprints";
 import { useActiveWorkspace, useWorkspaceMembers } from "@/features/workspaces";
 
 import { useCreateTask } from "../hooks/use-create-task";
@@ -132,6 +138,16 @@ export function TasksPage() {
     ? (assignees.find((assignee) => assignee.id === selectedTask.task.createdById) ?? null)
     : null;
 
+  // Scoped to the selected task's own project - only one task is ever
+  // previewed at a time, so there's no need to fan out a sprint query per
+  // project in the workspace the way useTasks fans out task queries.
+  const selectedTaskSprintsQuery = useSprints(selectedTask?.task.projectId);
+  const selectedTaskSprintName = selectedTask?.task.sprintId
+    ? ((selectedTaskSprintsQuery.data ?? []).find(
+        (sprint) => sprint.id === selectedTask.task.sprintId,
+      )?.name ?? null)
+    : null;
+
   const handleOpenTask = (taskId: string) => navigate(`/tasks/${taskId}`);
   const handlePreviewClose = () => setIsPreviewOpen(false);
   const handlePreviewCloseAutoFocus = () => {
@@ -228,6 +244,7 @@ export function TasksPage() {
       <TaskPreviewPanel
         taskItem={selectedTask}
         createdBy={selectedTaskCreator}
+        sprintName={selectedTaskSprintName}
         open={isPreviewOpen}
         onClose={handlePreviewClose}
         onCloseAutoFocus={handlePreviewCloseAutoFocus}

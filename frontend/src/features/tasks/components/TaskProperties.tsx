@@ -5,12 +5,14 @@ import type { TaskAssignee, TaskListItem } from "../types";
 interface TaskPropertiesProps {
   taskItem: TaskListItem;
   createdBy: TaskAssignee | null;
+  sprintName: string | null;
   showTimestamps?: boolean;
 }
 
 export function TaskProperties({
   taskItem,
   createdBy,
+  sprintName,
   showTimestamps = true,
 }: TaskPropertiesProps) {
   const { assignee, project, task } = taskItem;
@@ -24,7 +26,7 @@ export function TaskProperties({
       <div className="flex items-center justify-between gap-4">
         <dt className="shrink-0 text-sm text-muted-foreground">Sprint</dt>
         <dd className="min-w-0 break-words text-right text-sm font-medium">
-          {task.sprintId ? task.sprintId : "Not assigned to a sprint"}
+          {sprintName ?? "Not assigned to a sprint"}
         </dd>
       </div>
       <div className="flex items-center justify-between gap-4">

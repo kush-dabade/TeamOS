@@ -65,6 +65,8 @@ export function SprintPreviewPanel({
     return null;
   }
 
+  const isCompleted = sprint.status === "COMPLETED";
+
   return (
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <SheetContent
@@ -107,14 +109,16 @@ export function SprintPreviewPanel({
           <div className="mt-5">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-medium">Tasks</h3>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onAssignTask}
-                disabled={isAssigningTask}
-              >
-                {isAssigningTask ? "Assigning..." : "Assign task"}
-              </Button>
+              {isCompleted ? null : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onAssignTask}
+                  disabled={isAssigningTask}
+                >
+                  {isAssigningTask ? "Assigning..." : "Assign task"}
+                </Button>
+              )}
             </div>
 
             <div className="mt-2">
@@ -127,6 +131,7 @@ export function SprintPreviewPanel({
                 isAssigningTask={isAssigningTask}
                 removingTaskId={removingTaskId}
                 onRemove={onRemoveTask}
+                sprintStatus={sprint.status}
               />
             </div>
           </div>
@@ -136,9 +141,11 @@ export function SprintPreviewPanel({
 
         <SheetFooter className="flex-row items-center justify-between p-4">
           <div className="flex items-center gap-1">
-            <Button type="button" variant="ghost" onClick={onEdit}>
-              Edit
-            </Button>
+            {isCompleted ? null : (
+              <Button type="button" variant="ghost" onClick={onEdit}>
+                Edit
+              </Button>
+            )}
           </div>
 
           {sprint.status === "PLANNED" ? (

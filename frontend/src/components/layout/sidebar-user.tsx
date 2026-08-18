@@ -12,7 +12,6 @@ import {
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { UserAvatar } from "@/components/ux";
 import { logout, useAuth } from "@/features/auth";
-import { queryClient } from "@/lib";
 import { getAvatarUrl, getErrorMessage } from "@/utils";
 
 import { ThemeToggle } from "./theme-toggle";
@@ -29,8 +28,9 @@ export function SidebarUser() {
     try {
       await logout();
 
-      queryClient.clear();
-
+      // Query cache isolation is owned by AuthProvider's authenticated ->
+      // unauthenticated transition detector, so it also covers Better
+      // Auth's cross-tab sign-out broadcast, not just this button.
       navigate("/login", { replace: true });
     } catch (error) {
       toast.error(getErrorMessage(error));

@@ -25,7 +25,9 @@ export function MyTasksList() {
   const { user } = useAuth();
   const { tasks, isLoading, error } = useTasks(workspace?.id);
 
-  const myTasks = user ? tasks.filter(({ assignee }) => assignee?.id === user.id) : [];
+  const myTasks = user
+    ? tasks.filter(({ task, assignee }) => assignee?.id === user.id && task.status !== "DONE")
+    : [];
   const preview = myTasks.slice(0, MAX_PREVIEW_TASKS);
 
   return (

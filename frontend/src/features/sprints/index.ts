@@ -10,3 +10,5 @@ export { useCompleteSprint } from "./hooks/use-complete-sprint";
 export { useAssignTaskToSprint } from "./hooks/use-assign-task-to-sprint";
 export { useRemoveTaskFromSprint } from "./hooks/use-remove-task-from-sprint";
 export { SprintsView } from "./components/SprintsView";
+export { SprintFormPanel } from "./components/form";
+export type { SprintFormData } from "./validation/sprint";

@@ -1,6 +1,8 @@
 import { prisma } from "../../lib/prisma.js";
 import { createActivity } from "../activity/activity.service.js";
 
+import type { Sprint } from "../../generated/prisma/client.js";
+
 import {
   ActivityEntityType,
   ActivityType,
@@ -55,6 +57,12 @@ async function validateProjectCanBeModified(projectId: string) {
   return project;
 }
 
+function validateSprintCanBeModified(sprint: Sprint) {
+  if (sprint.status === "COMPLETED") {
+    throw new ValidationError("Completed sprints cannot be modified");
+  }
+}
+
 export async function assignTaskToSprint(
   userId: string,
   sprintId: string,
@@ -69,6 +77,8 @@ export async function assignTaskToSprint(
   const membership = await requireWorkspaceMembership(sprint.workspaceId, userId);
 
   requireRole(membership, [WorkspaceRole.OWNER, WorkspaceRole.ADMIN]);
+
+  validateSprintCanBeModified(sprint);
 
   const task = await findTaskById(taskId);
 
@@ -166,6 +176,8 @@ export async function removeTaskFromSprint(
   const membership = await requireWorkspaceMembership(sprint.workspaceId, userId);
 
   requireRole(membership, [WorkspaceRole.OWNER, WorkspaceRole.ADMIN]);
+
+  validateSprintCanBeModified(sprint);
 
   const task = await findTaskById(taskId);
 

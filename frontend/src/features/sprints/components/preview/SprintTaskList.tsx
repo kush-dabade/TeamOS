@@ -6,6 +6,8 @@ import type { Task } from "@/features/tasks";
 
 import { SprintTaskItem } from "./SprintTaskItem";
 
+import type { SprintStatus } from "../../types";
+
 interface SprintTaskListProps {
   tasks: Task[];
   isLoading: boolean;
@@ -15,6 +17,7 @@ interface SprintTaskListProps {
   isAssigningTask: boolean;
   removingTaskId: string | null;
   onRemove: (taskId: string) => void;
+  sprintStatus: SprintStatus;
 }
 
 const skeletonRows = Array.from({ length: 2 }, (_, index) => index);
@@ -28,7 +31,9 @@ export function SprintTaskList({
   isAssigningTask,
   removingTaskId,
   onRemove,
+  sprintStatus,
 }: SprintTaskListProps) {
+  const isCompleted = sprintStatus === "COMPLETED";
   if (isError) {
     return (
       <ListErrorState
@@ -60,14 +65,16 @@ export function SprintTaskList({
           title="No tasks in this sprint"
           description="Assign existing tasks from this project to plan this sprint's work."
           action={
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onAssignTask}
-              disabled={isAssigningTask}
-            >
-              {isAssigningTask ? "Assigning..." : "Assign task"}
-            </Button>
+            isCompleted ? undefined : (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onAssignTask}
+                disabled={isAssigningTask}
+              >
+                {isAssigningTask ? "Assigning..." : "Assign task"}
+              </Button>
+            )
           }
           iconClassName="size-10"
         />
@@ -83,6 +90,7 @@ export function SprintTaskList({
           task={task}
           isRemoving={removingTaskId === task.id}
           onRemove={() => onRemove(task.id)}
+          sprintStatus={sprintStatus}
         />
       ))}
     </div>

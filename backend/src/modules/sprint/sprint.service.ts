@@ -225,6 +225,10 @@ export async function updateSprint(
     throw new ValidationError("Archived projects cannot be modified");
   }
 
+  if (sprint.status === "COMPLETED") {
+    throw new ValidationError("Completed sprints cannot be modified");
+  }
+
   const effectiveStartDate =
     data.startDate !== undefined ? new Date(data.startDate) : sprint.startDate;
 

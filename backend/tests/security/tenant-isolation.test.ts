@@ -191,6 +191,9 @@ describe("tenant isolation", () => {
 
       expect(res.body.success).toBe(false);
       expect(res.body.error.code).toBe("VALIDATION_ERROR");
+      expect(res.body.error.message).toBe(
+        "Task and sprint must belong to the same workspace",
+      );
 
       const unchangedTask = await prisma.task.findUniqueOrThrow({
         where: { id: targetTask.id },

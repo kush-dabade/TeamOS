@@ -5,6 +5,7 @@ export { useWorkspaceMembers } from "./hooks/use-workspace-members";
 export { useWorkspaceList } from "./hooks/use-workspace-list";
 export { OnboardingPage } from "./pages/OnboardingPage";
 export { CreateWorkspaceForm } from "./components/create-workspace-form";
+export { WorkspaceInviteForm } from "./components/workspace-invite-form";
 export { WorkspaceSettingsPage } from "./pages/WorkspaceSettingsPage";
 export { WorkspaceGuard } from "./routes/workspace-guard";
 export { WorkspaceProvider } from "./providers/workspace-provider";

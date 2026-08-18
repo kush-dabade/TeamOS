@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { PageHeader, PageLayout } from "@/components/layout";
+import { useAuth } from "@/features/auth";
 import { useProjects } from "@/features/projects";
 // Direct module path, not the "@/features/sprints" barrel - see the same
 // note in TaskWorkspacePage.tsx. This file is part of the tasks feature
@@ -25,12 +26,20 @@ import type { TaskFormData } from "../validation/task";
 export function TasksPage() {
   const navigate = useNavigate();
   const { workspace } = useActiveWorkspace();
+  const { user } = useAuth();
+  // Read once on mount only - the sidebar My Tasks section's "View all" link
+  // is the sole producer of ?assignee=me, and TasksToolbar's own assignee
+  // Select is the source of truth for this filter after that (mirrors how
+  // none of the other filters below sync back to the URL either).
+  const [searchParams] = useSearchParams();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>("ALL");
   const [priorityFilter, setPriorityFilter] = useState<TaskPriorityFilter>("ALL");
   const [projectFilter, setProjectFilter] = useState("ALL");
-  const [assigneeFilter, setAssigneeFilter] = useState("ALL");
+  const [assigneeFilter, setAssigneeFilter] = useState(() =>
+    searchParams.get("assignee") === "me" && user ? user.id : "ALL",
+  );
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [selectedTaskTrigger, setSelectedTaskTrigger] = useState<HTMLButtonElement | null>(null);

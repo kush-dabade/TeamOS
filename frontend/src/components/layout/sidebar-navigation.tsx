@@ -9,6 +9,8 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
+import { MyTasksSection } from "./my-tasks-section";
+
 export function SidebarNavigation() {
   const location = useLocation();
 
@@ -35,6 +37,8 @@ export function SidebarNavigation() {
               </SidebarMenuItem>
             );
           })}
+
+          <MyTasksSection />
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>

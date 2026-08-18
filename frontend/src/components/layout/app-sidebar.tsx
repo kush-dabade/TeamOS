@@ -1,5 +1,6 @@
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader } from "@/components/ui/sidebar";
 
+import { InviteMembersAction } from "./invite-members-action";
 import { SidebarBrand } from "./sidebar-brand";
 import { SidebarNavigation } from "./sidebar-navigation";
 import { SidebarUser } from "./sidebar-user";
@@ -18,6 +19,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="pt-3">
+        <InviteMembersAction />
         <SidebarUser />
       </SidebarFooter>
     </Sidebar>

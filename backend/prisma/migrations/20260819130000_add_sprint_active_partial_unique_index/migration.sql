@@ -1,0 +1,24 @@
+-- CreateIndex
+-- Enforces "at most one ACTIVE sprint per project" at the database level,
+-- closing the TOCTOU race the service-level pre-check in
+-- sprint.service.ts:startSprint can't fully close on its own (two
+-- concurrent requests can both pass that check before either commits).
+-- A partial unique index is the correct primitive here rather than a plain
+-- @@unique - only ACTIVE rows are constrained, so PLANNED/COMPLETED sprints
+-- for the same project are unaffected. Prisma's schema DSL has no syntax
+-- for a WHERE clause on @@unique, so this is hand-authored SQL (see the
+-- comment on the Sprint model in schema.prisma) rather than something
+-- `prisma migrate dev` could generate.
+--
+-- Uses CONCURRENTLY so this build doesn't hold the ACCESS EXCLUSIVE-adjacent
+-- lock a plain CREATE UNIQUE INDEX takes against concurrent writes to
+-- Sprint. This is the migration's only statement, so Prisma Migrate applies
+-- it outside a transaction (it only wraps multi-statement migration files) -
+-- required, since CONCURRENTLY is rejected by Postgres inside a transaction
+-- block, and CREATE UNIQUE INDEX CONCURRENTLY additionally cannot run
+-- inside a transaction at all (Postgres restriction, independent of Prisma).
+--
+-- Confirmed before authoring this migration that no existing Sprint data
+-- violates the constraint (no projectId has more than one ACTIVE row, in
+-- either the local dev or test database) - see the PR A commit 2 report.
+CREATE UNIQUE INDEX CONCURRENTLY "Sprint_projectId_active_unique" ON "Sprint"("projectId") WHERE "status" = 'ACTIVE';

@@ -409,6 +409,14 @@ model Activity {
   @@index([workspaceId, projectId, createdAt(sort: Desc), id(sort: Desc)])
 }
 
+// The "at most one ACTIVE sprint per project" invariant is enforced by a
+// partial unique index - "Sprint_projectId_active_unique" on (projectId)
+// WHERE status = 'ACTIVE' - that Prisma's schema DSL has no syntax to
+// express (no WHERE clause support on @@unique). It's created out-of-band
+// by a hand-authored SQL migration (see
+// prisma/migrations/20260819130000_add_sprint_active_partial_unique_index)
+// and therefore never appears below; `prisma db pull`/`migrate diff` will
+// not show it as schema-native, by design.
 model Sprint {
   id String @id @default(cuid())
 

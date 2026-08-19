@@ -1,3 +1,4 @@
+import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
 
 import type { CreateSprintData } from "./sprint.types.js";
@@ -387,37 +388,66 @@ export async function startSprint(actorId: string, sprintId: string) {
 
   let emitActivityCreated: () => void = () => {};
 
-  const updatedSprint = await prisma.$transaction(async (tx) => {
-    const updated = await tx.sprint.update({
-      where: {
-        id: sprint.id,
-      },
-      data: {
-        status: "ACTIVE",
-      },
-    });
+  // The service-level `findActiveSprintByProject` check above is a
+  // check-then-write - it can't close the race where two requests both
+  // pass it before either commits. The "Sprint_projectId_active_unique"
+  // partial unique index (see the comment on the Sprint model in
+  // schema.prisma) is what actually closes that race: only one of two
+  // concurrent activations can win the `status: "ACTIVE"` update below,
+  // and the loser gets a Postgres unique-violation, surfaced by Prisma as
+  // P2002. This transaction's only write to Sprint is that status update
+  // (it doesn't touch `name`, so the other Sprint unique index -
+  // @@unique([projectId, name]) - can't be the cause), so any P2002 here
+  // can only be that race, not an unrelated conflict from some other
+  // constraint or a different call site - it's translated into the exact
+  // same domain error the pre-check above throws, so a client sees one
+  // consistent failure shape regardless of which path caught it.
+  let updatedSprint: Sprint;
 
-    emitActivityCreated = await createActivity(
-      {
-        workspaceId: updated.workspaceId,
-        actorId,
-
-        type: ActivityType.SPRINT_STARTED,
-
-        entityType: ActivityEntityType.SPRINT,
-        entityId: updated.id,
-
-        projectId: updated.projectId,
-
-        metadata: {
-          sprintName: updated.name,
+  try {
+    updatedSprint = await prisma.$transaction(async (tx) => {
+      const updated = await tx.sprint.update({
+        where: {
+          id: sprint.id,
         },
-      },
-      tx,
-    );
+        data: {
+          status: "ACTIVE",
+        },
+      });
 
-    return updated;
-  });
+      emitActivityCreated = await createActivity(
+        {
+          workspaceId: updated.workspaceId,
+          actorId,
+
+          type: ActivityType.SPRINT_STARTED,
+
+          entityType: ActivityEntityType.SPRINT,
+          entityId: updated.id,
+
+          projectId: updated.projectId,
+
+          metadata: {
+            sprintName: updated.name,
+          },
+        },
+        tx,
+      );
+
+      return updated;
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      throw new ValidationError(
+        "Another active sprint already exists for this project",
+      );
+    }
+
+    throw error;
+  }
 
   emitActivityCreated();
 

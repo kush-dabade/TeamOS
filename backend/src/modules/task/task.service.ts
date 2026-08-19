@@ -12,6 +12,7 @@ import {
 import type {
   CreateTaskData,
   ListTasksOptions,
+  ListWorkspaceTasksOptions,
   UpdateTaskData,
 } from "./task.types.js";
 
@@ -182,6 +183,52 @@ export async function listTasks(actorId: string, options: ListTasksOptions) {
 
   const where = {
     projectId: options.projectId,
+    deletedAt: null,
+  };
+
+  const skip = (options.page - 1) * options.limit;
+
+  const [total, tasks] = await Promise.all([
+    prisma.task.count({
+      where,
+    }),
+
+    prisma.task.findMany({
+      where,
+
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+
+      skip,
+      take: options.limit,
+    }),
+  ]);
+
+  return {
+    tasks: tasks.map(toTaskResponse),
+    total,
+  };
+}
+
+/**
+ * Workspace-wide equivalent of listTasks - deliberately a separate query
+ * rather than listTasks with an optional projectId, since the two have
+ * different authorization shapes: listTasks derives workspace membership
+ * from a looked-up project, this checks membership directly against the
+ * workspaceId from the URL and scopes the Prisma query to it, without ever
+ * loading a project or trusting anything on the Task rows themselves for
+ * that check. Exists so frontend consumers that need "every task across
+ * every project in a workspace" (the Tasks page, dashboard widgets) no
+ * longer have to fan out one request per project and cap each at 100 -
+ * see use-tasks.ts's own comment on that gap.
+ */
+export async function listWorkspaceTasks(
+  actorId: string,
+  options: ListWorkspaceTasksOptions,
+) {
+  await requireWorkspaceMembership(options.workspaceId, actorId);
+
+  const where = {
+    workspaceId: options.workspaceId,
     deletedAt: null,
   };
 

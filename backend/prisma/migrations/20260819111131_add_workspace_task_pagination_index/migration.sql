@@ -1,0 +1,11 @@
+-- CreateIndex
+-- Same rationale as the projectId equivalent added in
+-- 20260817163939_add_task_pagination_index: supports the workspace-wide
+-- tasks endpoint's where(workspaceId, deletedAt) + orderBy(createdAt, id)
+-- query without an in-memory sort. Uses CONCURRENTLY so this build doesn't
+-- hold the ACCESS EXCLUSIVE-adjacent lock a plain CREATE INDEX takes
+-- against concurrent writes to Task. This is the migration's only
+-- statement, so Prisma Migrate applies it outside a transaction (it only
+-- wraps multi-statement migration files) - required, since CONCURRENTLY is
+-- rejected by Postgres inside a transaction block.
+CREATE INDEX CONCURRENTLY "Task_workspaceId_deletedAt_createdAt_id_idx" ON "Task"("workspaceId", "deletedAt", "createdAt", "id");

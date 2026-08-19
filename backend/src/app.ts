@@ -8,6 +8,7 @@ import workspaceRoutes from "./modules/workspace/workspace.routes.js";
 import workspaceItemRoutes from "./modules/workspace/workspace-item.routes.js";
 import projectRoutes from "./modules/project/project.routes.js";
 import taskRoutes from "./modules/task/task.routes.js";
+import workspaceTaskRoutes from "./modules/task/workspace-task.routes.js";
 import commentRoutes from "./modules/comments/comments.routes.js";
 import activityRoutes from "./modules/activity/activity.routes.js";
 import taskItemRoutes from "./modules/task/task-item.routes.js";
@@ -98,6 +99,7 @@ app.use("/api/v1/workspaces", workspaceItemRoutes);
 app.use("/api/v1/workspaces", projectRoutes);
 app.use("/api/v1/workspaces", activityRoutes);
 app.use("/api/v1/workspaces", workspaceInvitationRoutes);
+app.use("/api/v1/workspaces", workspaceTaskRoutes);
 
 //search resources
 app.use("/api/v1/search", searchRoutes);

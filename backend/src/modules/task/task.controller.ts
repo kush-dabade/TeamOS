@@ -11,6 +11,7 @@ import {
   deleteTask,
   getTaskById,
   listTasks,
+  listWorkspaceTasks,
   updateTask,
 } from "./task.service.js";
 
@@ -40,6 +41,30 @@ export async function listTasksHandler(req: Request, res: Response) {
 
   const result = await listTasks(req.user!.id, {
     projectId: req.params.projectId as string,
+
+    page: query.page,
+    limit: query.limit,
+  });
+
+  return res.status(200).json({
+    success: true,
+    data: {
+      tasks: result.tasks,
+    },
+    pagination: {
+      page: query.page,
+      limit: query.limit,
+      total: result.total,
+      pages: Math.ceil(result.total / query.limit),
+    },
+  });
+}
+
+export async function listWorkspaceTasksHandler(req: Request, res: Response) {
+  const query = listTasksQuerySchema.parse(req.query);
+
+  const result = await listWorkspaceTasks(req.user!.id, {
+    workspaceId: req.params.workspaceId as string,
 
     page: query.page,
     limit: query.limit,

@@ -30,6 +30,11 @@ import { securityHeaders } from "./middleware/security-headers.js";
 
 const app = express();
 
+// Express sets this header by default, identifying the framework to every
+// client. Disabling it is a one-line, zero-risk reduction in server
+// fingerprinting - there is no legitimate consumer of this header.
+app.disable("x-powered-by");
+
 // Mounted first, ahead of CORS/auth/body-parsing/rate limiting/routes -
 // res.setHeader calls persist on the response regardless of what happens
 // afterward, including an error jumping straight to errorHandler past all

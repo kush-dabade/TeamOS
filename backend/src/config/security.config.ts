@@ -30,7 +30,22 @@ function parseTrustedOrigins(): string[] {
 }
 
 function parseTrustProxyHops(): number {
-  const raw = process.env.TRUST_PROXY_HOPS ?? "0";
+  const raw = process.env.TRUST_PROXY_HOPS;
+
+  if (raw === undefined) {
+    if (isProduction) {
+      throw new Error(
+        "TRUST_PROXY_HOPS environment variable is required in production (number of " +
+          "reverse proxy hops between the client and this server - set to 0 if the API " +
+          "is directly internet-facing with no reverse proxy in front of it). Silently " +
+          "defaulting to 0 behind a real proxy would collapse every anonymous-IP " +
+          "rate-limit bucket into one.",
+      );
+    }
+
+    return 0;
+  }
+
   const parsed = Number(raw);
 
   if (!Number.isInteger(parsed) || parsed < 0) {

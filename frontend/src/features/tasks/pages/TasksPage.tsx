@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { PageHeader, PageLayout } from "@/components/layout";
+import { useAuth } from "@/features/auth";
 import { useProjects } from "@/features/projects";
 // Direct module path, not the "@/features/sprints" barrel - see the same
 // note in TaskWorkspacePage.tsx. This file is part of the tasks feature
@@ -25,12 +26,50 @@ import type { TaskFormData } from "../validation/task";
 export function TasksPage() {
   const navigate = useNavigate();
   const { workspace } = useActiveWorkspace();
+  const { user } = useAuth();
+  // The sidebar My Tasks section's "View all" link is the sole producer of
+  // ?assignee=me, and TasksToolbar's own assignee Select is the source of
+  // truth for this filter after that (mirrors how none of the other filters
+  // below sync back to the URL either).
+  const [searchParams] = useSearchParams();
+  const assigneeParam = searchParams.get("assignee");
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>("ALL");
   const [priorityFilter, setPriorityFilter] = useState<TaskPriorityFilter>("ALL");
   const [projectFilter, setProjectFilter] = useState("ALL");
-  const [assigneeFilter, setAssigneeFilter] = useState("ALL");
+  const [assigneeFilter, setAssigneeFilter] = useState(() =>
+    assigneeParam === "me" && user ? user.id : "ALL",
+  );
+
+  // The initializer above only runs on mount, so it alone misses navigating
+  // from /tasks to /tasks?assignee=me: same route element, only the query
+  // string changes, so TasksPage never remounts. assigneeFilter can also be
+  // changed independently by TasksToolbar's own Select, so it isn't purely
+  // derived state - syncing it from the URL needs to know whether
+  // (assigneeParam, user) actually changed since the last sync, not run on
+  // every render. Tracked and self-healed here during render (mirrors
+  // WorkspaceProvider's activeWorkspaceId/storedWorkspaceId reconciliation)
+  // rather than in a useEffect, which the project's lint config flags as a
+  // cascading-render anti-pattern for exactly this kind of derived sync.
+  const [syncedAssigneeParam, setSyncedAssigneeParam] = useState(assigneeParam);
+  const [syncedUserId, setSyncedUserId] = useState(user?.id);
+
+  if (assigneeParam !== syncedAssigneeParam || user?.id !== syncedUserId) {
+    setSyncedAssigneeParam(assigneeParam);
+    setSyncedUserId(user?.id);
+
+    if (assigneeParam === "me") {
+      // If user hasn't resolved yet, leave assigneeFilter as-is - this
+      // block re-runs once `user` (and therefore user?.id) changes, so it
+      // still gets applied once auth finishes initializing.
+      if (user) {
+        setAssigneeFilter(user.id);
+      }
+    } else {
+      setAssigneeFilter("ALL");
+    }
+  }
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [selectedTaskTrigger, setSelectedTaskTrigger] = useState<HTMLButtonElement | null>(null);

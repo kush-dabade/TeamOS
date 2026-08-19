@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { BriefcaseBusiness, ListTodo, PlusIcon } from "lucide-react";
+import { BriefcaseBusiness, ListTodo, PlusIcon, Rocket } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,9 @@ import {
 } from "@/features/tasks";
 import { useActiveWorkspace, useWorkspaceMembers } from "@/features/workspaces";
 
-type CreatePanel = "project" | "task" | null;
+import { CreateSprintFlow } from "./create-sprint-flow";
+
+type CreatePanel = "project" | "task" | "sprint" | null;
 
 export function HeaderCreate() {
   const { user } = useAuth();
@@ -118,6 +120,11 @@ export function HeaderCreate() {
             <ListTodo className="size-4" />
             Task
           </DropdownMenuItem>
+
+          <DropdownMenuItem onSelect={() => setActivePanel("sprint")}>
+            <Rocket className="size-4" />
+            Sprint
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -139,6 +146,16 @@ export function HeaderCreate() {
         onClose={closePanel}
         onCloseAutoFocus={handleCloseAutoFocus}
         onSubmit={handleCreateTask}
+      />
+
+      <CreateSprintFlow
+        open={activePanel === "sprint"}
+        onOpenChange={(open) => !open && closePanel()}
+        onCloseAutoFocus={handleCloseAutoFocus}
+        projects={projects}
+        isProjectsLoading={projectsQuery.isLoading}
+        isProjectsError={projectsQuery.isError}
+        onRetryProjects={() => projectsQuery.refetch()}
       />
     </>
   );

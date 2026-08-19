@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Layers3, PanelLeftIcon } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { useSidebar } from "@/components/ui/sidebar";
@@ -7,6 +8,7 @@ import { cn } from "@/utils";
 
 export function SidebarBrandButton() {
   const { state, toggleSidebar } = useSidebar();
+  const navigate = useNavigate();
 
   const [hovered, setHovered] = useState(false);
 
@@ -19,7 +21,10 @@ export function SidebarBrandButton() {
       onClick={() => {
         if (isCollapsed) {
           toggleSidebar();
+          return;
         }
+
+        navigate("/dashboard");
       }}
       aria-label={isCollapsed ? "Expand sidebar" : "TeamOS"}
       onMouseEnter={() => setHovered(true)}

@@ -13,7 +13,11 @@ import {
   type CreateWorkspaceFormData,
 } from "../validation/create-workspace";
 
-export function CreateWorkspaceForm() {
+interface CreateWorkspaceFormProps {
+  onSuccess?: () => void;
+}
+
+export function CreateWorkspaceForm({ onSuccess }: CreateWorkspaceFormProps = {}) {
   const navigate = useNavigate();
   const createWorkspace = useCreateWorkspace();
 
@@ -31,6 +35,7 @@ export function CreateWorkspaceForm() {
       toast.success("Workspace created successfully!");
 
       navigate("/dashboard", { replace: true });
+      onSuccess?.();
     } catch {
       // Failure feedback is already surfaced via the mutation's onError toast.
     }

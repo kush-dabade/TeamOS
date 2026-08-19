@@ -40,3 +40,37 @@ export const rateLimitRedis = new Redis({
 rateLimitRedis.on("error", (error) => {
   console.error("Rate-limit Redis connection error:", error.message);
 });
+
+// Atomic INCR-then-conditionally-set-TTL, expressed as a single Lua script
+// so Redis (single-threaded per script) executes both steps as one
+// indivisible operation - two concurrent callers can never both observe
+// count === 1 and both (re)set the TTL, and a caller arriving after the
+// window has already been established can never accidentally extend it,
+// since PEXPIRE only runs on the increment that produces count === 1.
+// Mirrors the same contract rate-limit-redis's own Lua script already
+// gives every express-rate-limit-based limiter in middleware/rate-limit.ts
+// (see tests/setup/reset-rate-limits.ts's comment: "SET key 1 PX windowMs
+// on first hit and INCR thereafter") - this is a small hand-rolled
+// equivalent for the one limiter that isn't Express middleware (it's
+// called from inside a Better Auth hook, not a request/response cycle
+// express-rate-limit can wrap) and so can't reuse that library directly.
+const INCREMENT_WITH_WINDOW_SCRIPT = `
+local count = redis.call("INCR", KEYS[1])
+if count == 1 then
+  redis.call("PEXPIRE", KEYS[1], ARGV[1])
+end
+return count
+`;
+
+/**
+ * Atomically increments `key` on the rate-limit Redis connection, setting a
+ * `windowMs` expiry only on the increment that first creates the key. Returns
+ * the counter's new value after this increment - callers compare it against
+ * their own limit rather than this function enforcing one, since "count vs.
+ * limit" and "what to do once exceeded" are caller-specific decisions.
+ */
+export async function incrementRateLimitCounter(key: string, windowMs: number): Promise<number> {
+  const count = await rateLimitRedis.eval(INCREMENT_WITH_WINDOW_SCRIPT, 1, key, windowMs);
+
+  return count as number;
+}

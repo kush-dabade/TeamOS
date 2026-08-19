@@ -91,48 +91,55 @@ export async function createTask(actorId: string, data: CreateTaskData) {
     }
   }
 
-  const task = await prisma.task.create({
-    data: {
-      workspaceId: project.workspaceId,
-      projectId: data.projectId,
+  const task = await prisma.$transaction(async (tx) => {
+    const createdTask = await tx.task.create({
+      data: {
+        workspaceId: project.workspaceId,
+        projectId: data.projectId,
 
-      title: data.title,
+        title: data.title,
 
-      createdById: actorId,
+        createdById: actorId,
 
-      ...(data.description !== undefined && {
-        description: data.description,
-      }),
+        ...(data.description !== undefined && {
+          description: data.description,
+        }),
 
-      ...(data.priority !== undefined && {
-        priority: data.priority,
-      }),
+        ...(data.priority !== undefined && {
+          priority: data.priority,
+        }),
 
-      ...(data.dueDate !== undefined && {
-        dueDate: data.dueDate,
-      }),
+        ...(data.dueDate !== undefined && {
+          dueDate: data.dueDate,
+        }),
 
-      ...(data.assigneeId !== undefined && {
-        assigneeId: data.assigneeId,
-      }),
-    },
-  });
+        ...(data.assigneeId !== undefined && {
+          assigneeId: data.assigneeId,
+        }),
+      },
+    });
 
-  await createActivity({
-    workspaceId: project.workspaceId,
-    actorId,
+    await createActivity(
+      {
+        workspaceId: project.workspaceId,
+        actorId,
 
-    type: ActivityType.TASK_CREATED,
+        type: ActivityType.TASK_CREATED,
 
-    entityType: ActivityEntityType.TASK,
-    entityId: task.id,
+        entityType: ActivityEntityType.TASK,
+        entityId: createdTask.id,
 
-    taskId: task.id,
-    projectId: task.projectId,
+        taskId: createdTask.id,
+        projectId: createdTask.projectId,
 
-    metadata: {
-      taskTitle: task.title,
-    },
+        metadata: {
+          taskTitle: createdTask.title,
+        },
+      },
+      tx,
+    );
+
+    return createdTask;
   });
 
   if (task.assigneeId && task.assigneeId !== actorId) {
@@ -300,30 +307,35 @@ export async function deleteTask(actorId: string, taskId: string) {
     throw new ValidationError("Archived projects cannot be modified");
   }
 
-  await prisma.task.update({
-    where: {
-      id: task.id,
-    },
-    data: {
-      deletedAt: new Date(),
-    },
-  });
+  await prisma.$transaction(async (tx) => {
+    await tx.task.update({
+      where: {
+        id: task.id,
+      },
+      data: {
+        deletedAt: new Date(),
+      },
+    });
 
-  await createActivity({
-    workspaceId: task.workspaceId,
-    actorId,
+    await createActivity(
+      {
+        workspaceId: task.workspaceId,
+        actorId,
 
-    type: ActivityType.TASK_DELETED,
+        type: ActivityType.TASK_DELETED,
 
-    entityType: ActivityEntityType.TASK,
-    entityId: task.id,
+        entityType: ActivityEntityType.TASK,
+        entityId: task.id,
 
-    taskId: task.id,
-    projectId: task.projectId,
+        taskId: task.id,
+        projectId: task.projectId,
 
-    metadata: {
-      taskTitle: task.title,
-    },
+        metadata: {
+          taskTitle: task.title,
+        },
+      },
+      tx,
+    );
   });
 
   emitToWorkspace(task.workspaceId, REALTIME_EVENTS.TASK_DELETED, {
@@ -427,12 +439,74 @@ export async function updateTask(
     updateData.completedAt = null;
   }
 
-  const updatedTask = await prisma.task.update({
-    where: {
-      id: task.id,
-    },
+  // The status-changed/completed activity writes must commit or roll back
+  // atomically with the entity update itself (this function's whole reason
+  // for being transactional). enqueueNotification is a BullMQ/Redis call,
+  // not a Postgres write - it can't participate in this transaction and
+  // has no business holding it open, so it's deliberately run after the
+  // transaction resolves instead of in its old position between the entity
+  // update and the activity writes. This also means a notification is only
+  // ever sent for an assignment that's genuinely committed, not one that
+  // might still roll back.
+  const updatedTask = await prisma.$transaction(async (tx) => {
+    const updated = await tx.task.update({
+      where: {
+        id: task.id,
+      },
 
-    data: updateData,
+      data: updateData,
+    });
+
+    if (data.status !== undefined && oldStatus !== updated.status) {
+      await createActivity(
+        {
+          workspaceId: task.workspaceId,
+          actorId,
+
+          type: ActivityType.TASK_STATUS_CHANGED,
+
+          entityType: ActivityEntityType.TASK,
+          entityId: updated.id,
+
+          taskId: updated.id,
+          projectId: updated.projectId,
+
+          metadata: {
+            oldStatus,
+            newStatus: updated.status,
+          },
+        },
+        tx,
+      );
+    }
+
+    if (
+      data.status !== undefined &&
+      oldStatus !== "DONE" &&
+      updated.status === "DONE"
+    ) {
+      await createActivity(
+        {
+          workspaceId: task.workspaceId,
+          actorId,
+
+          type: ActivityType.TASK_COMPLETED,
+
+          entityType: ActivityEntityType.TASK,
+          entityId: updated.id,
+
+          taskId: updated.id,
+          projectId: updated.projectId,
+
+          metadata: {
+            taskTitle: updated.title,
+          },
+        },
+        tx,
+      );
+    }
+
+    return updated;
   });
 
   if (
@@ -461,49 +535,6 @@ export async function updateTask(
     } catch (error) {
       console.error("Failed to create notification:", error);
     }
-  }
-
-  if (data.status !== undefined && oldStatus !== updatedTask.status) {
-    await createActivity({
-      workspaceId: task.workspaceId,
-      actorId,
-
-      type: ActivityType.TASK_STATUS_CHANGED,
-
-      entityType: ActivityEntityType.TASK,
-      entityId: updatedTask.id,
-
-      taskId: updatedTask.id,
-      projectId: updatedTask.projectId,
-
-      metadata: {
-        oldStatus,
-        newStatus: updatedTask.status,
-      },
-    });
-  }
-
-  if (
-    data.status !== undefined &&
-    oldStatus !== "DONE" &&
-    updatedTask.status === "DONE"
-  ) {
-    await createActivity({
-      workspaceId: task.workspaceId,
-      actorId,
-
-      type: ActivityType.TASK_COMPLETED,
-
-      entityType: ActivityEntityType.TASK,
-      entityId: updatedTask.id,
-
-      taskId: updatedTask.id,
-      projectId: updatedTask.projectId,
-
-      metadata: {
-        taskTitle: updatedTask.title,
-      },
-    });
   }
 
   const response = toTaskResponse(updatedTask);

@@ -109,37 +109,44 @@ export async function assignTaskToSprint(
       ? await findSprintById(task.sprintId)
       : null;
 
-  const updatedTask = await prisma.task.update({
-    where: {
-      id: task.id,
-    },
-    data: {
-      sprintId: sprint.id,
-    },
-  });
+  const updatedTask = await prisma.$transaction(async (tx) => {
+    const updated = await tx.task.update({
+      where: {
+        id: task.id,
+      },
+      data: {
+        sprintId: sprint.id,
+      },
+    });
 
-  await createActivity({
-    workspaceId: updatedTask.workspaceId,
-    actorId: userId,
+    await createActivity(
+      {
+        workspaceId: updated.workspaceId,
+        actorId: userId,
 
-    type: ActivityType.TASK_ASSIGNED_TO_SPRINT,
+        type: ActivityType.TASK_ASSIGNED_TO_SPRINT,
 
-    entityType: ActivityEntityType.TASK,
-    entityId: updatedTask.id,
+        entityType: ActivityEntityType.TASK,
+        entityId: updated.id,
 
-    taskId: updatedTask.id,
-    projectId: updatedTask.projectId,
+        taskId: updated.id,
+        projectId: updated.projectId,
 
-    metadata: previousSprint
-      ? {
-          taskTitle: updatedTask.title,
-          previousSprint: previousSprint.name,
-          newSprint: sprint.name,
-        }
-      : {
-          taskTitle: updatedTask.title,
-          sprintName: sprint.name,
-        },
+        metadata: previousSprint
+          ? {
+              taskTitle: updated.title,
+              previousSprint: previousSprint.name,
+              newSprint: sprint.name,
+            }
+          : {
+              taskTitle: updated.title,
+              sprintName: sprint.name,
+            },
+      },
+      tx,
+    );
+
+    return updated;
   });
 
   emitToWorkspace(
@@ -195,31 +202,38 @@ export async function removeTaskFromSprint(
 
   await validateProjectCanBeModified(sprint.projectId);
 
-  const updatedTask = await prisma.task.update({
-    where: {
-      id: task.id,
-    },
-    data: {
-      sprintId: null,
-    },
-  });
+  const updatedTask = await prisma.$transaction(async (tx) => {
+    const updated = await tx.task.update({
+      where: {
+        id: task.id,
+      },
+      data: {
+        sprintId: null,
+      },
+    });
 
-  await createActivity({
-    workspaceId: updatedTask.workspaceId,
-    actorId: userId,
+    await createActivity(
+      {
+        workspaceId: updated.workspaceId,
+        actorId: userId,
 
-    type: ActivityType.TASK_REMOVED_FROM_SPRINT,
+        type: ActivityType.TASK_REMOVED_FROM_SPRINT,
 
-    entityType: ActivityEntityType.TASK,
-    entityId: updatedTask.id,
+        entityType: ActivityEntityType.TASK,
+        entityId: updated.id,
 
-    taskId: updatedTask.id,
-    projectId: updatedTask.projectId,
+        taskId: updated.id,
+        projectId: updated.projectId,
 
-    metadata: {
-      taskTitle: updatedTask.title,
-      sprintName: sprint.name,
-    },
+        metadata: {
+          taskTitle: updated.title,
+          sprintName: sprint.name,
+        },
+      },
+      tx,
+    );
+
+    return updated;
   });
 
   emitToWorkspace(

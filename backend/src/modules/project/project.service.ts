@@ -118,25 +118,6 @@ export async function updateProject(
   const oldName = project.name;
   const oldStatus = project.status;
 
-  const updatedProject = await prisma.project.update({
-    where: {
-      id: project.id,
-    },
-    data: {
-      ...(data.name !== undefined && {
-        name: data.name,
-      }),
-
-      ...(data.description !== undefined && {
-        description: data.description,
-      }),
-
-      ...(data.status !== undefined && {
-        status: data.status,
-      }),
-    },
-  });
-
   const metadata: Record<string, string> = {};
 
   if (data.name !== undefined && data.name !== oldName) {
@@ -149,21 +130,47 @@ export async function updateProject(
     metadata.newStatus = data.status;
   }
 
-  if (Object.keys(metadata).length > 0) {
-    await createActivity({
-      workspaceId: updatedProject.workspaceId,
-      actorId,
+  const updatedProject = await prisma.$transaction(async (tx) => {
+    const updated = await tx.project.update({
+      where: {
+        id: project.id,
+      },
+      data: {
+        ...(data.name !== undefined && {
+          name: data.name,
+        }),
 
-      type: ActivityType.PROJECT_UPDATED,
+        ...(data.description !== undefined && {
+          description: data.description,
+        }),
 
-      entityType: ActivityEntityType.PROJECT,
-      entityId: updatedProject.id,
-
-      projectId: updatedProject.id,
-
-      metadata,
+        ...(data.status !== undefined && {
+          status: data.status,
+        }),
+      },
     });
-  }
+
+    if (Object.keys(metadata).length > 0) {
+      await createActivity(
+        {
+          workspaceId: updated.workspaceId,
+          actorId,
+
+          type: ActivityType.PROJECT_UPDATED,
+
+          entityType: ActivityEntityType.PROJECT,
+          entityId: updated.id,
+
+          projectId: updated.id,
+
+          metadata,
+        },
+        tx,
+      );
+    }
+
+    return updated;
+  });
 
   const response = toProjectResponse(updatedProject);
 
@@ -190,29 +197,36 @@ export async function archiveProject(actorId: string, projectId: string) {
     throw new ValidationError("Project is already archived");
   }
 
-  const archivedProject = await prisma.project.update({
-    where: {
-      id: project.id,
-    },
-    data: {
-      status: "ARCHIVED",
-    },
-  });
+  const archivedProject = await prisma.$transaction(async (tx) => {
+    const archived = await tx.project.update({
+      where: {
+        id: project.id,
+      },
+      data: {
+        status: "ARCHIVED",
+      },
+    });
 
-  await createActivity({
-    workspaceId: archivedProject.workspaceId,
-    actorId,
+    await createActivity(
+      {
+        workspaceId: archived.workspaceId,
+        actorId,
 
-    type: ActivityType.PROJECT_ARCHIVED,
+        type: ActivityType.PROJECT_ARCHIVED,
 
-    entityType: ActivityEntityType.PROJECT,
-    entityId: archivedProject.id,
+        entityType: ActivityEntityType.PROJECT,
+        entityId: archived.id,
 
-    projectId: archivedProject.id,
+        projectId: archived.id,
 
-    metadata: {
-      projectName: archivedProject.name,
-    },
+        metadata: {
+          projectName: archived.name,
+        },
+      },
+      tx,
+    );
+
+    return archived;
   });
 
   const response = toProjectResponse(archivedProject);
@@ -277,41 +291,48 @@ export async function createProject(actorId: string, data: CreateProjectData) {
 
   const slug = await generateUniqueProjectSlug(data.workspaceId, data.name);
 
-  const project = await prisma.project.create({
-    data: {
-      workspaceId: data.workspaceId,
-      ownerId: data.ownerId,
-      name: data.name,
-      slug,
+  const project = await prisma.$transaction(async (tx) => {
+    const createdProject = await tx.project.create({
+      data: {
+        workspaceId: data.workspaceId,
+        ownerId: data.ownerId,
+        name: data.name,
+        slug,
 
-      ...(data.description !== undefined && {
-        description: data.description,
-      }),
+        ...(data.description !== undefined && {
+          description: data.description,
+        }),
 
-      ...(data.startDate !== undefined && {
-        startDate: data.startDate,
-      }),
+        ...(data.startDate !== undefined && {
+          startDate: data.startDate,
+        }),
 
-      ...(data.endDate !== undefined && {
-        endDate: data.endDate,
-      }),
-    },
-  });
+        ...(data.endDate !== undefined && {
+          endDate: data.endDate,
+        }),
+      },
+    });
 
-  await createActivity({
-    workspaceId: project.workspaceId,
-    actorId,
+    await createActivity(
+      {
+        workspaceId: createdProject.workspaceId,
+        actorId,
 
-    type: ActivityType.PROJECT_CREATED,
+        type: ActivityType.PROJECT_CREATED,
 
-    entityType: ActivityEntityType.PROJECT,
-    entityId: project.id,
+        entityType: ActivityEntityType.PROJECT,
+        entityId: createdProject.id,
 
-    projectId: project.id,
+        projectId: createdProject.id,
 
-    metadata: {
-      projectName: project.name,
-    },
+        metadata: {
+          projectName: createdProject.name,
+        },
+      },
+      tx,
+    );
+
+    return createdProject;
   });
 
   const response = toProjectResponse(project);

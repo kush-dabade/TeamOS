@@ -58,7 +58,22 @@ function toActivityResponse(activity: ActivityWithActor): ActivityResponse {
   };
 }
 
-export async function createActivity(data: CreateActivityData): Promise<void> {
+/**
+ * `client` defaults to the global `prisma` singleton, preserving every
+ * existing caller's behavior unchanged (attachment/comments/workspace/
+ * invitation services still call this with just `data`, still outside any
+ * transaction). Callers that need the entity mutation and this activity
+ * write to commit or roll back together - see task/sprint/sprint-task/
+ * project services - pass their `$transaction` callback's `tx` explicitly.
+ * `Prisma.TransactionClient` is what Prisma's own callback parameter is
+ * typed as; `PrismaClient` satisfies it structurally (it has every member
+ * `Prisma.TransactionClient` requires, plus more), so the same parameter
+ * accepts either without a cast or `any`.
+ */
+export async function createActivity(
+  data: CreateActivityData,
+  client: Prisma.TransactionClient = prisma,
+): Promise<void> {
   const activityData = {
     workspaceId: data.workspaceId,
     actorId: data.actorId,
@@ -76,7 +91,7 @@ export async function createActivity(data: CreateActivityData): Promise<void> {
     }),
   };
 
-  const activity = await prisma.activity.create({
+  const activity = await client.activity.create({
     data: activityData,
     include: {
       actor: {

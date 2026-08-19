@@ -21,4 +21,24 @@
 -- Confirmed before authoring this migration that no existing Sprint data
 -- violates the constraint (no projectId has more than one ACTIVE row, in
 -- either the local dev or test database) - see the PR A commit 2 report.
+--
+-- Operational recovery, if this specific CREATE UNIQUE INDEX CONCURRENTLY
+-- fails partway through (e.g. the migration is interrupted, or a
+-- concurrent write genuinely violates the constraint while it's building):
+-- Postgres does not roll the index back automatically - CONCURRENTLY builds
+-- happen outside the normal DDL transaction specifically so concurrent
+-- writes aren't blocked while it runs, and a failure partway through can
+-- leave a real, disk-resident index row behind that Postgres marks invalid
+-- rather than dropping.
+--   1. Check whether it was left invalid:
+--        SELECT indisvalid FROM pg_index
+--        WHERE indexrelid = '"Sprint_projectId_active_unique"'::regclass;
+--   2. If indisvalid is false, drop the invalid index (safe - an invalid
+--      index enforces nothing and is never used by the planner):
+--        DROP INDEX CONCURRENTLY IF EXISTS "Sprint_projectId_active_unique";
+--   3. Resolve the failed migration in Prisma's own migration history so
+--      `prisma migrate deploy` doesn't consider it already (successfully)
+--      applied - typically:
+--        npx prisma migrate resolve --rolled-back 20260819130000_add_sprint_active_partial_unique_index
+--   4. Re-run `prisma migrate deploy` to retry this migration from scratch.
 CREATE UNIQUE INDEX CONCURRENTLY "Sprint_projectId_active_unique" ON "Sprint"("projectId") WHERE "status" = 'ACTIVE';

@@ -150,8 +150,26 @@ describe("GET /api/v1/workspaces/:workspaceId/activity pagination", () => {
       ),
     );
 
+    // Independently derived from the created rows' own createdAt/id, not
+    // from anything the API returns - this is what lets the final
+    // assertion prove actual createdAt DESC, id DESC ordering rather than
+    // just "a stable, self-consistent" one. A pagination bug that returns
+    // every row exactly once, with no duplicates, but in some other stable
+    // order (e.g. id DESC only, or insertion order) would satisfy every
+    // other assertion in this test but fail this one.
+    const expectedIds = [...created]
+      .sort((a, b) => {
+        const byCreatedAt = b.createdAt.getTime() - a.createdAt.getTime();
+        if (byCreatedAt !== 0) {
+          return byCreatedAt;
+        }
+        return a.id < b.id ? 1 : a.id > b.id ? -1 : 0;
+      })
+      .map((activity) => activity.id);
+
     const PAGE_LIMIT = 3;
     const seenIds = new Set<string>();
+    const returnedIds: string[] = [];
     let page = 1;
     let totalPages = 1;
 
@@ -174,11 +192,17 @@ describe("GET /api/v1/workspaces/:workspaceId/activity pagination", () => {
         seenIds.add(id);
       }
 
+      returnedIds.push(...pageIds);
+
       page++;
     } while (page <= totalPages);
 
     expect(totalPages).toBe(Math.ceil(created.length / PAGE_LIMIT));
     expect(seenIds.size).toBe(created.length);
     expect([...seenIds].sort()).toEqual(created.map((a) => a.id).sort());
+
+    // The actual proof this test exists for: traversal order, across page
+    // boundaries, matches createdAt DESC / id DESC exactly.
+    expect(returnedIds).toEqual(expectedIds);
   });
 });

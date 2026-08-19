@@ -254,16 +254,36 @@ describe("Sprint lifecycle immutability", () => {
   });
 
   describe("completeSprint", () => {
-    it("rejects completing an already-COMPLETED sprint", async () => {
+    it("rejects completing an already-COMPLETED sprint, without creating a second SPRINT_COMPLETED activity", async () => {
       const owner = await signUpTestUser(app);
       const { workspace } = await createWorkspaceWithMember(owner.userId);
       const project = await createProjectDirect(workspace.id, owner.userId);
       const sprint = await createSprintDirect(workspace.id, project.id);
 
-      await prisma.sprint.update({
-        where: { id: sprint.id },
-        data: { status: "COMPLETED" },
+      // Legitimately reach COMPLETED through the real start/complete
+      // endpoints, rather than setting status directly - this is what
+      // makes the "still exactly one activity" assertion below meaningful:
+      // there's a real SPRINT_COMPLETED activity on record before the
+      // rejected second attempt, so seeing the count stay at one actually
+      // proves the rejected request didn't create a duplicate. Asserting
+      // "zero activities" (the previous version of this test) would have
+      // passed even if completeSprint created an activity on every call,
+      // since no legitimate completion ever happened to create one.
+      await request(app)
+        .post(`/api/v1/sprints/${sprint.id}/start`)
+        .set("Cookie", owner.cookie)
+        .expect(200);
+
+      await request(app)
+        .post(`/api/v1/sprints/${sprint.id}/complete`)
+        .set("Cookie", owner.cookie)
+        .expect(200);
+
+      const activitiesAfterLegitimateCompletion = await prisma.activity.findMany({
+        where: { entityId: sprint.id, type: "SPRINT_COMPLETED" },
       });
+      expect(activitiesAfterLegitimateCompletion).toHaveLength(1);
+      const legitimateActivityId = activitiesAfterLegitimateCompletion[0]?.id;
 
       const res = await request(app)
         .post(`/api/v1/sprints/${sprint.id}/complete`)
@@ -279,13 +299,14 @@ describe("Sprint lifecycle immutability", () => {
       });
       expect(unchangedSprint.status).toBe("COMPLETED");
 
-      // The status guard throws before completeSprint's $transaction, so no
-      // second SPRINT_COMPLETED activity should exist for this rejected
-      // attempt.
-      const persistedActivity = await prisma.activity.findFirst({
+      // Still exactly the one activity from the legitimate completion above
+      // - same row, not merely the same count - proving the rejected
+      // second attempt created no new SPRINT_COMPLETED activity.
+      const activitiesAfterRejectedCompletion = await prisma.activity.findMany({
         where: { entityId: sprint.id, type: "SPRINT_COMPLETED" },
       });
-      expect(persistedActivity).toBeNull();
+      expect(activitiesAfterRejectedCompletion).toHaveLength(1);
+      expect(activitiesAfterRejectedCompletion[0]?.id).toBe(legitimateActivityId);
     });
   });
 });

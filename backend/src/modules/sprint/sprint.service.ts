@@ -64,6 +64,66 @@ async function findSprintByProjectAndName(
   });
 }
 
+/**
+ * Narrowly identifies the one P2002 this file needs to translate: a
+ * violation of the "Sprint_projectId_active_unique" partial index (see the
+ * comment on the Sprint model in schema.prisma). Deliberately does not
+ * match on that index's *name* (per review feedback) - it checks that the
+ * violated constraint's columns are `projectId`, so a rename of the index
+ * itself wouldn't silently break this check.
+ *
+ * `error.meta.target` - the array Prisma normally populates for a known
+ * P2002 - is only populated when Prisma's own schema recognizes the
+ * constraint. This index is hand-authored SQL with no `@@unique`
+ * counterpart in schema.prisma (Prisma's DSL can't express the `WHERE`
+ * clause), so Prisma has no schema-level mapping for it and `target` comes
+ * back `undefined`. Verified empirically against this project's own
+ * Prisma 7.8.0 + driver-adapter setup: the column info instead surfaces
+ * under `error.meta.driverAdapterError.cause.constraint.fields`. Both
+ * shapes are checked here - `target` in case a future Prisma version (or a
+ * differently-configured driver) populates it after all, the
+ * driver-adapter shape for what this version actually reports - rather
+ * than hard-coding today's exact shape as the only possibility.
+ */
+function isProjectIdUniqueViolation(error: unknown): boolean {
+  if (
+    !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+    error.code !== "P2002"
+  ) {
+    return false;
+  }
+
+  const meta = error.meta;
+
+  if (!meta || typeof meta !== "object") {
+    return false;
+  }
+
+  const fieldListMentionsProjectId = (value: unknown): boolean =>
+    Array.isArray(value) &&
+    value.some((field) => typeof field === "string" && field.includes("projectId"));
+
+  if (fieldListMentionsProjectId(meta.target)) {
+    return true;
+  }
+
+  const driverAdapterError = meta.driverAdapterError;
+  const cause =
+    driverAdapterError && typeof driverAdapterError === "object"
+      ? (driverAdapterError as Record<string, unknown>).cause
+      : undefined;
+  const constraint =
+    cause && typeof cause === "object"
+      ? (cause as Record<string, unknown>).constraint
+      : undefined;
+  const fields =
+    constraint && typeof constraint === "object"
+      ? (constraint as Record<string, unknown>).fields
+      : undefined;
+
+  return fieldListMentionsProjectId(fields);
+}
+
 async function findActiveSprintByProject(projectId: string) {
   return prisma.sprint.findFirst({
     where: {
@@ -395,13 +455,13 @@ export async function startSprint(actorId: string, sprintId: string) {
   // schema.prisma) is what actually closes that race: only one of two
   // concurrent activations can win the `status: "ACTIVE"` update below,
   // and the loser gets a Postgres unique-violation, surfaced by Prisma as
-  // P2002. This transaction's only write to Sprint is that status update
-  // (it doesn't touch `name`, so the other Sprint unique index -
-  // @@unique([projectId, name]) - can't be the cause), so any P2002 here
-  // can only be that race, not an unrelated conflict from some other
-  // constraint or a different call site - it's translated into the exact
-  // same domain error the pre-check above throws, so a client sees one
-  // consistent failure shape regardless of which path caught it.
+  // P2002. `isProjectIdUniqueViolation` (above) narrows that P2002 to
+  // specifically this constraint by its columns, not merely its error
+  // code - an unrelated P2002 (e.g. from some other constraint sharing
+  // this transaction in the future) is rethrown unchanged rather than
+  // being misreported as an active-sprint conflict. It's translated into
+  // the exact same domain error the pre-check above throws, so a client
+  // sees one consistent failure shape regardless of which path caught it.
   let updatedSprint: Sprint;
 
   try {
@@ -437,10 +497,7 @@ export async function startSprint(actorId: string, sprintId: string) {
       return updated;
     });
   } catch (error) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
-    ) {
+    if (isProjectIdUniqueViolation(error)) {
       throw new ValidationError(
         "Another active sprint already exists for this project",
       );

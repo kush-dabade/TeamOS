@@ -25,10 +25,20 @@ import searchRoutes from "./modules/search/search.routes.js";
 import userRoutes from "./modules/user/user.routes.js";
 import { notFoundHandler } from "./middleware/not-found.js";
 import { errorHandler } from "./middleware/error-handler.js";
-import { generalApiLimiter, verificationEmailLimiter } from "./middleware/rate-limit.js";
+import {
+  generalApiLimiter,
+  verificationEmailLimiter,
+  signInIpLimiter,
+  signUpIpLimiter,
+} from "./middleware/rate-limit.js";
 import { securityHeaders } from "./middleware/security-headers.js";
 
 const app = express();
+
+// Express sets this header by default, identifying the framework to every
+// client. Disabling it is a one-line, zero-risk reduction in server
+// fingerprinting - there is no legitimate consumer of this header.
+app.disable("x-powered-by");
 
 // Mounted first, ahead of CORS/auth/body-parsing/rate limiting/routes -
 // res.setHeader calls persist on the response regardless of what happens
@@ -60,17 +70,19 @@ app.use(
   }),
 );
 
-// Mounted ahead of the Better Auth catch-all below, scoped to this one
-// path only. Better Auth's own built-in limiter is silently a no-op for
-// all of /api/auth/* in this deployment (see verificationEmailLimiter's
-// comment in middleware/rate-limit.ts for the confirmed reason), so this
-// specific endpoint - session-less and email-sending, the highest-risk
-// path under /api/auth/* - gets real, distributed-safe protection instead
-// of relying on a check that never fires. Sign-in/sign-up/etc. are left
-// alone: no evidence they're currently being abused, and duplicating
-// Express-level limiting across all of /api/auth/* would be a larger
-// rate-limiting refactor than this endpoint's real, reproduced gap calls for.
+// Mounted ahead of the Better Auth catch-all below, each scoped to one
+// specific path only - not a blanket app.use("/api/auth", ...), which
+// would also throttle session lookups, OAuth callbacks, and other
+// /api/auth/* traffic these limits were never sized for. Better Auth's own
+// built-in limiter is silently a no-op for all of /api/auth/* in this
+// deployment (see verificationEmailLimiter's comment in
+// middleware/rate-limit.ts for the confirmed reason), so these endpoints -
+// session-less, and either email-sending or credential-checking, the
+// highest-risk paths under /api/auth/* - get real, distributed-safe
+// protection instead of relying on a check that never fires.
 app.post("/api/auth/send-verification-email", verificationEmailLimiter);
+app.post("/api/auth/sign-in/email", signInIpLimiter);
+app.post("/api/auth/sign-up/email", signUpIpLimiter);
 
 app.all("/api/auth/*splat", toNodeHandler(auth));
 

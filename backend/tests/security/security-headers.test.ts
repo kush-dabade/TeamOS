@@ -98,6 +98,14 @@ describe("security headers", () => {
     expectSecurityHeaders(res);
   });
 
+  it("does not send X-Powered-By", async () => {
+    const { cookie } = await signUpTestUser(app);
+
+    const res = await request(app).get("/api/v1/workspaces").set("Cookie", cookie).expect(200);
+
+    expect(res.headers["x-powered-by"]).toBeUndefined();
+  });
+
   it("does not send Strict-Transport-Security in development", async () => {
     const { cookie } = await signUpTestUser(app);
 

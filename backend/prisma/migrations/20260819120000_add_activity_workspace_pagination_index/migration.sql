@@ -1,0 +1,11 @@
+-- CreateIndex
+-- Uses CONCURRENTLY so this build doesn't hold the ACCESS EXCLUSIVE-adjacent
+-- lock a plain CREATE INDEX takes against concurrent writes to Activity.
+-- This is the migration's only statement, so Prisma Migrate applies it
+-- outside a transaction (it only wraps multi-statement migration files) -
+-- required, since CONCURRENTLY is rejected by Postgres inside a transaction
+-- block. Supersedes "Activity_workspaceId_createdAt_idx" (adds "id" as a
+-- tiebreaker to match the now-deterministic `ORDER BY createdAt DESC, id
+-- DESC` in listWorkspaceActivities); the old index is dropped separately in
+-- a later migration so there's never a window with neither index present.
+CREATE INDEX CONCURRENTLY "Activity_workspaceId_createdAt_id_idx" ON "Activity"("workspaceId", "createdAt" DESC, "id" DESC);

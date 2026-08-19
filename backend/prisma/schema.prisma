@@ -404,9 +404,9 @@ model Activity {
 
   @@index([workspaceId])
   @@index([actorId])
-  @@index([workspaceId, createdAt])
-  @@index([workspaceId, taskId, createdAt])
-  @@index([workspaceId, projectId, createdAt])
+  @@index([workspaceId, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([workspaceId, taskId, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([workspaceId, projectId, createdAt(sort: Desc), id(sort: Desc)])
 }
 
 model Sprint {

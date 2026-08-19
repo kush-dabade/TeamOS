@@ -2,7 +2,11 @@ import request from "supertest";
 import type { Express } from "express";
 
 import { prisma } from "../../src/lib/prisma.js";
-import { WorkspaceRole } from "../../src/generated/prisma/enums.js";
+import {
+  ActivityEntityType,
+  ActivityType,
+  WorkspaceRole,
+} from "../../src/generated/prisma/enums.js";
 
 export interface AuthenticatedTestUser {
   userId: string;
@@ -170,6 +174,46 @@ export async function createSprintDirect(
       workspaceId,
       projectId,
       name,
+    },
+  });
+}
+
+/**
+ * Direct Prisma insert, same rationale as createProjectDirect - scoped
+ * narrowly to what pagination-determinism tests need: an explicit
+ * `createdAt` (overriding the column's `@default(now())`), since proving
+ * `ORDER BY createdAt DESC, id DESC` is deterministic requires rows with
+ * identical, caller-controlled timestamps. `type`/`entityType`/`entityId`
+ * default to an arbitrary valid combination - their actual values don't
+ * matter for pagination-ordering assertions, only that the row is valid.
+ */
+export async function createActivityDirect(
+  workspaceId: string,
+  actorId: string,
+  createdAt: Date,
+  overrides: Partial<{
+    type: ActivityType;
+    entityType: ActivityEntityType;
+    entityId: string;
+    taskId: string;
+    projectId: string;
+  }> = {},
+) {
+  return prisma.activity.create({
+    data: {
+      workspaceId,
+      actorId,
+      createdAt,
+
+      type: overrides.type ?? ActivityType.PROJECT_CREATED,
+
+      entityType: overrides.entityType ?? ActivityEntityType.PROJECT,
+      entityId: overrides.entityId ?? crypto.randomUUID(),
+
+      ...(overrides.taskId !== undefined && { taskId: overrides.taskId }),
+      ...(overrides.projectId !== undefined && {
+        projectId: overrides.projectId,
+      }),
     },
   });
 }

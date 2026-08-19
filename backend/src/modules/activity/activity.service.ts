@@ -189,9 +189,7 @@ export async function listWorkspaceActivities(
         },
       },
 
-      orderBy: {
-        createdAt: "desc",
-      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
 
       skip,
       take: options.limit,

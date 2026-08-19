@@ -29,6 +29,7 @@ import { errorHandler } from "./middleware/error-handler.js";
 import {
   generalApiLimiter,
   verificationEmailLimiter,
+  passwordResetRequestLimiter,
   signInIpLimiter,
   signUpIpLimiter,
 } from "./middleware/rate-limit.js";
@@ -82,6 +83,7 @@ app.use(
 // highest-risk paths under /api/auth/* - get real, distributed-safe
 // protection instead of relying on a check that never fires.
 app.post("/api/auth/send-verification-email", verificationEmailLimiter);
+app.post("/api/auth/request-password-reset", passwordResetRequestLimiter);
 app.post("/api/auth/sign-in/email", signInIpLimiter);
 app.post("/api/auth/sign-up/email", signUpIpLimiter);
 

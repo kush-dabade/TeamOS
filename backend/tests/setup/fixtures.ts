@@ -6,6 +6,8 @@ import { WorkspaceRole } from "../../src/generated/prisma/enums.js";
 
 export interface AuthenticatedTestUser {
   userId: string;
+  email: string;
+  password: string;
   cookie: string;
 }
 
@@ -61,6 +63,8 @@ export async function signUpTestUser(app: Express): Promise<AuthenticatedTestUse
 
   return {
     userId,
+    email,
+    password,
     cookie,
   };
 }

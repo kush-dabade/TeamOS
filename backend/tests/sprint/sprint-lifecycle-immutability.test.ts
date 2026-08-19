@@ -44,6 +44,15 @@ describe("Sprint lifecycle immutability", () => {
         where: { id: sprint.id },
       });
       expect(unchangedSprint.name).toBe(sprint.name);
+
+      // The COMPLETED check in updateSprint throws before the
+      // $transaction that would otherwise write both the Sprint update and
+      // its SPRINT_UPDATED activity - so no activity row should exist at
+      // all for this rejected attempt.
+      const persistedActivity = await prisma.activity.findFirst({
+        where: { entityId: sprint.id, type: "SPRINT_UPDATED" },
+      });
+      expect(persistedActivity).toBeNull();
     });
 
     it("allows updates to a PLANNED sprint", async () => {
@@ -110,6 +119,14 @@ describe("Sprint lifecycle immutability", () => {
         where: { id: task.id },
       });
       expect(unchangedTask.sprintId).toBeNull();
+
+      // validateSprintCanBeModified throws before assignTaskToSprint's
+      // $transaction, so no TASK_ASSIGNED_TO_SPRINT activity should exist
+      // for this rejected attempt.
+      const persistedActivity = await prisma.activity.findFirst({
+        where: { taskId: task.id, type: "TASK_ASSIGNED_TO_SPRINT" },
+      });
+      expect(persistedActivity).toBeNull();
     });
 
     it("allows assigning a task to a PLANNED sprint", async () => {
@@ -160,6 +177,14 @@ describe("Sprint lifecycle immutability", () => {
         where: { id: task.id },
       });
       expect(unchangedTask.sprintId).toBe(sprint.id);
+
+      // validateSprintCanBeModified throws before removeTaskFromSprint's
+      // $transaction, so no TASK_REMOVED_FROM_SPRINT activity should exist
+      // for this rejected attempt.
+      const persistedActivity = await prisma.activity.findFirst({
+        where: { taskId: task.id, type: "TASK_REMOVED_FROM_SPRINT" },
+      });
+      expect(persistedActivity).toBeNull();
     });
 
     it("allows removing a task from a PLANNED sprint", async () => {
@@ -181,6 +206,86 @@ describe("Sprint lifecycle immutability", () => {
 
       expect(res.body.success).toBe(true);
       expect(res.body.data.sprintId).toBeNull();
+    });
+  });
+
+  // startSprint/completeSprint reject a COMPLETED sprint via their own
+  // general transition-validity guards (`status !== "PLANNED"` /
+  // `status !== "ACTIVE"`), not the "Completed sprints cannot be modified"
+  // message updateSprint/assignTaskToSprint/removeTaskFromSprint share -
+  // those guards also happen to cover every other invalid transition (e.g.
+  // starting an already-ACTIVE sprint gets the same message). Covered here
+  // anyway because a COMPLETED sprint is a real instance of "cannot be
+  // started" / "cannot be completed again", and neither case had explicit
+  // regression coverage.
+  describe("startSprint", () => {
+    it("rejects starting a COMPLETED sprint", async () => {
+      const owner = await signUpTestUser(app);
+      const { workspace } = await createWorkspaceWithMember(owner.userId);
+      const project = await createProjectDirect(workspace.id, owner.userId);
+      const sprint = await createSprintDirect(workspace.id, project.id);
+
+      await prisma.sprint.update({
+        where: { id: sprint.id },
+        data: { status: "COMPLETED" },
+      });
+
+      const res = await request(app)
+        .post(`/api/v1/sprints/${sprint.id}/start`)
+        .set("Cookie", owner.cookie)
+        .expect(400);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe("VALIDATION_ERROR");
+      expect(res.body.error.message).toBe("Only planned sprints can be started");
+
+      const unchangedSprint = await prisma.sprint.findUniqueOrThrow({
+        where: { id: sprint.id },
+      });
+      expect(unchangedSprint.status).toBe("COMPLETED");
+
+      // The status guard throws before startSprint's $transaction, so no
+      // SPRINT_STARTED activity should exist for this rejected attempt.
+      const persistedActivity = await prisma.activity.findFirst({
+        where: { entityId: sprint.id, type: "SPRINT_STARTED" },
+      });
+      expect(persistedActivity).toBeNull();
+    });
+  });
+
+  describe("completeSprint", () => {
+    it("rejects completing an already-COMPLETED sprint", async () => {
+      const owner = await signUpTestUser(app);
+      const { workspace } = await createWorkspaceWithMember(owner.userId);
+      const project = await createProjectDirect(workspace.id, owner.userId);
+      const sprint = await createSprintDirect(workspace.id, project.id);
+
+      await prisma.sprint.update({
+        where: { id: sprint.id },
+        data: { status: "COMPLETED" },
+      });
+
+      const res = await request(app)
+        .post(`/api/v1/sprints/${sprint.id}/complete`)
+        .set("Cookie", owner.cookie)
+        .expect(400);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe("VALIDATION_ERROR");
+      expect(res.body.error.message).toBe("Only active sprints can be completed");
+
+      const unchangedSprint = await prisma.sprint.findUniqueOrThrow({
+        where: { id: sprint.id },
+      });
+      expect(unchangedSprint.status).toBe("COMPLETED");
+
+      // The status guard throws before completeSprint's $transaction, so no
+      // second SPRINT_COMPLETED activity should exist for this rejected
+      // attempt.
+      const persistedActivity = await prisma.activity.findFirst({
+        where: { entityId: sprint.id, type: "SPRINT_COMPLETED" },
+      });
+      expect(persistedActivity).toBeNull();
     });
   });
 });

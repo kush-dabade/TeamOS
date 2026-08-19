@@ -118,25 +118,6 @@ export async function updateProject(
   const oldName = project.name;
   const oldStatus = project.status;
 
-  const updatedProject = await prisma.project.update({
-    where: {
-      id: project.id,
-    },
-    data: {
-      ...(data.name !== undefined && {
-        name: data.name,
-      }),
-
-      ...(data.description !== undefined && {
-        description: data.description,
-      }),
-
-      ...(data.status !== undefined && {
-        status: data.status,
-      }),
-    },
-  });
-
   const metadata: Record<string, string> = {};
 
   if (data.name !== undefined && data.name !== oldName) {
@@ -149,21 +130,51 @@ export async function updateProject(
     metadata.newStatus = data.status;
   }
 
-  if (Object.keys(metadata).length > 0) {
-    await createActivity({
-      workspaceId: updatedProject.workspaceId,
-      actorId,
+  let emitActivityCreated: () => void = () => {};
 
-      type: ActivityType.PROJECT_UPDATED,
+  const updatedProject = await prisma.$transaction(async (tx) => {
+    const updated = await tx.project.update({
+      where: {
+        id: project.id,
+      },
+      data: {
+        ...(data.name !== undefined && {
+          name: data.name,
+        }),
 
-      entityType: ActivityEntityType.PROJECT,
-      entityId: updatedProject.id,
+        ...(data.description !== undefined && {
+          description: data.description,
+        }),
 
-      projectId: updatedProject.id,
-
-      metadata,
+        ...(data.status !== undefined && {
+          status: data.status,
+        }),
+      },
     });
-  }
+
+    if (Object.keys(metadata).length > 0) {
+      emitActivityCreated = await createActivity(
+        {
+          workspaceId: updated.workspaceId,
+          actorId,
+
+          type: ActivityType.PROJECT_UPDATED,
+
+          entityType: ActivityEntityType.PROJECT,
+          entityId: updated.id,
+
+          projectId: updated.id,
+
+          metadata,
+        },
+        tx,
+      );
+    }
+
+    return updated;
+  });
+
+  emitActivityCreated();
 
   const response = toProjectResponse(updatedProject);
 
@@ -190,30 +201,41 @@ export async function archiveProject(actorId: string, projectId: string) {
     throw new ValidationError("Project is already archived");
   }
 
-  const archivedProject = await prisma.project.update({
-    where: {
-      id: project.id,
-    },
-    data: {
-      status: "ARCHIVED",
-    },
+  let emitActivityCreated: () => void = () => {};
+
+  const archivedProject = await prisma.$transaction(async (tx) => {
+    const archived = await tx.project.update({
+      where: {
+        id: project.id,
+      },
+      data: {
+        status: "ARCHIVED",
+      },
+    });
+
+    emitActivityCreated = await createActivity(
+      {
+        workspaceId: archived.workspaceId,
+        actorId,
+
+        type: ActivityType.PROJECT_ARCHIVED,
+
+        entityType: ActivityEntityType.PROJECT,
+        entityId: archived.id,
+
+        projectId: archived.id,
+
+        metadata: {
+          projectName: archived.name,
+        },
+      },
+      tx,
+    );
+
+    return archived;
   });
 
-  await createActivity({
-    workspaceId: archivedProject.workspaceId,
-    actorId,
-
-    type: ActivityType.PROJECT_ARCHIVED,
-
-    entityType: ActivityEntityType.PROJECT,
-    entityId: archivedProject.id,
-
-    projectId: archivedProject.id,
-
-    metadata: {
-      projectName: archivedProject.name,
-    },
-  });
+  emitActivityCreated();
 
   const response = toProjectResponse(archivedProject);
 
@@ -277,42 +299,53 @@ export async function createProject(actorId: string, data: CreateProjectData) {
 
   const slug = await generateUniqueProjectSlug(data.workspaceId, data.name);
 
-  const project = await prisma.project.create({
-    data: {
-      workspaceId: data.workspaceId,
-      ownerId: data.ownerId,
-      name: data.name,
-      slug,
+  let emitActivityCreated: () => void = () => {};
 
-      ...(data.description !== undefined && {
-        description: data.description,
-      }),
+  const project = await prisma.$transaction(async (tx) => {
+    const createdProject = await tx.project.create({
+      data: {
+        workspaceId: data.workspaceId,
+        ownerId: data.ownerId,
+        name: data.name,
+        slug,
 
-      ...(data.startDate !== undefined && {
-        startDate: data.startDate,
-      }),
+        ...(data.description !== undefined && {
+          description: data.description,
+        }),
 
-      ...(data.endDate !== undefined && {
-        endDate: data.endDate,
-      }),
-    },
+        ...(data.startDate !== undefined && {
+          startDate: data.startDate,
+        }),
+
+        ...(data.endDate !== undefined && {
+          endDate: data.endDate,
+        }),
+      },
+    });
+
+    emitActivityCreated = await createActivity(
+      {
+        workspaceId: createdProject.workspaceId,
+        actorId,
+
+        type: ActivityType.PROJECT_CREATED,
+
+        entityType: ActivityEntityType.PROJECT,
+        entityId: createdProject.id,
+
+        projectId: createdProject.id,
+
+        metadata: {
+          projectName: createdProject.name,
+        },
+      },
+      tx,
+    );
+
+    return createdProject;
   });
 
-  await createActivity({
-    workspaceId: project.workspaceId,
-    actorId,
-
-    type: ActivityType.PROJECT_CREATED,
-
-    entityType: ActivityEntityType.PROJECT,
-    entityId: project.id,
-
-    projectId: project.id,
-
-    metadata: {
-      projectName: project.name,
-    },
-  });
+  emitActivityCreated();
 
   const response = toProjectResponse(project);
 

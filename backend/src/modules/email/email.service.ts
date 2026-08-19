@@ -1,9 +1,11 @@
 import { resend } from "./email.client.js";
 import { emailConfig } from "./email.config.js";
+import { passwordResetTemplate } from "./templates/reset-password.js";
 import { verifyEmailTemplate } from "./templates/verify-email.js";
 import { workspaceInvitationTemplate } from "./templates/workspace-invitation.js";
 import type {
   EmailTemplate,
+  SendPasswordResetEmailData,
   SendVerificationEmailData,
   SendWorkspaceInvitationEmailData,
 } from "./email.types.js";
@@ -53,6 +55,17 @@ export async function sendVerificationEmail(
   const email = verifyEmailTemplate({
     recipientName: data.recipientName,
     verificationUrl: data.verificationUrl,
+  });
+
+  await sendEmail(data.recipientEmail, email);
+}
+
+export async function sendPasswordResetEmail(
+  data: SendPasswordResetEmailData,
+): Promise<void> {
+  const email = passwordResetTemplate({
+    recipientName: data.recipientName,
+    resetUrl: data.resetUrl,
   });
 
   await sendEmail(data.recipientEmail, email);

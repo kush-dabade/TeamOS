@@ -65,6 +65,16 @@ export interface ListProjectTasksResult {
   pagination: TaskPagination;
 }
 
+export interface ListWorkspaceTasksParams {
+  page?: number;
+  limit?: number;
+}
+
+export interface ListWorkspaceTasksResult {
+  tasks: Task[];
+  pagination: TaskPagination;
+}
+
 // The backend task resource never returns deletedAt (soft-deleted tasks are
 // simply excluded from list/detail results).
 function toTask(task: BackendTask): Task {
@@ -92,6 +102,20 @@ export async function fetchProjectTasks(
   params: ListProjectTasksParams = {},
 ): Promise<ListProjectTasksResult> {
   const response = await apiClient.get<TaskListResponse>(`/projects/${projectId}/tasks`, {
+    params,
+  });
+
+  return {
+    tasks: response.data.data.tasks.map(toTask),
+    pagination: response.data.pagination,
+  };
+}
+
+export async function fetchWorkspaceTasks(
+  workspaceId: string,
+  params: ListWorkspaceTasksParams = {},
+): Promise<ListWorkspaceTasksResult> {
+  const response = await apiClient.get<TaskListResponse>(`/workspaces/${workspaceId}/tasks`, {
     params,
   });
 

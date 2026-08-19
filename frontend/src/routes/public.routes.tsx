@@ -4,9 +4,11 @@ import { GuestRoute } from "@/features/auth";
 import { InvitationPage } from "@/features/invitations";
 import PublicLayout from "@/layouts/PublicLayout";
 import RouteErrorBoundary from "@/layouts/RouteErrorBoundary";
+import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
 import HomePage from "@/pages/HomePage";
 import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import VerifyEmailPage from "@/pages/VerifyEmailPage";
 
 import { NotFoundGate } from "./not-found-gate";
@@ -33,6 +35,17 @@ export const publicRoutes: RouteObject[] = [
     errorElement: <RouteErrorBoundary fullPage recoveryPath="/" recoveryLabel="Back to home" />,
   },
   {
+    // Public regardless of auth state, same rationale as /verify-email
+    // above: Better Auth's reset-password callback redirects here with no
+    // session, but a user could also open the emailed link while still
+    // signed in on that browser (e.g. a stale session on this device) and
+    // must still be able to complete the reset - GuestRoute would instead
+    // bounce them straight to /dashboard before they ever see the form.
+    path: "/reset-password",
+    element: <ResetPasswordPage />,
+    errorElement: <RouteErrorBoundary fullPage recoveryPath="/" recoveryLabel="Back to home" />,
+  },
+  {
     path: "*",
     element: <NotFoundGate />,
   },
@@ -50,6 +63,10 @@ export const publicRoutes: RouteObject[] = [
           {
             path: "/register",
             element: <RegisterPage />,
+          },
+          {
+            path: "/forgot-password",
+            element: <ForgotPasswordPage />,
           },
         ],
       },

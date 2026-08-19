@@ -19,6 +19,7 @@ export function useUpdateTask() {
     onSuccess: (task, { taskId }) => {
       queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
       queryClient.invalidateQueries({ queryKey: taskKeys.list(task.projectId) });
+      queryClient.invalidateQueries({ queryKey: taskKeys.workspaceLists() });
     },
   });
 }

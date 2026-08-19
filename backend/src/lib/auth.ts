@@ -7,7 +7,10 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "./prisma.js";
 import { incrementRateLimitCounter, rateLimitRedis } from "./redis.js";
 import { trustedOrigins } from "../config/security.config.js";
-import { enqueueVerificationEmail } from "../queues/email/email.queue.js";
+import {
+  enqueuePasswordResetEmail,
+  enqueueVerificationEmail,
+} from "../queues/email/email.queue.js";
 
 // Mirrors the same fail-fast check already in app.ts and
 // modules/email/email.config.ts (each process-local consumer of
@@ -85,6 +88,36 @@ export const auth = betterAuth({
     // email, so an unverified account could accept a workspace invitation
     // meant for the real owner of that address.
     requireEmailVerification: true,
+
+    // Presence of this callback alone is what turns on
+    // POST /request-password-reset and POST /reset-password (see
+    // requestPasswordReset in the installed better-auth package's
+    // api/routes/password.ts - it 400s with RESET_PASSWORD_DISABLED
+    // without one). Token generation, its persistence in the existing
+    // `verification` table, expiration, and single-use consumption are
+    // all handled internally by Better Auth - this only wires the already-
+    // generated link into TeamOS's own email delivery, the same way
+    // emailVerification.sendVerificationEmail below does.
+    sendResetPassword: async ({ user, url }) => {
+      // Enqueued rather than sent inline, same rationale as
+      // sendVerificationEmail below: keeps this request's latency
+      // independent of Resend's availability and gets BullMQ's existing
+      // retry/backoff. `url` is Better Auth's own
+      // `${baseURL}/reset-password/:token?callbackURL=...` link - never
+      // logged here or anywhere downstream (email.worker.ts only logs the
+      // job id/name on success or failure, never job.data).
+      await enqueuePasswordResetEmail({
+        email: user.email,
+        name: user.name,
+        url,
+      });
+    },
+
+    // A password reset is exactly the scenario where an attacker may
+    // already hold a live session on the account being recovered (that's
+    // often *why* the legitimate owner is resetting it) - without this,
+    // resetting the password does nothing to end that session.
+    revokeSessionsOnPasswordReset: true,
   },
 
   emailVerification: {
@@ -162,6 +195,27 @@ export const auth = betterAuth({
             body: {
               ...ctx.body,
               callbackURL: `${frontendUrl}/verify-email`,
+            },
+          },
+        };
+      }
+
+      // Same reasoning as the callbackURL default above, applied to
+      // request-password-reset's differently-named `redirectTo` field
+      // (Better Auth's own requestPasswordReset endpoint uses that name,
+      // not callbackURL). Without it, Better Auth builds the emailed link
+      // with an empty callbackURL, and its GET /reset-password/:token
+      // redirect step (see requestPasswordResetCallback in the installed
+      // package) then has nowhere to send the user - the reset would land
+      // back on this API server instead of the frontend's /reset-password
+      // page Commit 6 adds.
+      if (ctx.path === "/request-password-reset" && !ctx.body?.redirectTo) {
+        return {
+          context: {
+            ...ctx,
+            body: {
+              ...ctx.body,
+              redirectTo: `${frontendUrl}/reset-password`,
             },
           },
         };

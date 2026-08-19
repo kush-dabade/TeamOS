@@ -8,6 +8,7 @@ import workspaceRoutes from "./modules/workspace/workspace.routes.js";
 import workspaceItemRoutes from "./modules/workspace/workspace-item.routes.js";
 import projectRoutes from "./modules/project/project.routes.js";
 import taskRoutes from "./modules/task/task.routes.js";
+import workspaceTaskRoutes from "./modules/task/workspace-task.routes.js";
 import commentRoutes from "./modules/comments/comments.routes.js";
 import activityRoutes from "./modules/activity/activity.routes.js";
 import taskItemRoutes from "./modules/task/task-item.routes.js";
@@ -28,6 +29,7 @@ import { errorHandler } from "./middleware/error-handler.js";
 import {
   generalApiLimiter,
   verificationEmailLimiter,
+  passwordResetRequestLimiter,
   signInIpLimiter,
   signUpIpLimiter,
 } from "./middleware/rate-limit.js";
@@ -81,6 +83,7 @@ app.use(
 // highest-risk paths under /api/auth/* - get real, distributed-safe
 // protection instead of relying on a check that never fires.
 app.post("/api/auth/send-verification-email", verificationEmailLimiter);
+app.post("/api/auth/request-password-reset", passwordResetRequestLimiter);
 app.post("/api/auth/sign-in/email", signInIpLimiter);
 app.post("/api/auth/sign-up/email", signUpIpLimiter);
 
@@ -98,6 +101,7 @@ app.use("/api/v1/workspaces", workspaceItemRoutes);
 app.use("/api/v1/workspaces", projectRoutes);
 app.use("/api/v1/workspaces", activityRoutes);
 app.use("/api/v1/workspaces", workspaceInvitationRoutes);
+app.use("/api/v1/workspaces", workspaceTaskRoutes);
 
 //search resources
 app.use("/api/v1/search", searchRoutes);

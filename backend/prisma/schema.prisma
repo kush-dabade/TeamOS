@@ -319,6 +319,7 @@ model Task {
   @@index([sprintId, status])
   @@index([deletedAt])
   @@index([projectId, deletedAt, createdAt, id])
+  @@index([workspaceId, deletedAt, createdAt, id])
 }
 
 model Comment {

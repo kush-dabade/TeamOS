@@ -31,3 +31,14 @@ export interface VerifyEmailTemplateData {
   recipientName: string;
   verificationUrl: string;
 }
+
+export interface SendPasswordResetEmailData {
+  recipientEmail: string;
+  recipientName: string;
+  resetUrl: string;
+}
+
+export interface PasswordResetTemplateData {
+  recipientName: string;
+  resetUrl: string;
+}

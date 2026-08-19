@@ -22,6 +22,13 @@ export interface ListTasksOptions {
   limit: number;
 }
 
+export interface ListWorkspaceTasksOptions {
+  workspaceId: string;
+
+  page: number;
+  limit: number;
+}
+
 export interface UpdateTaskData {
   title?: string;
 

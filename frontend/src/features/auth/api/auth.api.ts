@@ -33,6 +33,40 @@ export async function logout(): Promise<void> {
   throwIfAuthError(error);
 }
 
+// Calls Better Auth's existing POST /request-password-reset endpoint
+// (auto-registered once emailAndPassword.sendResetPassword is configured -
+// backend/src/lib/auth.ts) - not a custom endpoint. The installed
+// better-auth client has no hardcoded "forgetPassword" method; its proxy
+// derives the callable name by kebab-casing the property path
+// (client/proxy.mjs), so `authClient.requestPasswordReset` is what actually
+// maps to this route, not an invented name.
+//
+// redirectTo is passed explicitly (unlike resendVerificationEmail's
+// callbackURL below, which relies on the backend's hooks.before default)
+// so the emailed link always matches the origin this request actually came
+// from, rather than the server's separately-configured FRONTEND_URL.
+export async function requestPasswordReset(email: string): Promise<void> {
+  const { error } = await authClient.requestPasswordReset({
+    email,
+    redirectTo: `${window.location.origin}/reset-password`,
+  });
+
+  throwIfAuthError(error);
+}
+
+// Calls Better Auth's existing POST /reset-password endpoint. `token` comes
+// from the query string Better Auth's own GET /reset-password/:token
+// redirect appends (?token=... on success, ?error=INVALID_TOKEN on
+// failure) - never generated or validated on the frontend.
+export async function resetPassword(data: { token: string; newPassword: string }): Promise<void> {
+  const { error } = await authClient.resetPassword({
+    newPassword: data.newPassword,
+    token: data.token,
+  });
+
+  throwIfAuthError(error);
+}
+
 // Calls Better Auth's existing POST /send-verification-email endpoint
 // (auto-registered once emailVerification.sendVerificationEmail is
 // configured - backend/src/lib/auth.ts) - not a custom endpoint.

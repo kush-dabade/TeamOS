@@ -6,6 +6,8 @@ import { closeRealtime, initializeRealtime } from "../../src/realtime/index.js";
 
 export interface TestServer {
   baseUrl: string;
+  /** The raw http.Server - only needed by tests exercising server.ts's own shutdown() directly. */
+  server: ReturnType<typeof createServer>;
   close: () => Promise<void>;
 }
 
@@ -35,6 +37,7 @@ export async function startTestServer(): Promise<TestServer> {
 
   return {
     baseUrl: `http://localhost:${port}`,
+    server,
     // closeRealtime() already closes the underlying http.Server itself -
     // Socket.IO's Server.close() awaits httpServer.close() internally,
     // since initializeRealtime() attached it via `new Server(server, ...)`.

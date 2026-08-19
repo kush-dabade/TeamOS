@@ -118,42 +118,53 @@ export async function createSprint(actorId: string, data: CreateSprintData) {
     );
   }
 
-  const sprint = await prisma.sprint.create({
-    data: {
-      workspaceId: project.workspaceId,
-      projectId: project.id,
+  let emitActivityCreated: () => void = () => {};
 
-      name: data.name,
+  const sprint = await prisma.$transaction(async (tx) => {
+    const createdSprint = await tx.sprint.create({
+      data: {
+        workspaceId: project.workspaceId,
+        projectId: project.id,
 
-      ...(data.goal !== undefined && {
-        goal: data.goal,
-      }),
+        name: data.name,
 
-      ...(data.startDate !== undefined && {
-        startDate: data.startDate,
-      }),
+        ...(data.goal !== undefined && {
+          goal: data.goal,
+        }),
 
-      ...(data.endDate !== undefined && {
-        endDate: data.endDate,
-      }),
-    },
+        ...(data.startDate !== undefined && {
+          startDate: data.startDate,
+        }),
+
+        ...(data.endDate !== undefined && {
+          endDate: data.endDate,
+        }),
+      },
+    });
+
+    emitActivityCreated = await createActivity(
+      {
+        workspaceId: createdSprint.workspaceId,
+        actorId,
+
+        type: ActivityType.SPRINT_CREATED,
+
+        entityType: ActivityEntityType.SPRINT,
+        entityId: createdSprint.id,
+
+        projectId: createdSprint.projectId,
+
+        metadata: {
+          sprintName: createdSprint.name,
+        },
+      },
+      tx,
+    );
+
+    return createdSprint;
   });
 
-  await createActivity({
-    workspaceId: sprint.workspaceId,
-    actorId,
-
-    type: ActivityType.SPRINT_CREATED,
-
-    entityType: ActivityEntityType.SPRINT,
-    entityId: sprint.id,
-
-    projectId: sprint.projectId,
-
-    metadata: {
-      sprintName: sprint.name,
-    },
-  });
+  emitActivityCreated();
 
   const response = toSprintResponse(sprint);
 
@@ -260,29 +271,6 @@ export async function updateSprint(
     }
   }
 
-  const updatedSprint = await prisma.sprint.update({
-    where: {
-      id: sprint.id,
-    },
-    data: {
-      ...(data.name !== undefined && {
-        name: data.name,
-      }),
-
-      ...(data.goal !== undefined && {
-        goal: data.goal,
-      }),
-
-      ...(data.startDate !== undefined && {
-        startDate: new Date(data.startDate),
-      }),
-
-      ...(data.endDate !== undefined && {
-        endDate: new Date(data.endDate),
-      }),
-    },
-  });
-
   const metadata: Record<string, string> = {};
 
   if (data.name !== undefined && data.name !== sprint.name) {
@@ -303,21 +291,55 @@ export async function updateSprint(
     metadata.endDateUpdated = "true";
   }
 
-  if (Object.keys(metadata).length > 0) {
-    await createActivity({
-      workspaceId: updatedSprint.workspaceId,
-      actorId,
+  let emitActivityCreated: () => void = () => {};
 
-      type: ActivityType.SPRINT_UPDATED,
+  const updatedSprint = await prisma.$transaction(async (tx) => {
+    const updated = await tx.sprint.update({
+      where: {
+        id: sprint.id,
+      },
+      data: {
+        ...(data.name !== undefined && {
+          name: data.name,
+        }),
 
-      entityType: ActivityEntityType.SPRINT,
-      entityId: updatedSprint.id,
+        ...(data.goal !== undefined && {
+          goal: data.goal,
+        }),
 
-      projectId: updatedSprint.projectId,
+        ...(data.startDate !== undefined && {
+          startDate: new Date(data.startDate),
+        }),
 
-      metadata,
+        ...(data.endDate !== undefined && {
+          endDate: new Date(data.endDate),
+        }),
+      },
     });
-  }
+
+    if (Object.keys(metadata).length > 0) {
+      emitActivityCreated = await createActivity(
+        {
+          workspaceId: updated.workspaceId,
+          actorId,
+
+          type: ActivityType.SPRINT_UPDATED,
+
+          entityType: ActivityEntityType.SPRINT,
+          entityId: updated.id,
+
+          projectId: updated.projectId,
+
+          metadata,
+        },
+        tx,
+      );
+    }
+
+    return updated;
+  });
+
+  emitActivityCreated();
 
   const response = toSprintResponse(updatedSprint);
 
@@ -363,30 +385,41 @@ export async function startSprint(actorId: string, sprintId: string) {
     );
   }
 
-  const updatedSprint = await prisma.sprint.update({
-    where: {
-      id: sprint.id,
-    },
-    data: {
-      status: "ACTIVE",
-    },
+  let emitActivityCreated: () => void = () => {};
+
+  const updatedSprint = await prisma.$transaction(async (tx) => {
+    const updated = await tx.sprint.update({
+      where: {
+        id: sprint.id,
+      },
+      data: {
+        status: "ACTIVE",
+      },
+    });
+
+    emitActivityCreated = await createActivity(
+      {
+        workspaceId: updated.workspaceId,
+        actorId,
+
+        type: ActivityType.SPRINT_STARTED,
+
+        entityType: ActivityEntityType.SPRINT,
+        entityId: updated.id,
+
+        projectId: updated.projectId,
+
+        metadata: {
+          sprintName: updated.name,
+        },
+      },
+      tx,
+    );
+
+    return updated;
   });
 
-  await createActivity({
-    workspaceId: updatedSprint.workspaceId,
-    actorId,
-
-    type: ActivityType.SPRINT_STARTED,
-
-    entityType: ActivityEntityType.SPRINT,
-    entityId: updatedSprint.id,
-
-    projectId: updatedSprint.projectId,
-
-    metadata: {
-      sprintName: updatedSprint.name,
-    },
-  });
+  emitActivityCreated();
 
   const response = toSprintResponse(updatedSprint);
 
@@ -424,30 +457,41 @@ export async function completeSprint(actorId: string, sprintId: string) {
     throw new ValidationError("Only active sprints can be completed");
   }
 
-  const updatedSprint = await prisma.sprint.update({
-    where: {
-      id: sprint.id,
-    },
-    data: {
-      status: "COMPLETED",
-    },
+  let emitActivityCreated: () => void = () => {};
+
+  const updatedSprint = await prisma.$transaction(async (tx) => {
+    const updated = await tx.sprint.update({
+      where: {
+        id: sprint.id,
+      },
+      data: {
+        status: "COMPLETED",
+      },
+    });
+
+    emitActivityCreated = await createActivity(
+      {
+        workspaceId: updated.workspaceId,
+        actorId,
+
+        type: ActivityType.SPRINT_COMPLETED,
+
+        entityType: ActivityEntityType.SPRINT,
+        entityId: updated.id,
+
+        projectId: updated.projectId,
+
+        metadata: {
+          sprintName: updated.name,
+        },
+      },
+      tx,
+    );
+
+    return updated;
   });
 
-  await createActivity({
-    workspaceId: updatedSprint.workspaceId,
-    actorId,
-
-    type: ActivityType.SPRINT_COMPLETED,
-
-    entityType: ActivityEntityType.SPRINT,
-    entityId: updatedSprint.id,
-
-    projectId: updatedSprint.projectId,
-
-    metadata: {
-      sprintName: updatedSprint.name,
-    },
-  });
+  emitActivityCreated();
 
   const response = toSprintResponse(updatedSprint);
 

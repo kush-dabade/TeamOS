@@ -2,12 +2,14 @@ import { Worker } from "bullmq";
 
 import { redisConfig } from "../../config/redis.config.js";
 import {
+  sendPasswordResetEmail,
   sendVerificationEmail,
   sendWorkspaceInvitation,
 } from "../../modules/email/index.js";
 import { QUEUE_NAMES } from "../queue.constants.js";
 import { EMAIL_JOB_NAMES } from "./email.jobs.js";
 import type {
+  PasswordResetEmailJob,
   VerificationEmailJob,
   WorkspaceInvitationEmailJob,
 } from "./email.types.js";
@@ -38,6 +40,18 @@ export const emailWorker = new Worker(
           recipientEmail: payload.email,
           recipientName: payload.name,
           verificationUrl: payload.url,
+        });
+
+        break;
+      }
+
+      case EMAIL_JOB_NAMES.PASSWORD_RESET: {
+        const payload = job.data as PasswordResetEmailJob;
+
+        await sendPasswordResetEmail({
+          recipientEmail: payload.email,
+          recipientName: payload.name,
+          resetUrl: payload.url,
         });
 
         break;

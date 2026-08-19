@@ -3,6 +3,7 @@ import { Queue } from "bullmq";
 import { redisConfig } from "../../config/redis.config.js";
 import { EMAIL_JOB_NAMES } from "./email.jobs.js";
 import type {
+  PasswordResetEmailJob,
   VerificationEmailJob,
   WorkspaceInvitationEmailJob,
 } from "./email.types.js";
@@ -39,4 +40,10 @@ export async function enqueueVerificationEmail(
   payload: VerificationEmailJob,
 ): Promise<void> {
   await emailQueue.add(EMAIL_JOB_NAMES.EMAIL_VERIFICATION, payload);
+}
+
+export async function enqueuePasswordResetEmail(
+  payload: PasswordResetEmailJob,
+): Promise<void> {
+  await emailQueue.add(EMAIL_JOB_NAMES.PASSWORD_RESET, payload);
 }

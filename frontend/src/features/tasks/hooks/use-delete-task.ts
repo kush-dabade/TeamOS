@@ -19,6 +19,7 @@ export function useDeleteTask() {
     onSuccess: (_data, { taskId, projectId }) => {
       queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
       queryClient.invalidateQueries({ queryKey: taskKeys.list(projectId) });
+      queryClient.invalidateQueries({ queryKey: taskKeys.workspaceLists() });
     },
     onError: (error) => {
       toast.error(error.message);

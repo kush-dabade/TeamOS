@@ -15,3 +15,9 @@ export interface VerificationEmailJob {
   name: string;
   url: string;
 }
+
+export interface PasswordResetEmailJob {
+  email: string;
+  name: string;
+  url: string;
+}

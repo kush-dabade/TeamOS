@@ -193,6 +193,27 @@ export const verificationEmailLimiter = rateLimit({
   ...FAIL_OPEN_ON_STORE_ERROR,
 });
 
+// 3/min per IP - same rationale and the same confirmed-ineffective-here
+// built-in Better Auth limiter as verificationEmailLimiter above: Better
+// Auth's own getDefaultSpecialRules() (better-auth/dist/api/rate-limiter/index.mjs)
+// groups "/request-password-reset" into the *exact same* rule as
+// "/send-verification-email" (window: 60, max: 3) - this mirrors that
+// number, not an arbitrary choice. Deliberately does NOT also limit
+// POST /api/auth/reset-password (the token-consumption endpoint): its
+// token is Better Auth's own generateId(24) over [a-zA-Z0-9], ~143 bits of
+// entropy - brute-forcing it isn't a rate-limit-shaped problem the way
+// guessing a weak token or flooding an inbox is.
+export const passwordResetRequestLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: createRedisStore("rl:reset-password:"),
+  keyGenerator: (req) => ipKeyGenerator(req.ip ?? "unknown"),
+  handler: handleRateLimitExceeded,
+  ...FAIL_OPEN_ON_STORE_ERROR,
+});
+
 // 20/min per IP - the IP-scoped half of login abuse protection: caps
 // credential-stuffing/scanning volume from a single source regardless of
 // which account(s) it targets. Deliberately generous (a shared

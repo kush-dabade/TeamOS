@@ -18,6 +18,7 @@ export function useCreateTask() {
     mutationFn: ({ projectId, input }) => createTask(projectId, input),
     onSuccess: (_task, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: taskKeys.list(projectId) });
+      queryClient.invalidateQueries({ queryKey: taskKeys.workspaceLists() });
     },
   });
 }

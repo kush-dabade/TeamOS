@@ -3,6 +3,7 @@ import request from "supertest";
 
 import app from "../../src/app.js";
 import { prisma } from "../../src/lib/prisma.js";
+import { rateLimitRedis } from "../../src/lib/redis.js";
 
 import { startTestServer, type TestServer } from "../setup/test-server.js";
 import { resetDatabase } from "../setup/reset-database.js";
@@ -80,6 +81,17 @@ describe("auth rate limiting (account-scoped, sign-in only)", () => {
 
     expect(blocked.status).toBe(429);
     expect(blocked.body.code).toBe("RATE_LIMITED");
+
+    // A request rejected by this limiter must never itself count as a
+    // "success" that refunds the account's slot - the `after` hook only
+    // clears the counter when ctx.context.returned is NOT an APIError, and
+    // this blocked response's own TOO_MANY_REQUESTS *is* one, so a second
+    // attempt right after must still be blocked too, not quietly let back
+    // in.
+    const blockedAgain = await signIn(email, PASSWORD);
+
+    expect(blockedAgain.status).toBe(429);
+    expect(blockedAgain.body.code).toBe("RATE_LIMITED");
   });
 
   it("normalizes email case/whitespace into one shared bucket", async () => {
@@ -176,5 +188,41 @@ describe("auth rate limiting (account-scoped, sign-in only)", () => {
     const res = await signIn(email, PASSWORD).expect(200);
 
     expect(res.headers["ratelimit-limit"]).toBe("20");
+  });
+
+  it("never stores the raw email address in the generated Redis key", async () => {
+    const email = uniqueEmail("no-raw-email-in-key");
+    await createVerifiedUser(email);
+
+    await signIn(email, WRONG_PASSWORD);
+
+    // Same SCAN approach reset-rate-limits.ts already uses - reads the
+    // real key(s) this attempt just created under the account limiter's
+    // prefix, rather than asserting against any particular implementation
+    // detail of how the key is derived.
+    const keys: string[] = [];
+    let cursor = "0";
+
+    do {
+      const [nextCursor, batch] = await rateLimitRedis.scan(
+        cursor,
+        "MATCH",
+        "rl:auth:signin:account:*",
+        "COUNT",
+        "100",
+      );
+      cursor = nextCursor;
+      keys.push(...batch);
+    } while (cursor !== "0");
+
+    expect(keys.length).toBeGreaterThan(0);
+
+    for (const key of keys) {
+      expect(key.toLowerCase()).not.toContain(email.toLowerCase());
+      expect(key.toLowerCase()).not.toContain("example.com");
+      // Fixed-length HMAC-SHA256 hex digest (64 hex chars) after the
+      // prefix, not a variable-length, human-readable identifier.
+      expect(key).toMatch(/^rl:auth:signin:account:[0-9a-f]{64}$/);
+    }
   });
 });

@@ -46,7 +46,20 @@ function parseTrustProxyHops(): number {
     return 0;
   }
 
-  const parsed = Number(raw);
+  // Number("") and Number("  ") both evaluate to 0, which would otherwise
+  // pass the integer check below and silently accept an explicitly-set-but-
+  // empty value as "0 hops" - trimming and checking for emptiness first
+  // means a value that's present but blank is rejected the same way any
+  // other malformed value is, not treated as equivalent to being unset.
+  const trimmed = raw.trim();
+
+  if (trimmed.length === 0) {
+    throw new Error(
+      "TRUST_PROXY_HOPS must be a non-negative integer (number of reverse proxy hops between the client and this server).",
+    );
+  }
+
+  const parsed = Number(trimmed);
 
   if (!Number.isInteger(parsed) || parsed < 0) {
     throw new Error(

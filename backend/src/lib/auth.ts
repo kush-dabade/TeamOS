@@ -1,3 +1,5 @@
+import { createHmac } from "node:crypto";
+
 import { betterAuth } from "better-auth";
 import { createAuthMiddleware, APIError } from "better-auth/api";
 import { prismaAdapter } from "better-auth/adapters/prisma";
@@ -15,6 +17,24 @@ const frontendUrl = process.env.FRONTEND_URL;
 
 if (!frontendUrl) {
   throw new Error("FRONTEND_URL environment variable is required.");
+}
+
+// Reused as the HMAC key for signInAccountRateLimitKey below rather than
+// introducing a second secret - this is already Better Auth's own signing
+// secret (read implicitly via this exact env var whenever `secret` isn't
+// passed to betterAuth({...}) below), already required in every
+// environment this app runs in (see backend/.env.example, backend/.env.test,
+// and docker-compose.yml's env_file: backend/.env), so it needs no new
+// configuration surface, deployment step, or test-environment setup.
+// Typed/coerced to a plain string (rather than left as `string | undefined`)
+// so every later usage - including inside createHmac, which requires a real
+// BinaryLike, not undefined - doesn't need its own narrowing or assertion.
+// The guard below still throws on a genuinely missing/empty value; this
+// only changes the static type the rest of the file sees.
+const authHmacSecret: string = process.env.BETTER_AUTH_SECRET ?? "";
+
+if (!authHmacSecret) {
+  throw new Error("BETTER_AUTH_SECRET environment variable is required.");
 }
 
 // Account-scoped half of sign-in brute-force protection. The IP-scoped
@@ -36,12 +56,18 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-// The normalized email is embedded in the Redis key by design (this is
-// the whole point of an account-scoped bucket) - what must never happen is
-// logging it. Every call site below that can fail only logs the error
-// message, never the key or the raw request body.
+// HMAC-SHA256 of the normalized email, not the email itself - Redis keys
+// are visible through backups, SCAN, admin/monitoring tooling, etc. in a
+// way that shouldn't casually expose a user's raw address. Keying on the
+// HMAC digest instead of a reversible encoding (e.g. base64) keeps the
+// bucket lookup deterministic (same email always produces the same
+// digest, so repeated attempts still share one bucket) while making the
+// key itself non-reversible without authHmacSecret. digest("hex") is
+// always a fixed 64 characters for sha256, regardless of input length.
 function signInAccountRateLimitKey(normalizedEmail: string): string {
-  return `rl:auth:signin:account:${normalizedEmail}`;
+  const digest = createHmac("sha256", authHmacSecret).update(normalizedEmail).digest("hex");
+
+  return `rl:auth:signin:account:${digest}`;
 }
 
 export const auth = betterAuth({

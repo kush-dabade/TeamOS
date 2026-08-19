@@ -39,6 +39,19 @@ describe("TRUST_PROXY_HOPS validation", () => {
     expect(stdout.trim()).toMatch(/^ERROR:.*TRUST_PROXY_HOPS/);
   });
 
+  it("rejects an empty/whitespace-only TRUST_PROXY_HOPS value in production", async () => {
+    // A single whitespace-only value exercises both the "empty" and
+    // "whitespace-only" cases in one test, since parseTrustProxyHops trims
+    // before checking emptiness - a literal "" would hit the exact same
+    // code path.
+    const { stdout } = await execFileAsync("npx", ["tsx", TRUST_PROXY_CHECK_SCRIPT], {
+      cwd: backendRoot,
+      env: { ...process.env, NODE_ENV: "production", TRUST_PROXY_HOPS: "   " },
+    });
+
+    expect(stdout.trim()).toMatch(/^ERROR:.*TRUST_PROXY_HOPS/);
+  });
+
   it("accepts an explicit TRUST_PROXY_HOPS value in production", async () => {
     const { stdout } = await execFileAsync("npx", ["tsx", TRUST_PROXY_CHECK_SCRIPT], {
       cwd: backendRoot,

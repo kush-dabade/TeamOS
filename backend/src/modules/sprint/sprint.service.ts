@@ -118,6 +118,8 @@ export async function createSprint(actorId: string, data: CreateSprintData) {
     );
   }
 
+  let emitActivityCreated: () => void = () => {};
+
   const sprint = await prisma.$transaction(async (tx) => {
     const createdSprint = await tx.sprint.create({
       data: {
@@ -140,7 +142,7 @@ export async function createSprint(actorId: string, data: CreateSprintData) {
       },
     });
 
-    await createActivity(
+    emitActivityCreated = await createActivity(
       {
         workspaceId: createdSprint.workspaceId,
         actorId,
@@ -161,6 +163,8 @@ export async function createSprint(actorId: string, data: CreateSprintData) {
 
     return createdSprint;
   });
+
+  emitActivityCreated();
 
   const response = toSprintResponse(sprint);
 
@@ -287,6 +291,8 @@ export async function updateSprint(
     metadata.endDateUpdated = "true";
   }
 
+  let emitActivityCreated: () => void = () => {};
+
   const updatedSprint = await prisma.$transaction(async (tx) => {
     const updated = await tx.sprint.update({
       where: {
@@ -312,7 +318,7 @@ export async function updateSprint(
     });
 
     if (Object.keys(metadata).length > 0) {
-      await createActivity(
+      emitActivityCreated = await createActivity(
         {
           workspaceId: updated.workspaceId,
           actorId,
@@ -332,6 +338,8 @@ export async function updateSprint(
 
     return updated;
   });
+
+  emitActivityCreated();
 
   const response = toSprintResponse(updatedSprint);
 
@@ -377,6 +385,8 @@ export async function startSprint(actorId: string, sprintId: string) {
     );
   }
 
+  let emitActivityCreated: () => void = () => {};
+
   const updatedSprint = await prisma.$transaction(async (tx) => {
     const updated = await tx.sprint.update({
       where: {
@@ -387,7 +397,7 @@ export async function startSprint(actorId: string, sprintId: string) {
       },
     });
 
-    await createActivity(
+    emitActivityCreated = await createActivity(
       {
         workspaceId: updated.workspaceId,
         actorId,
@@ -408,6 +418,8 @@ export async function startSprint(actorId: string, sprintId: string) {
 
     return updated;
   });
+
+  emitActivityCreated();
 
   const response = toSprintResponse(updatedSprint);
 
@@ -445,6 +457,8 @@ export async function completeSprint(actorId: string, sprintId: string) {
     throw new ValidationError("Only active sprints can be completed");
   }
 
+  let emitActivityCreated: () => void = () => {};
+
   const updatedSprint = await prisma.$transaction(async (tx) => {
     const updated = await tx.sprint.update({
       where: {
@@ -455,7 +469,7 @@ export async function completeSprint(actorId: string, sprintId: string) {
       },
     });
 
-    await createActivity(
+    emitActivityCreated = await createActivity(
       {
         workspaceId: updated.workspaceId,
         actorId,
@@ -476,6 +490,8 @@ export async function completeSprint(actorId: string, sprintId: string) {
 
     return updated;
   });
+
+  emitActivityCreated();
 
   const response = toSprintResponse(updatedSprint);
 

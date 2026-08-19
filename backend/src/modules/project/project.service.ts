@@ -130,6 +130,8 @@ export async function updateProject(
     metadata.newStatus = data.status;
   }
 
+  let emitActivityCreated: () => void = () => {};
+
   const updatedProject = await prisma.$transaction(async (tx) => {
     const updated = await tx.project.update({
       where: {
@@ -151,7 +153,7 @@ export async function updateProject(
     });
 
     if (Object.keys(metadata).length > 0) {
-      await createActivity(
+      emitActivityCreated = await createActivity(
         {
           workspaceId: updated.workspaceId,
           actorId,
@@ -171,6 +173,8 @@ export async function updateProject(
 
     return updated;
   });
+
+  emitActivityCreated();
 
   const response = toProjectResponse(updatedProject);
 
@@ -197,6 +201,8 @@ export async function archiveProject(actorId: string, projectId: string) {
     throw new ValidationError("Project is already archived");
   }
 
+  let emitActivityCreated: () => void = () => {};
+
   const archivedProject = await prisma.$transaction(async (tx) => {
     const archived = await tx.project.update({
       where: {
@@ -207,7 +213,7 @@ export async function archiveProject(actorId: string, projectId: string) {
       },
     });
 
-    await createActivity(
+    emitActivityCreated = await createActivity(
       {
         workspaceId: archived.workspaceId,
         actorId,
@@ -228,6 +234,8 @@ export async function archiveProject(actorId: string, projectId: string) {
 
     return archived;
   });
+
+  emitActivityCreated();
 
   const response = toProjectResponse(archivedProject);
 
@@ -291,6 +299,8 @@ export async function createProject(actorId: string, data: CreateProjectData) {
 
   const slug = await generateUniqueProjectSlug(data.workspaceId, data.name);
 
+  let emitActivityCreated: () => void = () => {};
+
   const project = await prisma.$transaction(async (tx) => {
     const createdProject = await tx.project.create({
       data: {
@@ -313,7 +323,7 @@ export async function createProject(actorId: string, data: CreateProjectData) {
       },
     });
 
-    await createActivity(
+    emitActivityCreated = await createActivity(
       {
         workspaceId: createdProject.workspaceId,
         actorId,
@@ -334,6 +344,8 @@ export async function createProject(actorId: string, data: CreateProjectData) {
 
     return createdProject;
   });
+
+  emitActivityCreated();
 
   const response = toProjectResponse(project);
 

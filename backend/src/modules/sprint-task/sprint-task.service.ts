@@ -109,6 +109,8 @@ export async function assignTaskToSprint(
       ? await findSprintById(task.sprintId)
       : null;
 
+  let emitActivityCreated: () => void = () => {};
+
   const updatedTask = await prisma.$transaction(async (tx) => {
     const updated = await tx.task.update({
       where: {
@@ -119,7 +121,7 @@ export async function assignTaskToSprint(
       },
     });
 
-    await createActivity(
+    emitActivityCreated = await createActivity(
       {
         workspaceId: updated.workspaceId,
         actorId: userId,
@@ -148,6 +150,8 @@ export async function assignTaskToSprint(
 
     return updated;
   });
+
+  emitActivityCreated();
 
   emitToWorkspace(
     updatedTask.workspaceId,
@@ -202,6 +206,8 @@ export async function removeTaskFromSprint(
 
   await validateProjectCanBeModified(sprint.projectId);
 
+  let emitActivityCreated: () => void = () => {};
+
   const updatedTask = await prisma.$transaction(async (tx) => {
     const updated = await tx.task.update({
       where: {
@@ -212,7 +218,7 @@ export async function removeTaskFromSprint(
       },
     });
 
-    await createActivity(
+    emitActivityCreated = await createActivity(
       {
         workspaceId: updated.workspaceId,
         actorId: userId,
@@ -235,6 +241,8 @@ export async function removeTaskFromSprint(
 
     return updated;
   });
+
+  emitActivityCreated();
 
   emitToWorkspace(
     updatedTask.workspaceId,

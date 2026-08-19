@@ -1,8 +1,11 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import request from "supertest";
+import type { Socket } from "socket.io-client";
 
 import app from "../../src/app.js";
 import { prisma } from "../../src/lib/prisma.js";
+import { REALTIME_EVENTS } from "../../src/realtime/realtime.constants.js";
+import { emitToWorkspace } from "../../src/realtime/realtime.emitter.js";
 
 import { resetDatabase } from "../setup/reset-database.js";
 import {
@@ -12,6 +15,15 @@ import {
   createWorkspaceWithMember,
   signUpTestUser,
 } from "../setup/fixtures.js";
+import { startTestServer, type TestServer } from "../setup/test-server.js";
+import { connectTestSocket, trackEvent, waitForEvent, waitForEventWithRetries } from "../setup/socket-client.js";
+
+// A sentinel event, distinct from ACTIVITY_CREATED, used only to prove a
+// socket is connected/joined/still-listening - same role and same choice
+// (PROJECT_CREATED) as tests/realtime/workspace-room-isolation.test.ts's own
+// CROSS_WORKSPACE_SENTINEL, so a real delivery can never be confused with
+// the event actually under test.
+const SENTINEL_EVENT = REALTIME_EVENTS.PROJECT_CREATED;
 
 /**
  * Proves the entity mutation and its activity write commit or roll back
@@ -73,7 +85,21 @@ async function withActivityInsertFailure(
 }
 
 describe("entity + activity writes are transactional", () => {
+  let testServer: TestServer;
+  const openSockets: Socket[] = [];
+
+  beforeAll(async () => {
+    testServer = await startTestServer();
+  });
+
+  afterAll(async () => {
+    await testServer.close();
+  });
+
   afterEach(async () => {
+    openSockets.forEach((socket) => socket.disconnect());
+    openSockets.length = 0;
+
     await resetDatabase();
   });
 
@@ -133,6 +159,73 @@ describe("entity + activity writes are transactional", () => {
 
     const persistedActivity = await prisma.activity.findFirst({
       where: { workspaceId: workspace.id, type: "TASK_ASSIGNED_TO_SPRINT" },
+    });
+    expect(persistedActivity).toBeNull();
+  });
+
+  /**
+   * Proves the fix for the realtime-before-commit bug: createActivity(data,
+   * tx) used to call emitToWorkspace(ACTIVITY_CREATED, ...) immediately
+   * after staging the write inside `tx`, before the surrounding
+   * $transaction had actually committed - so a client could be told about
+   * an activity whose row then rolled back. createActivity now returns a
+   * deferred emit callback instead, and every transactional caller (see
+   * task/sprint/sprint-task/project services) only invokes it after
+   * $transaction resolves successfully - so a rolled-back transaction must
+   * never invoke it at all.
+   *
+   * A weak version of this test would just spy on emitToWorkspace and
+   * assert it wasn't called - but that only proves the function wasn't
+   * invoked in-process, not that a real client would never have observed
+   * the event. This uses a genuine, connected Socket.IO client (the same
+   * infrastructure/pattern as
+   * tests/realtime/workspace-room-isolation.test.ts's forbidden/sentinel
+   * checks) instead: a listener is registered before the failing request is
+   * even sent, and a real, independently-triggered sentinel event on the
+   * same socket afterward proves the socket was live and listening for the
+   * entire window, not just that nothing happened to arrive yet.
+   */
+  it("never emits ACTIVITY_CREATED for an activity write that rolled back", async () => {
+    const owner = await signUpTestUser(app);
+    const { workspace } = await createWorkspaceWithMember(owner.userId);
+    const project = await createProjectDirect(workspace.id, owner.userId);
+
+    const socket = await connectTestSocket(testServer.baseUrl, owner.cookie);
+    openSockets.push(socket);
+
+    // Confirms the socket has actually joined the workspace room before the
+    // real check below - see waitForEventWithRetries's own comment for why
+    // a fresh connection can't assume its room join has landed yet.
+    await waitForEventWithRetries(socket, SENTINEL_EVENT, () =>
+      emitToWorkspace(workspace.id, SENTINEL_EVENT, { marker: "confirm-joined" }),
+    );
+
+    const forbidden = trackEvent(socket, REALTIME_EVENTS.ACTIVITY_CREATED);
+
+    const taskTitle = `Realtime rollback probe ${Date.now()}`;
+
+    await withActivityInsertFailure(owner.userId, "TASK_CREATED", async () => {
+      const res = await request(app)
+        .post(`/api/v1/projects/${project.id}/tasks`)
+        .set("Cookie", owner.cookie)
+        .send({ title: taskTitle });
+
+      expect(res.status).toBeGreaterThanOrEqual(500);
+      expect(res.body.success).toBe(false);
+    });
+
+    // The liveness proof described above: a genuine, independently-emitted
+    // event on this same socket, after the failing request has already
+    // fully resolved, must still arrive - if it didn't, "forbidden was
+    // never received" would be meaningless (the socket could just be dead).
+    emitToWorkspace(workspace.id, SENTINEL_EVENT, { marker: "liveness-check" });
+    await waitForEvent(socket, SENTINEL_EVENT);
+
+    expect(forbidden.wasReceived()).toBe(false);
+    forbidden.stop();
+
+    const persistedActivity = await prisma.activity.findFirst({
+      where: { workspaceId: workspace.id, type: "TASK_CREATED" },
     });
     expect(persistedActivity).toBeNull();
   });

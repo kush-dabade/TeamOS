@@ -91,6 +91,14 @@ export async function createTask(actorId: string, data: CreateTaskData) {
     }
   }
 
+  // createActivity(..., tx) only stages the activity row inside this
+  // transaction - it can't safely emit ACTIVITY_CREATED yet, since the
+  // transaction might still roll back after this callback returns. It hands
+  // back a callback that performs that emit instead; this is invoked below
+  // only once $transaction has actually resolved, so a client is never told
+  // about an activity whose write didn't durably commit.
+  let emitActivityCreated: () => void = () => {};
+
   const task = await prisma.$transaction(async (tx) => {
     const createdTask = await tx.task.create({
       data: {
@@ -119,7 +127,7 @@ export async function createTask(actorId: string, data: CreateTaskData) {
       },
     });
 
-    await createActivity(
+    emitActivityCreated = await createActivity(
       {
         workspaceId: project.workspaceId,
         actorId,
@@ -141,6 +149,8 @@ export async function createTask(actorId: string, data: CreateTaskData) {
 
     return createdTask;
   });
+
+  emitActivityCreated();
 
   if (task.assigneeId && task.assigneeId !== actorId) {
     try {
@@ -307,6 +317,8 @@ export async function deleteTask(actorId: string, taskId: string) {
     throw new ValidationError("Archived projects cannot be modified");
   }
 
+  let emitActivityCreated: () => void = () => {};
+
   await prisma.$transaction(async (tx) => {
     await tx.task.update({
       where: {
@@ -317,7 +329,7 @@ export async function deleteTask(actorId: string, taskId: string) {
       },
     });
 
-    await createActivity(
+    emitActivityCreated = await createActivity(
       {
         workspaceId: task.workspaceId,
         actorId,
@@ -337,6 +349,8 @@ export async function deleteTask(actorId: string, taskId: string) {
       tx,
     );
   });
+
+  emitActivityCreated();
 
   emitToWorkspace(task.workspaceId, REALTIME_EVENTS.TASK_DELETED, {
     workspaceId: task.workspaceId,
@@ -448,6 +462,12 @@ export async function updateTask(
   // update and the activity writes. This also means a notification is only
   // ever sent for an assignment that's genuinely committed, not one that
   // might still roll back.
+  // Both branches below are independently conditional (a status change can
+  // fire neither, either, or both), so this collects only the callbacks for
+  // activities actually created, in the same order they were created in -
+  // preserved below by emitting in array order once the transaction commits.
+  const emitActivityCreatedCallbacks: Array<() => void> = [];
+
   const updatedTask = await prisma.$transaction(async (tx) => {
     const updated = await tx.task.update({
       where: {
@@ -458,25 +478,27 @@ export async function updateTask(
     });
 
     if (data.status !== undefined && oldStatus !== updated.status) {
-      await createActivity(
-        {
-          workspaceId: task.workspaceId,
-          actorId,
+      emitActivityCreatedCallbacks.push(
+        await createActivity(
+          {
+            workspaceId: task.workspaceId,
+            actorId,
 
-          type: ActivityType.TASK_STATUS_CHANGED,
+            type: ActivityType.TASK_STATUS_CHANGED,
 
-          entityType: ActivityEntityType.TASK,
-          entityId: updated.id,
+            entityType: ActivityEntityType.TASK,
+            entityId: updated.id,
 
-          taskId: updated.id,
-          projectId: updated.projectId,
+            taskId: updated.id,
+            projectId: updated.projectId,
 
-          metadata: {
-            oldStatus,
-            newStatus: updated.status,
+            metadata: {
+              oldStatus,
+              newStatus: updated.status,
+            },
           },
-        },
-        tx,
+          tx,
+        ),
       );
     }
 
@@ -485,29 +507,35 @@ export async function updateTask(
       oldStatus !== "DONE" &&
       updated.status === "DONE"
     ) {
-      await createActivity(
-        {
-          workspaceId: task.workspaceId,
-          actorId,
+      emitActivityCreatedCallbacks.push(
+        await createActivity(
+          {
+            workspaceId: task.workspaceId,
+            actorId,
 
-          type: ActivityType.TASK_COMPLETED,
+            type: ActivityType.TASK_COMPLETED,
 
-          entityType: ActivityEntityType.TASK,
-          entityId: updated.id,
+            entityType: ActivityEntityType.TASK,
+            entityId: updated.id,
 
-          taskId: updated.id,
-          projectId: updated.projectId,
+            taskId: updated.id,
+            projectId: updated.projectId,
 
-          metadata: {
-            taskTitle: updated.title,
+            metadata: {
+              taskTitle: updated.title,
+            },
           },
-        },
-        tx,
+          tx,
+        ),
       );
     }
 
     return updated;
   });
+
+  for (const emitActivityCreated of emitActivityCreatedCallbacks) {
+    emitActivityCreated();
+  }
 
   if (
     data.assigneeId !== undefined &&

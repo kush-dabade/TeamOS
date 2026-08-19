@@ -10,16 +10,21 @@ import { startTestServer, type TestServer } from "../setup/test-server.js";
 
 const BOUND_MS = 3000;
 
+// The timer handle is retained and explicitly cleared once the race
+// settles - regardless of whether `promise` resolves, `promise` rejects, or
+// the timeout itself wins - so a fast-settling `promise` doesn't leave this
+// timeout still pending in the background for the remainder of BOUND_MS.
 function boundedBy<T>(promise: Promise<T>, label: string): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<never>((_, reject) => {
-      setTimeout(
-        () => reject(new Error(`${label} did not settle within ${BOUND_MS}ms`)),
-        BOUND_MS,
-      );
-    }),
-  ]);
+  let timer: ReturnType<typeof setTimeout>;
+
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${label} did not settle within ${BOUND_MS}ms`)),
+      BOUND_MS,
+    );
+  });
+
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 /**

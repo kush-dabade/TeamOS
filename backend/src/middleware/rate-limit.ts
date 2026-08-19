@@ -192,3 +192,42 @@ export const verificationEmailLimiter = rateLimit({
   handler: handleRateLimitExceeded,
   ...FAIL_OPEN_ON_STORE_ERROR,
 });
+
+// 20/min per IP - the IP-scoped half of login abuse protection: caps
+// credential-stuffing/scanning volume from a single source regardless of
+// which account(s) it targets. Deliberately generous (a shared
+// office/NAT/VPN IP genuinely produces bursts of real sign-in traffic) -
+// the tight per-account brute-force bound lives separately, keyed by
+// normalized email inside Better Auth's own hooks.before (see
+// lib/auth.ts), because Express middleware mounted ahead of the Better
+// Auth catch-all runs before any body is parsed and has no email to key
+// on yet. This limiter only needs the IP, so it has no such constraint.
+export const signInIpLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: createRedisStore("rl:auth:signin:ip:"),
+  keyGenerator: (req) => ipKeyGenerator(req.ip ?? "unknown"),
+  handler: handleRateLimitExceeded,
+  ...FAIL_OPEN_ON_STORE_ERROR,
+});
+
+// 10/min per IP - bounds mass account-creation/registration spam from a
+// single source. Matches the existing upload/invitation/avatar tier
+// (rather than verificationEmailLimiter's tighter 3/min) since sign-up is
+// the primary, expected-frequency path for creating an account - the
+// already-rate-limited resend/verification-email endpoint is the tighter
+// one, precisely because sign-up itself only sends one email per attempt
+// and legitimate multi-user-per-IP sign-up bursts (a team onboarding
+// together from one office) need more headroom.
+export const signUpIpLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: createRedisStore("rl:auth:signup:ip:"),
+  keyGenerator: (req) => ipKeyGenerator(req.ip ?? "unknown"),
+  handler: handleRateLimitExceeded,
+  ...FAIL_OPEN_ON_STORE_ERROR,
+});

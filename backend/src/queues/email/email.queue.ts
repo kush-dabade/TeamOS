@@ -39,8 +39,28 @@ function hmacToken(token: string): string {
   return createHmac("sha256", jobIdHmacSecret).update(token).digest("hex");
 }
 
+// Producer-only connection: a separate config object (not a mutation of
+// redisConfig, which email.worker.ts's Worker also reads) so this doesn't
+// touch the worker's connection or its indefinite-reconnect behavior.
+// enableOfflineQueue: false is what actually bounds enqueueEmailWithTimeout
+// above (F-14) - without it, Promise.race's 2s timeout only bounds the
+// *caller's wait*, while ioredis keeps the underlying .add() command
+// buffered in its offline queue, retrying the connection forever; verified
+// empirically (throwaway process, real Redis killed after a successful
+// warmup add()) that with this flag a post-outage .add() rejects in ~1ms
+// instead of hanging, so timed-out enqueues can no longer accumulate.
+// (A from-scratch-unreachable Redis at process start is a different,
+// pre-existing gap - BullMQ's own connection-readiness gate blocks before
+// this flag is even consulted - but that's not the "accumulates under
+// sustained traffic" backlog CodeRabbit flagged, which is specifically the
+// already-connected-then-outage case this fixes.)
+const emailQueueConnection = {
+  ...redisConfig,
+  enableOfflineQueue: false,
+};
+
 export const emailQueue = new Queue(QUEUE_NAMES.EMAIL, {
-  connection: redisConfig,
+  connection: emailQueueConnection,
   defaultJobOptions: {
     attempts: 5,
     backoff: {

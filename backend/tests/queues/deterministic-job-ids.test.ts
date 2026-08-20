@@ -289,6 +289,10 @@ describe("F-19: deterministic email job ids", () => {
       delay: 1000,
     });
     expect(emailQueue.opts.defaultJobOptions?.removeOnComplete).toBe(true);
+    expect(emailQueue.opts.defaultJobOptions?.removeOnFail).toEqual({
+      age: 604800,
+      count: 1000,
+    });
   });
 });
 
@@ -399,5 +403,9 @@ describe("F-19: deterministic notification job ids", () => {
       delay: 1000,
     });
     expect(notificationQueue.opts.defaultJobOptions?.removeOnComplete).toBe(true);
+    expect(notificationQueue.opts.defaultJobOptions?.removeOnFail).toEqual({
+      age: 604800,
+      count: 1000,
+    });
   });
 });

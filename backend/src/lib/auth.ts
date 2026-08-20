@@ -40,6 +40,48 @@ if (!authHmacSecret) {
   throw new Error("BETTER_AUTH_SECRET environment variable is required.");
 }
 
+// F-14: bounds how long sendVerificationEmail/sendResetPassword below wait
+// on their respective enqueue calls. Verified against the installed bullmq
+// (node_modules/bullmq/dist/cjs/classes/redis-connection.js): BullMQ forces
+// maxRetriesPerRequest: null on any connection it builds from a plain options
+// object for a blocking-capable client (which emailQueue's connection is,
+// since email.worker.ts's Worker shares config/redis.config.ts's
+// redisConfig - both enqueueVerificationEmail and enqueuePasswordResetEmail
+// call .add() on that exact same Queue instance) - so a genuinely
+// unreachable Redis doesn't make .add() fail fast, it makes ioredis buffer
+// the command and retry the connection forever. Confirmed empirically for
+// both: emailQueue.add() and the real enqueuePasswordResetEmail() function
+// itself, each run against an unreachable host, never settled in an 8+
+// second test run. 2s comfortably covers normal Redis latency/jitter while
+// keeping these requests responsive even during a real outage.
+const ENQUEUE_EMAIL_TIMEOUT_MS = 2000;
+
+// Shared by sendVerificationEmail and sendResetPassword below - both are
+// Better Auth callbacks on a request's critical path (see
+// runInBackgroundOrAwait's doc in sendVerificationEmail), both enqueue onto
+// the same emailQueue, and both need the identical bounded-wait/fail-open
+// treatment, so this is the one place that logic lives rather than
+// duplicating the same Promise.race+catch block twice. Racing (not
+// aborting) means a timed-out enqueue attempt isn't cancelled - it can
+// still succeed on its own once Redis recovers, so no email attempt is
+// silently discarded, only the caller's wait on it is bounded.
+async function enqueueEmailWithTimeout(label: string, enqueue: Promise<void>): Promise<void> {
+  await Promise.race([
+    enqueue,
+    new Promise((_resolve, reject) => {
+      setTimeout(
+        () => reject(new Error(`Timed out enqueueing ${label}`)),
+        ENQUEUE_EMAIL_TIMEOUT_MS,
+      );
+    }),
+  ]).catch((error: unknown) => {
+    console.error(
+      `Failed to enqueue ${label} in time; request proceeds regardless:`,
+      error instanceof Error ? error.message : error,
+    );
+  });
+}
+
 // Account-scoped half of sign-in brute-force protection. The IP-scoped
 // half (signInIpLimiter in middleware/rate-limit.ts) can't stop an
 // attacker who rotates source IPs against one target account - this
@@ -106,11 +148,21 @@ export const auth = betterAuth({
       // `${baseURL}/reset-password/:token?callbackURL=...` link - never
       // logged here or anywhere downstream (email.worker.ts only logs the
       // job id/name on success or failure, never job.data).
-      await enqueuePasswordResetEmail({
-        email: user.email,
-        name: user.name,
-        url,
-      });
+      //
+      // F-14 follow-up: this callback runs on POST /request-password-reset's
+      // request path via the identical runInBackgroundOrAwait mechanism
+      // documented on sendVerificationEmail below (verified against the
+      // installed better-auth's api/routes/password.mjs: same
+      // `await ctx.context.runInBackgroundOrAwait(...)` shape, same shared
+      // implementation) - bounded the same way, for the same reason.
+      await enqueueEmailWithTimeout(
+        "password-reset email",
+        enqueuePasswordResetEmail({
+          email: user.email,
+          name: user.name,
+          url,
+        }),
+      );
     },
 
     // A password reset is exactly the scenario where an attacker may
@@ -126,11 +178,30 @@ export const auth = betterAuth({
       // independent of Resend's availability and gets BullMQ's existing
       // retry/backoff, matching how workspace invitation email is
       // already sent (see queues/email/email.queue.ts).
-      await enqueueVerificationEmail({
-        email: user.email,
-        name: user.name,
-        url,
-      });
+      //
+      // F-14: this callback runs on POST /sign-up/email's request path -
+      // the installed better-auth (node_modules/better-auth/dist/context/
+      // create-context.mjs's runInBackgroundOrAwait) awaits it directly
+      // unless an advanced.backgroundTasks.handler is configured (it isn't
+      // here), and already catches whatever this eventually rejects with,
+      // so a slow/failed enqueue was never going to fail sign-up itself -
+      // but with no bound on the wait, a genuinely unreachable Redis (see
+      // ENQUEUE_EMAIL_TIMEOUT_MS's comment above) means this callback's
+      // promise never settles, and neither does the sign-up response, even
+      // though the account was already created. enqueueEmailWithTimeout
+      // (same fail-open philosophy as incrementRateLimitCounter's .catch()
+      // in the `before` hook below) is what actually keeps sign-up
+      // responsive. A user left without a verification email after a
+      // timeout can always request a fresh one via
+      // POST /send-verification-email.
+      await enqueueEmailWithTimeout(
+        "verification email",
+        enqueueVerificationEmail({
+          email: user.email,
+          name: user.name,
+          url,
+        }),
+      );
     },
   },
 

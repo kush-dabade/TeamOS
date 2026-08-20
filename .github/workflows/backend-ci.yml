@@ -1,0 +1,146 @@
+name: Backend CI
+
+"on":
+  pull_request:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  backend-ci:
+    name: Backend CI
+    runs-on: ubuntu-latest
+
+    # Every `run:` step below is relative to backend/ - this is a
+    # backend-only pipeline (Commit 3's scope), not a repo-root one.
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      # Disposable, CI-only database. Mirrors docker-compose.yml's postgres
+      # service image (postgres:17); credentials here are throwaway values
+      # scoped to this job's lifetime, not production/dev secrets.
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: teamos_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d teamos_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+      # Disposable, CI-only Redis - backs both BullMQ (email/notification
+      # queues) and rate limiting during the test run. Mirrors
+      # docker-compose.yml's image (redis:8-alpine).
+      #
+      # Unlike docker-compose's redis service, this one is NOT started with
+      # --requirepass: GitHub Actions service containers can only be
+      # configured via `image`/`env`/`ports`/`volumes`/`options` - there is
+      # no way to pass startup arguments (e.g. --requirepass) to the
+      # container's own command. REDIS_PASSWORD below is still set to a
+      # non-empty value, because src/config/redis.config.ts requires one -
+      # ioredis detects that this server doesn't actually enforce a
+      # password, logs a warning, and connects normally regardless (verified
+      # locally against a real passwordless redis-server before writing this
+      # workflow). This is a CI-only accommodation; it does not change what
+      # Commit 1 requires of the application itself.
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      # --- Database ---
+      # src/config/database.config.ts uses DATABASE_URL as-is when set -
+      # this is what the explicit `prisma generate`/`prisma migrate deploy`
+      # steps below use.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/teamos_test
+      # tests/setup/test-env.ts deliberately does NOT trust a pre-set
+      # DATABASE_URL: it re-derives it from backend/.env.test (which does
+      # not exist on this clean checkout - it's gitignored) or from
+      # TEST_DATABASE_URL, then force-assigns DATABASE_URL to whatever it
+      # resolves to. Without this var, `npm test` fails fast with that
+      # file's own "No test database configured" error. Same disposable DB
+      # as DATABASE_URL above - there is only ever one CI database.
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/teamos_test
+
+      # --- Better Auth / app URLs (dummy, test-only, matches
+      # backend/.env.test.example) ---
+      BETTER_AUTH_URL: http://localhost:3000
+      BETTER_AUTH_SECRET: ci-test-secret-do-not-use-in-production
+      TRUSTED_ORIGINS: http://localhost:3000
+      TRUST_PROXY_HOPS: "0"
+      FRONTEND_URL: http://localhost:5173
+
+      # --- Redis (Commit 1's REDIS_DB isolation model) ---
+      REDIS_HOST: localhost
+      REDIS_PORT: "6379"
+      # See the redis service's comment above - this Redis has no
+      # server-side password, but redis.config.ts still requires this to be
+      # a non-empty string.
+      REDIS_PASSWORD: ci-unused-redis-password
+      # Kept explicit even though CI's Redis is already a fresh, disposable
+      # container nothing else ever connects to - this is what keeps CI's
+      # env shaped exactly like backend/.env.test.example's documented
+      # isolation model (Commit 1), rather than relying on CI's incidental
+      # isolation instead of the application's own configuration.
+      REDIS_DB: "1"
+
+      # --- Email ---
+      # Not a real credential, and not actually read by anything `npm test`
+      # loads: src/modules/email/email.config.ts (which requires
+      # RESEND_API_KEY/EMAIL_FROM) is only imported by
+      # src/queues/email/email.worker.ts, which only src/worker.ts imports -
+      # and this workflow never runs the worker. Set anyway, as explicit,
+      # visible proof that CI can never hold a real Resend key.
+      RESEND_API_KEY: re_ci_dummy_not_a_real_key
+      EMAIL_FROM: "TeamOS CI <ci@example.com>"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # backend/src/generated/prisma is gitignored - it does not exist on
+      # this checkout until this step creates it.
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Apply database migrations
+        run: npx prisma migrate deploy
+
+      - name: Lint
+        run: npm run lint
+
+      # tsconfig.test.json has one pre-existing, unrelated failure (see
+      # tests/sprint/sprint-active-invariant.test.ts) that Commit 3 is not
+      # authorized to fix - CI intentionally typechecks only tsconfig.json
+      # (src/), which is clean.
+      - name: Typecheck
+        run: npx tsc --noEmit -p tsconfig.json
+
+      - name: Test
+        run: npm test

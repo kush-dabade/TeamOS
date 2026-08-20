@@ -3,9 +3,14 @@ import request from "supertest";
 
 import app from "../../src/app.js";
 import { prisma } from "../../src/lib/prisma.js";
+import { NotificationType } from "../../src/generated/prisma/enums.js";
 
 import { resetDatabase } from "../setup/reset-database.js";
 import {
+  createActivityDirect,
+  createAttachmentDirect,
+  createCommentDirect,
+  createInvitationDirect,
   createProjectDirect,
   createSprintDirect,
   createTaskDirect,
@@ -290,6 +295,314 @@ describe("tenant isolation", () => {
         where: { id: targetTask.id },
       });
       expect(updatedTask.title).toBe("Legitimately updated title");
+    });
+  });
+
+  describe("cross-workspace attachment access", () => {
+    it("T13: rejects downloading another workspace's attachment, and exposes no content", async () => {
+      const { attacker, targetWorkspace, targetTask, targetOwner } =
+        await createCrossWorkspaceScenario();
+
+      const targetAttachment = await createAttachmentDirect(
+        targetWorkspace.id,
+        targetTask.id,
+        targetOwner.userId,
+      );
+
+      // downloadAttachment() calls requireWorkspaceMembership() before it
+      // ever touches storageService.stream() (attachment.service.ts), so
+      // this 403 proves the authorization boundary rejected the request
+      // before any file content could be streamed - not that the file
+      // happened to be missing from disk.
+      const res = await request(app)
+        .get(`/api/v1/attachments/${targetAttachment.id}`)
+        .set("Cookie", attacker.cookie)
+        .expect(403);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe("FORBIDDEN");
+    });
+
+    it("T14: rejects deleting another workspace's attachment, and leaves it undeleted", async () => {
+      const { attacker, targetWorkspace, targetTask, targetOwner } =
+        await createCrossWorkspaceScenario();
+
+      const targetAttachment = await createAttachmentDirect(
+        targetWorkspace.id,
+        targetTask.id,
+        targetOwner.userId,
+      );
+
+      const res = await request(app)
+        .delete(`/api/v1/attachments/${targetAttachment.id}`)
+        .set("Cookie", attacker.cookie)
+        .expect(403);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe("FORBIDDEN");
+
+      const unchangedAttachment = await prisma.attachment.findUniqueOrThrow({
+        where: { id: targetAttachment.id },
+      });
+      expect(unchangedAttachment.id).toBe(targetAttachment.id);
+    });
+  });
+
+  describe("cross-user notification access", () => {
+    // T15 (notification read cross-user) is not applicable: there is no
+    // single-notification GET-by-ID endpoint. The only read path is
+    // GET /api/v1/notifications, which is unconditionally scoped to the
+    // caller's own recipientId server-side (notification.service.ts,
+    // listNotifications) and takes no notification ID at all, so there is
+    // no ID-based lookup surface to test here.
+
+    it("T16: rejects marking another user's notification as read, and leaves it unread", async () => {
+      const userA = await signUpTestUser(app);
+      const userB = await signUpTestUser(app);
+
+      const { workspace } = await createWorkspaceWithMember(userB.userId);
+
+      const notification = await prisma.notification.create({
+        data: {
+          workspaceId: workspace.id,
+          recipientId: userB.userId,
+          type: NotificationType.TASK_ASSIGNED,
+          title: "You were assigned a task",
+          message: "Test notification",
+        },
+      });
+
+      // markNotificationAsRead() checks notification.recipientId !== actorId
+      // directly (notification.service.ts) rather than the shared
+      // requireWorkspaceMembership() primitive - userA isn't even a member
+      // of userB's workspace, but that's incidental here, the rejection is
+      // driven entirely by the recipient check.
+      const res = await request(app)
+        .patch(`/api/v1/notifications/${notification.id}/read`)
+        .set("Cookie", userA.cookie)
+        .expect(403);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe("FORBIDDEN");
+
+      const unchangedNotification = await prisma.notification.findUniqueOrThrow({
+        where: { id: notification.id },
+      });
+      expect(unchangedNotification.isRead).toBe(false);
+      expect(unchangedNotification.readAt).toBeNull();
+    });
+  });
+
+  describe("cross-workspace sprint access", () => {
+    // Sprint has no DELETE endpoint (only GET/PATCH/start/complete exist in
+    // sprint-item.routes.ts), so a delete case is intentionally not
+    // included here rather than inventing one.
+
+    it("T17: rejects reading another workspace's sprint by guessed ID", async () => {
+      const { attacker, targetWorkspace, targetProject } =
+        await createCrossWorkspaceScenario();
+
+      const targetSprint = await createSprintDirect(
+        targetWorkspace.id,
+        targetProject.id,
+      );
+
+      const res = await request(app)
+        .get(`/api/v1/sprints/${targetSprint.id}`)
+        .set("Cookie", attacker.cookie)
+        .expect(403);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe("FORBIDDEN");
+    });
+
+    it("T17: rejects updating another workspace's sprint, and leaves it unchanged", async () => {
+      const { attacker, targetWorkspace, targetProject } =
+        await createCrossWorkspaceScenario();
+
+      const targetSprint = await createSprintDirect(
+        targetWorkspace.id,
+        targetProject.id,
+      );
+
+      const res = await request(app)
+        .patch(`/api/v1/sprints/${targetSprint.id}`)
+        .set("Cookie", attacker.cookie)
+        .send({ name: "Hacked Sprint Name" })
+        .expect(403);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe("FORBIDDEN");
+
+      const unchangedSprint = await prisma.sprint.findUniqueOrThrow({
+        where: { id: targetSprint.id },
+      });
+      expect(unchangedSprint.name).toBe(targetSprint.name);
+    });
+  });
+
+  describe("cross-workspace comment mutation", () => {
+    it("T18: rejects updating another workspace's comment, and leaves it unchanged", async () => {
+      const { attacker, targetWorkspace, targetTask, targetOwner } =
+        await createCrossWorkspaceScenario();
+
+      const targetComment = await createCommentDirect(
+        targetWorkspace.id,
+        targetTask.id,
+        targetOwner.userId,
+        "Original comment",
+      );
+
+      const res = await request(app)
+        .patch(`/api/v1/comments/${targetComment.id}`)
+        .set("Cookie", attacker.cookie)
+        .send({ content: "Hacked comment" })
+        .expect(403);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe("FORBIDDEN");
+
+      const unchangedComment = await prisma.comment.findUniqueOrThrow({
+        where: { id: targetComment.id },
+      });
+      expect(unchangedComment.content).toBe("Original comment");
+    });
+
+    it("T19: rejects deleting another workspace's comment, and leaves it undeleted", async () => {
+      const { attacker, targetWorkspace, targetTask, targetOwner } =
+        await createCrossWorkspaceScenario();
+
+      const targetComment = await createCommentDirect(
+        targetWorkspace.id,
+        targetTask.id,
+        targetOwner.userId,
+        "Original comment",
+      );
+
+      const res = await request(app)
+        .delete(`/api/v1/comments/${targetComment.id}`)
+        .set("Cookie", attacker.cookie)
+        .expect(403);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe("FORBIDDEN");
+
+      const unchangedComment = await prisma.comment.findUniqueOrThrow({
+        where: { id: targetComment.id },
+      });
+      expect(unchangedComment.deletedAt).toBeNull();
+    });
+  });
+
+  describe("cross-workspace invitation access", () => {
+    // Unlike every other resource in this file, cancelInvitation() and
+    // resendInvitation() scope their lookup to *both* the actor's own
+    // workspaceId route param and the invitationId
+    // (getWorkspaceInvitationById), rather than deriving the workspace from
+    // the fetched row. The attacker is a legitimate OWNER of their own
+    // workspace, so requireWorkspaceMembership()/requireRole() both pass -
+    // the invitation simply isn't found under the attacker's own
+    // workspaceId, so this is expected to be a 404, not the 403 seen
+    // everywhere else in this file.
+
+    it("T20: rejects canceling another workspace's invitation (404, not 403), and leaves it unchanged", async () => {
+      const { attacker, attackerWorkspace, targetWorkspace, targetOwner } =
+        await createCrossWorkspaceScenario();
+
+      const targetInvitation = await createInvitationDirect(
+        targetWorkspace.id,
+        targetOwner.userId,
+      );
+
+      const res = await request(app)
+        .delete(
+          `/api/v1/workspaces/${attackerWorkspace.id}/invitations/${targetInvitation.id}`,
+        )
+        .set("Cookie", attacker.cookie)
+        .expect(404);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe("NOT_FOUND");
+
+      const unchangedInvitation =
+        await prisma.workspaceInvitation.findUniqueOrThrow({
+          where: { id: targetInvitation.id },
+        });
+      expect(unchangedInvitation.status).toBe("PENDING");
+    });
+
+    it("T20: rejects resending another workspace's invitation (404, not 403), and leaves it unchanged", async () => {
+      const { attacker, attackerWorkspace, targetWorkspace, targetOwner } =
+        await createCrossWorkspaceScenario();
+
+      const targetInvitation = await createInvitationDirect(
+        targetWorkspace.id,
+        targetOwner.userId,
+      );
+
+      const res = await request(app)
+        .post(
+          `/api/v1/workspaces/${attackerWorkspace.id}/invitations/${targetInvitation.id}/resend`,
+        )
+        .set("Cookie", attacker.cookie)
+        .expect(404);
+
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe("NOT_FOUND");
+
+      const unchangedInvitation =
+        await prisma.workspaceInvitation.findUniqueOrThrow({
+          where: { id: targetInvitation.id },
+        });
+      expect(unchangedInvitation.expiresAt.getTime()).toBe(
+        targetInvitation.expiresAt.getTime(),
+      );
+    });
+  });
+
+  describe("cross-workspace activity feed read", () => {
+    it("T21: excludes another workspace's activity from the caller's own feed", async () => {
+      const attacker = await signUpTestUser(app);
+      const { workspace: attackerWorkspace } = await createWorkspaceWithMember(
+        attacker.userId,
+      );
+
+      const targetOwner = await signUpTestUser(app);
+      const { workspace: targetWorkspace } = await createWorkspaceWithMember(
+        targetOwner.userId,
+      );
+
+      const ownActivity = await createActivityDirect(
+        attackerWorkspace.id,
+        attacker.userId,
+        new Date(),
+      );
+      const targetActivity = await createActivityDirect(
+        targetWorkspace.id,
+        targetOwner.userId,
+        new Date(),
+      );
+
+      // The attacker is requesting their *own* workspace's feed - a
+      // legitimate, authorized 200 request - so this isn't testing the
+      // requireWorkspaceMembership() gate (already proven elsewhere in this
+      // file). It's testing that the `where: { workspaceId }` filter in
+      // listWorkspaceActivities() actually scopes the query, rather than
+      // merely observing an empty feed that could just mean the attacker's
+      // workspace has no activity yet.
+      const res = await request(app)
+        .get(`/api/v1/workspaces/${attackerWorkspace.id}/activity`)
+        .set("Cookie", attacker.cookie)
+        .expect(200);
+
+      expect(res.body.success).toBe(true);
+
+      const activityIds = res.body.data.activities.map(
+        (activity: { id: string }) => activity.id,
+      );
+
+      expect(activityIds).toContain(ownActivity.id);
+      expect(activityIds).not.toContain(targetActivity.id);
     });
   });
 });

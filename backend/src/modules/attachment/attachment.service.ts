@@ -37,26 +37,6 @@ type AttachmentWithUploader = Prisma.AttachmentGetPayload<{
   };
 }>;
 
-type AttachmentWithRelations = Prisma.AttachmentGetPayload<{
-  include: {
-    task: {
-      select: {
-        id: true;
-        title: true;
-        workspaceId: true;
-      };
-    };
-
-    uploadedBy: {
-      select: {
-        id: true;
-        name: true;
-        image: true;
-      };
-    };
-  };
-}>;
-
 async function findTaskById(taskId: string) {
   const task = await prisma.task.findFirst({
     where: {

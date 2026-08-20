@@ -128,6 +128,9 @@ export async function createComment(
         type: NotificationType.COMMENT_ON_ASSIGNED_TASK,
         title: "New Comment",
         message: `A new comment was added to "${task.title}".`,
+        // A comment can only ever be created once - its own id already
+        // uniquely identifies this event, no version marker needed.
+        eventId: comment.id,
         metadata: {
           taskId: task.id,
           taskTitle: task.title,

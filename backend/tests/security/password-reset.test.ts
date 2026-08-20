@@ -1,8 +1,11 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { createHmac } from "node:crypto";
+
+import { afterEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 
 import app from "../../src/app.js";
 import { prisma } from "../../src/lib/prisma.js";
+import * as emailQueueModule from "../../src/queues/email/email.queue.js";
 import { emailQueue } from "../../src/queues/email/email.queue.js";
 import { EMAIL_JOB_NAMES } from "../../src/queues/email/email.jobs.js";
 
@@ -195,5 +198,97 @@ describe("password reset", () => {
       .expect(200);
 
     await request(app).get("/api/v1/workspaces").set("Cookie", user.cookie).expect(401);
+  });
+
+  /**
+   * F-14 follow-up: enqueuePasswordResetEmail() previously had no bound -
+   * traced the installed better-auth's api/routes/password.mjs and
+   * confirmed requestPasswordReset invokes sendResetPassword through the
+   * identical `await ctx.context.runInBackgroundOrAwait(...)` shape
+   * sign-up.mjs uses for sendVerificationEmail (same shared implementation,
+   * no advanced.backgroundTasks.handler configured here either), and
+   * enqueuePasswordResetEmail() calls .add() on the exact same emailQueue
+   * instance - so the identical hang applies. Confirmed directly, not by
+   * analogy: ran the real exported enqueuePasswordResetEmail() against an
+   * unreachable Redis host in a throwaway process and it never settled
+   * within an 8+ second timeout, exactly like enqueueVerificationEmail did.
+   */
+  it("does not hang the password-reset request when the email can never be enqueued (F-14)", async () => {
+    const user = await signUpTestUser(app);
+
+    const enqueueSpy = vi
+      .spyOn(emailQueueModule, "enqueuePasswordResetEmail")
+      .mockImplementation(() => new Promise(() => {}));
+
+    try {
+      const startedAt = Date.now();
+
+      const res = await requestReset(user.email);
+
+      // Comfortably above auth.ts's 2s ENQUEUE_EMAIL_TIMEOUT_MS to absorb CI
+      // jitter, comfortably below what "actually hung" would look like.
+      expect(Date.now() - startedAt).toBeLessThan(4000);
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe(true);
+    } finally {
+      enqueueSpy.mockRestore();
+    }
+  });
+
+  /**
+   * F-14's fix must not regress Commit 4's deterministic jobId/HMAC work:
+   * a normal password-reset request (real Redis, no simulated failure)
+   * still produces a job keyed by password-reset-<hmac(token)>, and the raw
+   * token still never appears in the jobId.
+   */
+  it("still assigns the deterministic HMAC-keyed jobId through the timeout-wrapped enqueue path", async () => {
+    const user = await signUpTestUser(app);
+
+    await requestReset(user.email).expect(200);
+    const token = await extractResetToken(user.email);
+
+    const job = (await emailQueue.getJobs(["waiting", "delayed", "active", "completed"])).find(
+      (candidate) =>
+        candidate.name === EMAIL_JOB_NAMES.PASSWORD_RESET && candidate.data?.email === user.email,
+    );
+
+    expect(job).toBeDefined();
+
+    const expectedDigest = createHmac("sha256", process.env.BETTER_AUTH_SECRET!)
+      .update(token)
+      .digest("hex");
+
+    expect(job!.id).toBe(`password-reset-${expectedDigest}`);
+    expect(job!.id).not.toContain(token);
+  });
+
+  /**
+   * A legitimate later password-reset request must still enqueue a
+   * genuinely new job through the fixed path, and must not be incorrectly
+   * deduplicated against the first. Unlike verification email's JWT (see
+   * email-verification.test.ts's identical test), better-auth's password-
+   * reset token is generateId(24) - a genuinely random string (verified
+   * against @better-auth/core/dist/utils/id.mjs: createRandomStringGenerator,
+   * not time-derived) backed by a brand-new createVerificationValue() row
+   * every call - so no artificial delay is needed between the two requests
+   * for them to reliably produce different tokens, unlike the verification-
+   * email case.
+   */
+  it("still enqueues a fresh, distinct job on a legitimate second request", async () => {
+    const user = await signUpTestUser(app);
+
+    await requestReset(user.email).expect(200);
+    await requestReset(user.email).expect(200);
+
+    const jobs = await emailQueue.getJobs(["waiting", "delayed", "active", "completed"]);
+    const matching = jobs.filter(
+      (job) => job.name === EMAIL_JOB_NAMES.PASSWORD_RESET && job.data?.email === user.email,
+    );
+
+    expect(matching.length).toBeGreaterThanOrEqual(2);
+
+    const distinctJobIds = new Set(matching.map((job) => job.id));
+
+    expect(distinctJobIds.size).toBe(matching.length);
   });
 });

@@ -6,6 +6,7 @@ export const redis = new Redis({
   host: redisConfig.host,
   port: redisConfig.port,
   password: redisConfig.password,
+  db: redisConfig.db,
   maxRetriesPerRequest: null,
 });
 
@@ -30,6 +31,7 @@ export const rateLimitRedis = new Redis({
   host: redisConfig.host,
   port: redisConfig.port,
   password: redisConfig.password,
+  db: redisConfig.db,
   commandTimeout: 500,
 });
 

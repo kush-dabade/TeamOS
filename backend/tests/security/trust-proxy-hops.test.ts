@@ -29,7 +29,8 @@ describe("TRUST_PROXY_HOPS validation", () => {
     // tests/setup/test-env.ts), and execFileAsync's env option below
     // otherwise inherits process.env wholesale - this strips it back out so
     // the child process genuinely sees it as unset, not "set to 0".
-    const { TRUST_PROXY_HOPS: _omit, ...envWithoutTrustProxyHops } = process.env;
+    const envWithoutTrustProxyHops = { ...process.env };
+    delete envWithoutTrustProxyHops.TRUST_PROXY_HOPS;
 
     const { stdout } = await execFileAsync("npx", ["tsx", TRUST_PROXY_CHECK_SCRIPT], {
       cwd: backendRoot,

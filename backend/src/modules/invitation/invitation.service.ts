@@ -308,6 +308,11 @@ export async function createInvitation(
         type: NotificationType.INVITATION_RECEIVED,
         title: "Workspace Invitation",
         message: `${actor.name} invited you to join "${workspace.name}".`,
+        // Only ever enqueued from createInvitation() - resendInvitation()
+        // does not call enqueueNotification, only enqueueWorkspaceInvitationEmail
+        // - so this notification is a genuine one-time event per invitation;
+        // its own id already uniquely identifies it.
+        eventId: invitation.id,
         metadata: {
           invitationId: invitation.id,
           workspaceName: workspace.name,

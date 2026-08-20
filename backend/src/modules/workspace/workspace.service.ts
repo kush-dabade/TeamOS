@@ -475,6 +475,14 @@ export async function transferWorkspaceOwnership(
       title: "Workspace Ownership Transferred",
       message: `You are now the owner of "${transferredWorkspace.name}".`,
 
+      // Ownership can legitimately transfer again later, including back to
+      // this same recipient - workspaceId+recipientId alone would collide
+      // with that future transfer. updatedAt is bumped by the updateMany
+      // above (Prisma's @updatedAt on Workspace), so it's a real, already-
+      // persisted marker of THIS specific transfer, not a timestamp invented
+      // just for uniqueness.
+      eventId: `${transferredWorkspace.id}-${transferredWorkspace.updatedAt.getTime()}`,
+
       metadata: {
         workspaceId: transferredWorkspace.id,
         previousOwnerId: actorId,

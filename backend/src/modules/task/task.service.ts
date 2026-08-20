@@ -165,6 +165,12 @@ export async function createTask(actorId: string, data: CreateTaskData) {
 
         message: `You were assigned "${task.title}".`,
 
+        // Task creation is one-time - its own id already uniquely
+        // identifies this event (unlike the reassignment call site below,
+        // which needs a version marker since the same task can be
+        // reassigned again later).
+        eventId: task.id,
+
         metadata: {
           taskId: task.id,
           taskTitle: task.title,
@@ -554,6 +560,14 @@ export async function updateTask(
         title: "Task Assigned",
 
         message: `You were assigned "${updatedTask.title}".`,
+
+        // A task can legitimately be reassigned again later, including back
+        // to this same recipient - taskId+recipientId alone would collide
+        // with that future reassignment. updatedAt is bumped by the
+        // tx.task.update() above (Prisma's @updatedAt on Task), so it's a
+        // real, already-persisted marker of THIS specific reassignment, not
+        // a timestamp invented just for uniqueness.
+        eventId: `${updatedTask.id}-${updatedTask.updatedAt.getTime()}`,
 
         metadata: {
           taskId: updatedTask.id,

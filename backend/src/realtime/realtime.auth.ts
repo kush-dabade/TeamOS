@@ -2,7 +2,7 @@ import { fromNodeHeaders } from "better-auth/node";
 import type { Socket } from "socket.io";
 
 import { auth } from "../lib/auth.js";
-import type { AuthenticatedSocket, RealtimeUser } from "./realtime.types.js";
+import type { AuthenticatedSocket } from "./realtime.types.js";
 
 export async function authenticateSocket(
   socket: Socket,

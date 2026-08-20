@@ -61,7 +61,7 @@ describe("GET /api/v1/workspaces/:workspaceId/tasks", () => {
 
     const seenIds = new Set<string>();
     let page = 1;
-    let totalPages = 1;
+    let totalPages: number;
 
     do {
       const res = await request(app)

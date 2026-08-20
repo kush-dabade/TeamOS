@@ -171,7 +171,7 @@ describe("GET /api/v1/workspaces/:workspaceId/activity pagination", () => {
     const seenIds = new Set<string>();
     const returnedIds: string[] = [];
     let page = 1;
-    let totalPages = 1;
+    let totalPages: number;
 
     do {
       const res = await request(app)

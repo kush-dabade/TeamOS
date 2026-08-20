@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { SprintStatus } from "../../generated/prisma/enums.js";
 
 export const createSprintSchema = z
   .object({

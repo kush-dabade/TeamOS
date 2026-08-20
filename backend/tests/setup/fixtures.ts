@@ -217,3 +217,77 @@ export async function createActivityDirect(
     },
   });
 }
+
+/**
+ * Direct Prisma insert, same rationale as createProjectDirect. `status`
+ * defaults to PENDING via the schema, but `token` and `expiresAt` have no
+ * schema default, so they're generated here the same way createInvitation
+ * does (invitation.service.ts).
+ */
+export async function createInvitationDirect(
+  workspaceId: string,
+  invitedById: string,
+  role: WorkspaceRole = WorkspaceRole.MEMBER,
+  email = `invitee-${crypto.randomUUID()}@example.com`,
+) {
+  return prisma.workspaceInvitation.create({
+    data: {
+      workspaceId,
+      invitedById,
+      email,
+      role,
+      token: crypto.randomUUID(),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    },
+  });
+}
+
+/**
+ * Direct Prisma insert, same rationale as createProjectDirect.
+ */
+export async function createCommentDirect(
+  workspaceId: string,
+  taskId: string,
+  authorId: string,
+  content = "Test comment",
+) {
+  return prisma.comment.create({
+    data: {
+      workspaceId,
+      taskId,
+      authorId,
+      content,
+    },
+  });
+}
+
+/**
+ * Direct Prisma insert, same rationale as createProjectDirect - with one
+ * caveat the others don't have: `storageKey` here does not point to a real
+ * file on disk. downloadAttachment and deleteAttachment both call
+ * requireWorkspaceMembership() before ever touching storage
+ * (attachment.service.ts), so this fixture is valid for proving the
+ * authorization boundary rejects a non-member, but it is NOT valid for a
+ * positive control asserting a successful download streams real file
+ * content - that would need a file actually written through the local
+ * storage provider.
+ */
+export async function createAttachmentDirect(
+  workspaceId: string,
+  taskId: string,
+  uploadedById: string,
+  originalName = "test-file.txt",
+) {
+  return prisma.attachment.create({
+    data: {
+      workspaceId,
+      taskId,
+      uploadedById,
+      originalName,
+      storageKey: `test/${crypto.randomUUID()}`,
+      storageFileName: crypto.randomUUID(),
+      mimeType: "text/plain",
+      size: 128,
+    },
+  });
+}

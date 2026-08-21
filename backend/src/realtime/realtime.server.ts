@@ -2,6 +2,7 @@ import type { Server as HttpServer } from "node:http";
 
 import { Server } from "socket.io";
 
+import { logger } from "../lib/logger.js";
 import { prisma } from "../lib/prisma.js";
 import { trustedOrigins } from "../config/security.config.js";
 
@@ -119,8 +120,9 @@ async function joinWorkspaceRooms(socket: AuthenticatedSocket): Promise<void> {
     }
   }
 
-  console.log(
-    `Socket ${socket.id} joined ${currentWorkspaceIds.size} workspace room(s)`,
+  logger.info(
+    { socketId: socket.id, workspaceCount: currentWorkspaceIds.size },
+    "Socket joined workspace rooms",
   );
 }
 
@@ -142,13 +144,13 @@ function registerConnectionHandlers(io: Server): void {
 
       await joinWorkspaceRooms(authenticatedSocket);
 
-      console.log(`Socket connected: ${socket.id}`);
+      logger.info({ socketId: socket.id }, "Socket connected");
 
       socket.on("disconnect", (reason) => {
-        console.log(`Socket disconnected: ${socket.id} (${reason})`);
+        logger.info({ socketId: socket.id, reason }, "Socket disconnected");
       });
     } catch (error) {
-      console.error("Socket connection setup failed:", error);
+      logger.error({ err: error, socketId: socket.id }, "Socket connection setup failed");
 
       socket.disconnect(true);
     }

@@ -4,6 +4,7 @@ import {
   registerFatalErrorHandlers,
   type FatalErrorEmitter,
 } from "../../src/lib/fatal-error-handler.js";
+import { logger } from "../../src/lib/logger.js";
 
 /**
  * Commit 9: uncaughtException/unhandledRejection previously had no
@@ -33,7 +34,7 @@ describe("registerFatalErrorHandlers", () => {
   let fakeProcess: FatalErrorEmitter;
   let shutdown: (exitCode: number) => void;
   let shutdownCalls: number[];
-  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+  let loggerErrorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     uncaughtExceptionHandler = undefined;
@@ -61,11 +62,11 @@ describe("registerFatalErrorHandlers", () => {
     shutdown = (exitCode: number) => {
       shutdownCalls.push(exitCode);
     };
-    consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    loggerErrorSpy = vi.spyOn(logger, "error").mockImplementation(() => undefined);
   });
 
   afterEach(() => {
-    consoleErrorSpy.mockRestore();
+    loggerErrorSpy.mockRestore();
   });
 
   it("registers both uncaughtException and unhandledRejection handlers", () => {
@@ -81,9 +82,9 @@ describe("registerFatalErrorHandlers", () => {
     const error = new Error("boom");
     uncaughtExceptionHandler!(error, "uncaughtException");
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(loggerErrorSpy).toHaveBeenCalledWith(
+      { err: error },
       expect.stringContaining("uncaughtException"),
-      error,
     );
     expect(shutdownCalls).toEqual([1]);
   });
@@ -94,9 +95,9 @@ describe("registerFatalErrorHandlers", () => {
     const reason = new Error("rejected");
     unhandledRejectionHandler!(reason, Promise.reject(reason).catch(() => {}));
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(loggerErrorSpy).toHaveBeenCalledWith(
+      { err: reason },
       expect.stringContaining("unhandledRejection"),
-      reason,
     );
     expect(shutdownCalls).toEqual([1]);
   });
@@ -110,9 +111,9 @@ describe("registerFatalErrorHandlers", () => {
       unhandledRejectionHandler!("plain string reason", Promise.resolve()),
     ).not.toThrow();
 
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(loggerErrorSpy).toHaveBeenCalledWith(
+      { err: "plain string reason" },
       expect.stringContaining("unhandledRejection"),
-      "plain string reason",
     );
     expect(shutdownCalls).toEqual([1]);
   });

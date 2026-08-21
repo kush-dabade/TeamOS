@@ -1,3 +1,4 @@
+import { logger } from "../../lib/logger.js";
 import { prisma } from "../../lib/prisma.js";
 
 import type {
@@ -139,7 +140,9 @@ export async function createComment(
         },
       });
     } catch (error) {
-      console.error("Failed to create comment notification:", error);
+      // Best-effort: the comment itself already succeeded - only the
+      // supplementary notification failed to be created.
+      logger.warn({ err: error }, "Failed to create comment notification");
     }
   }
 

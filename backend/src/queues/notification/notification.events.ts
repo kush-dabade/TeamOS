@@ -1,5 +1,6 @@
 import { QueueEvents } from "bullmq";
 
+import { logger } from "../../lib/logger.js";
 import { redisConfig } from "../../config/redis.config.js";
 import type { NotificationResponse } from "../../modules/notification/notification.types.js";
 import { REALTIME_EVENTS } from "../../realtime/realtime.constants.js";
@@ -37,15 +38,15 @@ export function initializeNotificationQueueEvents(): QueueEvents {
         },
       );
     } catch (error) {
-      console.error(
-        "Failed to emit realtime event for completed notification job:",
-        error,
-      );
+      // Best-effort: the notification is already persisted (the job
+      // completed successfully) - only the live push failed. The
+      // recipient will still see it on their next fetch/poll.
+      logger.warn({ err: error }, "Failed to emit realtime event for completed notification job");
     }
   });
 
   queueEvents.on("error", (error) => {
-    console.error("Notification queue events error:", error);
+    logger.error({ err: error }, "Notification queue events error");
   });
 
   notificationQueueEvents = queueEvents;

@@ -2,6 +2,7 @@ import { fromNodeHeaders } from "better-auth/node";
 import type { Socket } from "socket.io";
 
 import { auth } from "../lib/auth.js";
+import { logger } from "../lib/logger.js";
 import type { AuthenticatedSocket } from "./realtime.types.js";
 
 export async function authenticateSocket(
@@ -24,7 +25,7 @@ export async function authenticateSocket(
 
     next();
   } catch (error) {
-    console.error("Socket authentication error:", error);
+    logger.error({ err: error }, "Socket authentication error");
 
     next(new Error("Authentication failed"));
   }

@@ -1,5 +1,6 @@
 import type { RealtimeEvent } from "./realtime.constants.js";
 
+import { logger } from "../lib/logger.js";
 import { getUserRoom, getWorkspaceRoom } from "./realtime.rooms.js";
 import { getIO } from "./realtime.server.js";
 
@@ -11,10 +12,11 @@ export function emitToRoom(
   try {
     getIO().to(room).emit(event, payload);
   } catch (error) {
-    console.error(
-      `Failed to emit realtime event "${event}" to room "${room}":`,
-      error,
-    );
+    // Best-effort: every domain event pushed over realtime is already
+    // persisted (DB row, activity log, notification, ...) before this
+    // runs - a failed live push just means the affected client(s) will see
+    // the change on their next fetch instead of immediately.
+    logger.warn({ err: error, event, room }, "Failed to emit realtime event to room");
   }
 }
 

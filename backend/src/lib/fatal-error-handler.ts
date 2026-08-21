@@ -8,6 +8,8 @@
  * this interface structurally, with no cast needed at the call site in
  * server.ts/worker.ts.
  */
+import { logger } from "./logger.js";
+
 export interface FatalErrorEmitter {
   on(
     event: "uncaughtException",
@@ -45,19 +47,17 @@ export function registerFatalErrorHandlers({
   shutdown,
 }: FatalErrorHandlerOptions): void {
   process.on("uncaughtException", (error) => {
-    console.error(
-      "Fatal: uncaughtException - initiating graceful shutdown.",
-      error,
-    );
+    logger.error({ err: error }, "Fatal: uncaughtException - initiating graceful shutdown.");
 
     void shutdown(1);
   });
 
   process.on("unhandledRejection", (reason) => {
-    console.error(
-      "Fatal: unhandledRejection - initiating graceful shutdown.",
-      reason,
-    );
+    // `reason` isn't required to be an Error - a rejected promise can
+    // reject with any value. pino's err serializer degrades gracefully for
+    // a non-Error value (see logger.ts), so this is passed through as-is
+    // rather than assuming .message/.stack exist.
+    logger.error({ err: reason }, "Fatal: unhandledRejection - initiating graceful shutdown.");
 
     void shutdown(1);
   });

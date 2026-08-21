@@ -4,6 +4,7 @@ import { betterAuth } from "better-auth";
 import { createAuthMiddleware, APIError } from "better-auth/api";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 
+import { logger } from "./logger.js";
 import { prisma } from "./prisma.js";
 import { incrementRateLimitCounter, rateLimitRedis } from "./redis.js";
 import { isProduction, trustedOrigins } from "../config/security.config.js";
@@ -75,10 +76,10 @@ async function enqueueEmailWithTimeout(label: string, enqueue: Promise<void>): P
       );
     }),
   ]).catch((error: unknown) => {
-    console.error(
-      `Failed to enqueue ${label} in time; request proceeds regardless:`,
-      error instanceof Error ? error.message : error,
-    );
+    // Fail-open/degraded, not a genuine failure - the enqueue may still
+    // succeed on its own once Redis recovers (see this function's own doc
+    // comment above); only the caller's bounded wait on it timed out.
+    logger.warn({ err: error }, `Failed to enqueue ${label} in time; request proceeds regardless`);
   });
 }
 
@@ -272,10 +273,7 @@ export const auth = betterAuth({
               // Fails open, matching FAIL_OPEN_ON_STORE_ERROR's philosophy
               // in middleware/rate-limit.ts: a Redis outage degrades this
               // to "temporarily unprotected," not "nobody can sign in."
-              console.error(
-                "Sign-in account rate limit check failed, failing open:",
-                error instanceof Error ? error.message : error,
-              );
+              logger.warn({ err: error }, "Sign-in account rate limit check failed, failing open");
 
               return null;
             },
@@ -358,10 +356,7 @@ export const auth = betterAuth({
         // here is one fewer available attempt left in the current window
         // for a legitimate user, not a security issue, so this is safe to
         // swallow rather than fail the (already-successful) sign-in over.
-        console.error(
-          "Sign-in account rate limit reset failed:",
-          error instanceof Error ? error.message : error,
-        );
+        logger.warn({ err: error }, "Sign-in account rate limit reset failed");
       });
     }),
   },

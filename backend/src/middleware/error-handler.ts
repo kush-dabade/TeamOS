@@ -5,6 +5,7 @@ import { APIError as BetterAuthAPIError } from "better-auth";
 
 import { Prisma } from "../generated/prisma/client.js";
 
+import { logger } from "../lib/logger.js";
 import { ValidationError } from "../shared/errors/validation-error.js";
 import { NotFoundError } from "../shared/errors/not-found-error.js";
 import { ForbiddenError } from "../shared/errors/forbidden-error.js";
@@ -87,7 +88,7 @@ export function errorHandler(
   // client exposure — no need to re-classify by message content.
   if (error instanceof BetterAuthAPIError) {
     if (error.statusCode >= 500) {
-      console.error("Better Auth internal error:", error);
+      logger.error({ err: error }, "Better Auth internal error");
     }
 
     return sendError(
@@ -120,7 +121,7 @@ export function errorHandler(
       return sendError(res, 404, "NOT_FOUND", "Resource not found");
     }
 
-    console.error("Unhandled Prisma error:", error);
+    logger.error({ err: error }, "Unhandled Prisma error");
 
     return sendError(
       res,
@@ -131,7 +132,7 @@ export function errorHandler(
   }
 
   if (error instanceof StorageError) {
-    console.error("Storage error:", error);
+    logger.error({ err: error }, "Storage error");
 
     return sendError(
       res,
@@ -141,7 +142,7 @@ export function errorHandler(
     );
   }
 
-  console.error("Unhandled error:", error);
+  logger.error({ err: error }, "Unhandled error");
 
   return sendError(res, 500, "INTERNAL_ERROR", "An internal error occurred");
 }

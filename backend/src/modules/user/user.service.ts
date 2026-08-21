@@ -1,5 +1,6 @@
 import path from "node:path";
 
+import { logger } from "../../lib/logger.js";
 import { prisma } from "../../lib/prisma.js";
 import {
   storageService,
@@ -98,7 +99,7 @@ export async function uploadAvatar(
     try {
       await storageService.delete(storageObject.storageKey);
     } catch (error) {
-      console.error("Failed to clean up losing avatar upload:", error);
+      logger.error({ err: error }, "Failed to clean up losing avatar upload");
     }
 
     throw new ConflictError(
@@ -112,7 +113,7 @@ export async function uploadAvatar(
     try {
       await storageService.delete(previousImage);
     } catch (error) {
-      console.error("Failed to delete previous avatar file:", error);
+      logger.error({ err: error }, "Failed to delete previous avatar file");
     }
   }
 }
@@ -182,7 +183,7 @@ export async function deleteAvatar(userId: string): Promise<void> {
     await storageService.delete(storageKey);
   } catch (error) {
     if (!(error instanceof FileNotFoundError)) {
-      console.error("Failed to delete avatar file:", error);
+      logger.error({ err: error }, "Failed to delete avatar file");
     }
     // Best-effort cleanup; the user record is already updated.
   }

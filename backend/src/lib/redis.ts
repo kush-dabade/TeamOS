@@ -1,6 +1,7 @@
 import { Redis } from "ioredis";
 
 import { redisConfig } from "../config/redis.config.js";
+import { logger } from "./logger.js";
 
 export const redis = new Redis({
   host: redisConfig.host,
@@ -40,7 +41,11 @@ export const rateLimitRedis = new Redis({
 // intentional line - this is the one place that failure should be visible
 // in logs, not silent.
 rateLimitRedis.on("error", (error) => {
-  console.error("Rate-limit Redis connection error:", error.message);
+  // Degraded, not fatal - every consumer of rateLimitRedis (rate-limit.ts's
+  // limiters, auth.ts's sign-in account limiter) fails open on a Redis
+  // error, so this connection being unhealthy means "temporarily
+  // unprotected," not "the app is broken."
+  logger.warn({ err: error }, "Rate-limit Redis connection error");
 });
 
 // Atomic INCR-then-conditionally-set-TTL, expressed as a single Lua script

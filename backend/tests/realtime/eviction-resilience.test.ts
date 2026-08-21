@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import app from "../../src/app.js";
+import { logger } from "../../src/lib/logger.js";
 import { prisma } from "../../src/lib/prisma.js";
 import {
   leaveWorkspace,
@@ -27,7 +28,7 @@ describe("workspace membership mutations tolerate a fully unavailable realtime l
   });
 
   it("removeWorkspaceMember still deletes the membership and reports success when getIO() throws", async () => {
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => undefined);
 
     try {
       const owner = await signUpTestUser(app);
@@ -49,8 +50,8 @@ describe("workspace membership mutations tolerate a fully unavailable realtime l
       // silently - see removeWorkspaceMember's own "SECURITY:"-prefixed
       // log message.
       expect(errorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ err: expect.anything() }),
         expect.stringContaining("SECURITY"),
-        expect.anything(),
       );
     } finally {
       errorSpy.mockRestore();
@@ -58,7 +59,7 @@ describe("workspace membership mutations tolerate a fully unavailable realtime l
   });
 
   it("leaveWorkspace still deletes the membership and reports success when getIO() throws", async () => {
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => undefined);
 
     try {
       const owner = await signUpTestUser(app);
@@ -77,8 +78,8 @@ describe("workspace membership mutations tolerate a fully unavailable realtime l
       expect(remaining).toBeNull();
 
       expect(errorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ err: expect.anything() }),
         expect.stringContaining("SECURITY"),
-        expect.anything(),
       );
     } finally {
       errorSpy.mockRestore();

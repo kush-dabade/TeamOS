@@ -8,6 +8,7 @@ import {
   deleteAttachment,
 } from "./attachment.service.js";
 
+import { logger } from "../../lib/logger.js";
 import { ValidationError } from "../../shared/errors/validation-error.js";
 import { buildAttachmentContentDisposition } from "../../shared/http/content-disposition.js";
 
@@ -67,7 +68,7 @@ export async function downloadAttachmentHandler(req: Request, res: Response) {
     // disconnects mid-download — not just when the source itself errors.
     await pipeline(attachment.stream, res);
   } catch (error) {
-    console.error("Attachment stream error:", error);
+    logger.error({ err: error }, "Attachment stream error");
 
     // pipeline() always destroys the destination on failure — including
     // when the source errors before any bytes were written, well before

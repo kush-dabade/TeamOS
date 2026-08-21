@@ -7,6 +7,7 @@ import { registerFatalErrorHandlers } from "./lib/fatal-error-handler.js";
 import { logger } from "./lib/logger.js";
 import { prisma } from "./lib/prisma.js";
 import { createShutdownGate } from "./lib/shutdown-gate.js";
+import { markShuttingDown } from "./lib/shutdown-state.js";
 import {
   closeNotificationQueueEvents,
   initializeNotificationQueueEvents,
@@ -36,6 +37,12 @@ export async function shutdown(
   server: ReturnType<typeof createServer>,
   exitCode = 0,
 ): Promise<void> {
+  // Set before the shutdown-gate check below, and before any other line in
+  // this function - /ready must start reporting 503 immediately on the
+  // first shutdown signal, even a redundant one that the gate below is
+  // about to no-op.
+  markShuttingDown();
+
   if (!shutdownGate.requestShutdown(exitCode)) {
     return;
   }

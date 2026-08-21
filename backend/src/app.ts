@@ -35,6 +35,7 @@ import {
 } from "./middleware/rate-limit.js";
 import { securityHeaders } from "./middleware/security-headers.js";
 import { createRequestIdMiddleware } from "./middleware/request-id.js";
+import { createReadinessHandler } from "./lib/readiness.js";
 
 const app = express();
 
@@ -142,6 +143,11 @@ app.get("/health", (_req, res) => {
     message: "TeamOS API is running",
   });
 });
+
+// Dependency-readiness probe, distinct from /health's plain liveness check -
+// see readiness.ts's own doc comments for the DB/Redis check details and
+// shutdown-state.ts for the immediate-503-on-shutdown behavior.
+app.get("/ready", createReadinessHandler());
 
 app.use(notFoundHandler);
 app.use(errorHandler);

@@ -4,8 +4,10 @@ import { fileURLToPath } from "node:url";
 
 import app from "./app.js";
 import { registerFatalErrorHandlers } from "./lib/fatal-error-handler.js";
+import { logger } from "./lib/logger.js";
 import { prisma } from "./lib/prisma.js";
 import { createShutdownGate } from "./lib/shutdown-gate.js";
+import { markShuttingDown } from "./lib/shutdown-state.js";
 import {
   closeNotificationQueueEvents,
   initializeNotificationQueueEvents,
@@ -35,11 +37,17 @@ export async function shutdown(
   server: ReturnType<typeof createServer>,
   exitCode = 0,
 ): Promise<void> {
+  // Set before the shutdown-gate check below, and before any other line in
+  // this function - /ready must start reporting 503 immediately on the
+  // first shutdown signal, even a redundant one that the gate below is
+  // about to no-op.
+  markShuttingDown();
+
   if (!shutdownGate.requestShutdown(exitCode)) {
     return;
   }
 
-  console.log("Shutting down TeamOS API...");
+  logger.info("Shutting down TeamOS API...");
 
   // Stops the server accepting new connections, but its callback only
   // fires once every existing connection has ended - including any
@@ -57,7 +65,7 @@ export async function shutdown(
   // calls don't conflict.
   server.close((error) => {
     if (error) {
-      console.error("Error closing HTTP server:", error);
+      logger.error({ err: error }, "Error closing HTTP server");
     }
   });
 
@@ -66,11 +74,11 @@ export async function shutdown(
     await closeNotificationQueueEvents();
     await prisma.$disconnect();
 
-    console.log("Shutdown completed successfully.");
+    logger.info("Shutdown completed successfully.");
 
     process.exit(shutdownGate.getExitCode());
   } catch (error) {
-    console.error("Error during shutdown:", error);
+    logger.error({ err: error }, "Error during shutdown");
     process.exit(1);
   }
 }
@@ -91,7 +99,7 @@ async function start() {
   try {
     await prisma.$queryRaw`SELECT 1`;
 
-    console.log("Database connected");
+    logger.info("Database connected");
 
     const server = createServer(app);
 
@@ -106,15 +114,15 @@ async function start() {
     });
 
     server.on("error", (error) => {
-      console.error("Server error:", error);
+      logger.error({ err: error }, "Server error");
       process.exit(1);
     });
 
     server.listen(PORT, () => {
-      console.log(`TeamOS API running on port ${PORT}`);
+      logger.info({ port: PORT }, "TeamOS API running");
     });
   } catch (error) {
-    console.error("Failed to start server:", error);
+    logger.error({ err: error }, "Failed to start server");
     process.exit(1);
   }
 }
@@ -127,7 +135,7 @@ const isMainModule = process.argv[1] === fileURLToPath(import.meta.url);
 
 if (isMainModule) {
   start().catch((error) => {
-    console.error("Unhandled error during startup:", error);
+    logger.error({ err: error }, "Unhandled error during startup");
     process.exit(1);
   });
 }

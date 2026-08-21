@@ -1,5 +1,6 @@
 import { Worker } from "bullmq";
 
+import { logger } from "../../lib/logger.js";
 import { redisConfig } from "../../config/redis.config.js";
 import { createNotification } from "../../modules/notification/notification.service.js";
 
@@ -41,28 +42,27 @@ export const notificationWorker = new Worker(
 );
 
 notificationWorker.on("ready", () => {
-  console.log("Notification worker is ready.");
+  logger.info("Notification worker is ready.");
 });
 
 notificationWorker.on("completed", (job) => {
-  console.log(`Completed notification job: ${job.id} (${job.name})`);
+  logger.child({ jobId: job.id, jobName: job.name }).info("Completed notification job");
 });
 
 notificationWorker.on("failed", (job, error) => {
-  console.error(
-    `Notification job ${job?.id ?? "unknown"} (${job?.name ?? "unknown"}) failed:`,
-    error,
-  );
+  logger
+    .child({ jobId: job?.id ?? "unknown", jobName: job?.name ?? "unknown" })
+    .error({ err: error }, "Notification job failed");
 });
 
 notificationWorker.on("error", (error) => {
-  console.error("Notification worker error:", error);
+  logger.error({ err: error }, "Notification worker error");
 });
 
 export async function closeNotificationWorker(): Promise<void> {
-  console.log("Closing notification worker...");
+  logger.info("Closing notification worker...");
 
   await notificationWorker.close();
 
-  console.log("Notification worker closed.");
+  logger.info("Notification worker closed.");
 }

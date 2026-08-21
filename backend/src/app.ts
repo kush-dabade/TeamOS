@@ -34,6 +34,8 @@ import {
   signUpIpLimiter,
 } from "./middleware/rate-limit.js";
 import { securityHeaders } from "./middleware/security-headers.js";
+import { createRequestIdMiddleware } from "./middleware/request-id.js";
+import { createReadinessHandler } from "./lib/readiness.js";
 
 const app = express();
 
@@ -42,7 +44,13 @@ const app = express();
 // fingerprinting - there is no legitimate consumer of this header.
 app.disable("x-powered-by");
 
-// Mounted first, ahead of CORS/auth/body-parsing/rate limiting/routes -
+// Mounted before even securityHeaders - res.setHeader calls persist on the
+// response regardless of what happens afterward, so running first is what
+// guarantees X-Request-Id (and a correlated req.log) is available for every
+// response this app sends, including the earliest possible failures.
+app.use(createRequestIdMiddleware());
+
+// Mounted next, ahead of CORS/auth/body-parsing/rate limiting/routes -
 // res.setHeader calls persist on the response regardless of what happens
 // afterward, including an error jumping straight to errorHandler past all
 // remaining non-error middleware. Mounting this before everything else is
@@ -135,6 +143,11 @@ app.get("/health", (_req, res) => {
     message: "TeamOS API is running",
   });
 });
+
+// Dependency-readiness probe, distinct from /health's plain liveness check -
+// see readiness.ts's own doc comments for the DB/Redis check details and
+// shutdown-state.ts for the immediate-503-on-shutdown behavior.
+app.get("/ready", createReadinessHandler());
 
 app.use(notFoundHandler);
 app.use(errorHandler);

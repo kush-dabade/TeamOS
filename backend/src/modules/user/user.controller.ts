@@ -3,6 +3,7 @@ import { pipeline } from "node:stream/promises";
 
 import { uploadAvatar, getAvatar, deleteAvatar } from "./user.service.js";
 
+import { logger } from "../../lib/logger.js";
 import { ValidationError } from "../../shared/errors/validation-error.js";
 
 export async function uploadAvatarHandler(req: Request, res: Response) {
@@ -37,7 +38,7 @@ export async function getAvatarHandler(req: Request, res: Response) {
     // disconnects mid-download — not just when the source itself errors.
     await pipeline(avatar.stream, res);
   } catch (error) {
-    console.error("Avatar stream error:", error);
+    logger.error({ err: error }, "Avatar stream error");
 
     // pipeline() always destroys the destination on failure — including
     // when the source errors before any bytes were written, well before

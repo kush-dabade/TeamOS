@@ -13,6 +13,7 @@ import {
 import { emitToWorkspace } from "../../realtime/realtime.emitter.js";
 import { REALTIME_EVENTS } from "../../realtime/realtime.constants.js";
 
+import { logger } from "../../lib/logger.js";
 import { prisma } from "../../lib/prisma.js";
 
 import { createActivity } from "../activity/activity.service.js";
@@ -320,7 +321,9 @@ export async function createInvitation(
         },
       });
     } catch (error) {
-      console.error("Failed to create invitation notification:", error);
+      // Best-effort: the invitation itself already succeeded - only the
+      // supplementary notification failed to be created.
+      logger.warn({ err: error }, "Failed to create invitation notification");
     }
   }
 

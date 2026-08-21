@@ -1,3 +1,4 @@
+import { logger } from "../../lib/logger.js";
 import { prisma } from "../../lib/prisma.js";
 import type { Task } from "../../generated/prisma/client.js";
 
@@ -177,7 +178,9 @@ export async function createTask(actorId: string, data: CreateTaskData) {
         },
       });
     } catch (error) {
-      console.error("Failed to create notification:", error);
+      // Best-effort: the task mutation itself already succeeded - only the
+      // supplementary notification failed to be created.
+      logger.warn({ err: error }, "Failed to create notification");
     }
   }
 
@@ -575,7 +578,9 @@ export async function updateTask(
         },
       });
     } catch (error) {
-      console.error("Failed to create notification:", error);
+      // Best-effort: the task mutation itself already succeeded - only the
+      // supplementary notification failed to be created.
+      logger.warn({ err: error }, "Failed to create notification");
     }
   }
 

@@ -1,6 +1,7 @@
 import "dotenv/config";
 
 import { registerFatalErrorHandlers } from "./lib/fatal-error-handler.js";
+import { logger } from "./lib/logger.js";
 import { prisma } from "./lib/prisma.js";
 import { createShutdownGate } from "./lib/shutdown-gate.js";
 import { closeEmailWorker } from "./queues/email/email.worker.js";
@@ -29,7 +30,7 @@ async function shutdown(exitCode = 0): Promise<void> {
     return;
   }
 
-  console.log("Shutting down workers...");
+  logger.info("Shutting down workers...");
 
   let shutdownError: unknown;
 
@@ -37,25 +38,25 @@ async function shutdown(exitCode = 0): Promise<void> {
     await closeEmailWorker();
   } catch (error) {
     shutdownError = error;
-    console.error("Email worker shutdown failed:", error);
+    logger.error({ err: error }, "Email worker shutdown failed");
   }
 
   try {
     await closeNotificationWorker();
   } catch (error) {
     shutdownError = shutdownError ?? error;
-    console.error("Notification worker shutdown failed:", error);
+    logger.error({ err: error }, "Notification worker shutdown failed");
   }
 
   try {
     await prisma.$disconnect();
   } catch (error) {
     shutdownError = shutdownError ?? error;
-    console.error("Prisma disconnect failed:", error);
+    logger.error({ err: error }, "Prisma disconnect failed");
   }
 
   if (!shutdownError) {
-    console.log("Workers shut down successfully.");
+    logger.info("Workers shut down successfully.");
   }
 
   process.exit(Math.max(shutdownError ? 1 : 0, shutdownGate.getExitCode()));

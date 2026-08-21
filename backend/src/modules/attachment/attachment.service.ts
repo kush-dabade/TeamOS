@@ -1,3 +1,4 @@
+import { logger } from "../../lib/logger.js";
 import { prisma } from "../../lib/prisma.js";
 import type { Prisma } from "../../generated/prisma/client.js";
 import { storageService, FileNotFoundError } from "../../storage/index.js";
@@ -379,9 +380,9 @@ export async function deleteAttachment(
     await storageService.delete(attachment.storageKey);
   } catch (error) {
     if (!(error instanceof FileNotFoundError)) {
-      console.error(
-        `Failed to delete attachment file (attachmentId: ${attachment.id}, storageKey: ${attachment.storageKey}):`,
-        error,
+      logger.error(
+        { err: error, attachmentId: attachment.id, storageKey: attachment.storageKey },
+        "Failed to delete attachment file",
       );
     }
     // Best-effort cleanup; the database record is already gone. A missing

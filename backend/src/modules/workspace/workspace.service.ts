@@ -1,3 +1,4 @@
+import { logger } from "../../lib/logger.js";
 import { prisma } from "../../lib/prisma.js";
 import { generateSlug } from "../../lib/slug.js";
 import type { Prisma } from "../../generated/prisma/client.js";
@@ -338,11 +339,11 @@ export async function removeWorkspaceMember(
   try {
     await evictFromWorkspace(workspaceId, targetMember.userId);
   } catch (error) {
-    console.error(
+    logger.error(
+      { err: error, workspaceId, userId: targetMember.userId },
       "SECURITY: failed to evict removed member's sockets after retries - they may " +
         "continue receiving this workspace's realtime events until their socket " +
-        "next disconnects/reconnects:",
-      error,
+        "next disconnects/reconnects",
     );
   }
 
@@ -462,7 +463,9 @@ export async function transferWorkspaceOwnership(
       },
     });
   } catch (error) {
-    console.error("Failed to record ownership-transfer activity:", error);
+    // Best-effort: ownership has already transferred - only the audit-log
+    // entry for it failed to be recorded.
+    logger.warn({ err: error, workspaceId: transferredWorkspace.id }, "Failed to record ownership-transfer activity");
   }
 
   try {
@@ -489,7 +492,9 @@ export async function transferWorkspaceOwnership(
       },
     });
   } catch (error) {
-    console.error("Failed to enqueue ownership-transfer notification:", error);
+    // Best-effort: ownership has already transferred - only the
+    // notification about it failed to be enqueued.
+    logger.warn({ err: error, workspaceId: transferredWorkspace.id }, "Failed to enqueue ownership-transfer notification");
   }
 
   try {
@@ -503,7 +508,9 @@ export async function transferWorkspaceOwnership(
       },
     );
   } catch (error) {
-    console.error("Failed to emit ownership-transfer realtime event:", error);
+    // Best-effort: ownership has already transferred - only the live push
+    // failed. Clients will still see the new owner on their next fetch.
+    logger.warn({ err: error, workspaceId: transferredWorkspace.id }, "Failed to emit ownership-transfer realtime event");
   }
 
   return {
@@ -558,7 +565,9 @@ export async function leaveWorkspace(actorId: string, workspaceId: string) {
       memberId: membership.id,
     });
   } catch (error) {
-    console.error("Failed to record leave-workspace activity:", error);
+    // Best-effort: the membership is already gone - only the audit-log
+    // entry (and the realtime emit alongside it, above) failed.
+    logger.warn({ err: error, workspaceId }, "Failed to record leave-workspace activity");
   }
 
   // Best-effort and independent of the activity/emit block above - one
@@ -570,11 +579,11 @@ export async function leaveWorkspace(actorId: string, workspaceId: string) {
   try {
     await evictFromWorkspace(workspaceId, actorId);
   } catch (error) {
-    console.error(
+    logger.error(
+      { err: error, workspaceId, userId: actorId },
       "SECURITY: failed to evict leaving member's other sockets after retries - they " +
         "may continue receiving this workspace's realtime events until their socket " +
-        "next disconnects/reconnects:",
-      error,
+        "next disconnects/reconnects",
     );
   }
 

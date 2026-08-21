@@ -1,5 +1,6 @@
 import { Worker } from "bullmq";
 
+import { logger } from "../../lib/logger.js";
 import { redisConfig } from "../../config/redis.config.js";
 import {
   sendPasswordResetEmail,
@@ -68,28 +69,27 @@ export const emailWorker = new Worker(
 );
 
 emailWorker.on("ready", () => {
-  console.log("Email worker is ready.");
+  logger.info("Email worker is ready.");
 });
 
 emailWorker.on("completed", (job) => {
-  console.log(`Completed email job: ${job.id} (${job.name})`);
+  logger.child({ jobId: job.id, jobName: job.name }).info("Completed email job");
 });
 
 emailWorker.on("failed", (job, error) => {
-  console.error(
-    `Email job ${job?.id ?? "unknown"} (${job?.name ?? "unknown"}) failed:`,
-    error,
-  );
+  logger
+    .child({ jobId: job?.id ?? "unknown", jobName: job?.name ?? "unknown" })
+    .error({ err: error }, "Email job failed");
 });
 
 emailWorker.on("error", (error) => {
-  console.error("Email worker error:", error);
+  logger.error({ err: error }, "Email worker error");
 });
 
 export async function closeEmailWorker(): Promise<void> {
-  console.log("Closing email worker...");
+  logger.info("Closing email worker...");
 
   await emailWorker.close();
 
-  console.log("Email worker closed.");
+  logger.info("Email worker closed.");
 }

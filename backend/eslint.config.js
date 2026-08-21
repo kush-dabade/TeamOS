@@ -13,4 +13,16 @@ export default defineConfig([
       globals: globals.node,
     },
   },
+  // Scoped to application code only (src/), not tests/ - standalone
+  // subprocess check scripts under tests/setup/ (e.g.
+  // hsts-production-check.ts) legitimately use console.error as a
+  // last-resort crash reporter outside the app's logger, and this rule
+  // deliberately leaves that use untouched rather than requiring
+  // eslint-disable comments for it.
+  {
+    files: ["src/**/*.ts"],
+    rules: {
+      "no-console": "error",
+    },
+  },
 ]);

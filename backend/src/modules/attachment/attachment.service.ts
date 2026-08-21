@@ -5,6 +5,7 @@ import { storageService, FileNotFoundError } from "../../storage/index.js";
 import {
   ActivityEntityType,
   ActivityType,
+  ProjectStatus,
   WorkspaceRole,
 } from "../../generated/prisma/enums.js";
 
@@ -91,6 +92,25 @@ async function findAttachmentById(attachmentId: string) {
   return attachment;
 }
 
+// Mirrors the archived-project mutation guard already duplicated in
+// task.service.ts, comments.service.ts, and sprint.service.ts - kept local
+// to this module rather than shared, since each of those call sites has its
+// own project-lookup shape.
+async function assertProjectNotArchived(projectId: string): Promise<void> {
+  const project = await prisma.project.findUnique({
+    where: {
+      id: projectId,
+    },
+    select: {
+      status: true,
+    },
+  });
+
+  if (project?.status === ProjectStatus.ARCHIVED) {
+    throw new ValidationError("Archived projects cannot be modified");
+  }
+}
+
 function validateAttachmentMimeType(mimeType: string): void {
   if (
     !ALLOWED_ATTACHMENT_MIME_TYPES.includes(
@@ -143,15 +163,7 @@ export async function uploadAttachment(
     throw new ForbiddenError("Guests cannot upload attachments.");
   }
 
-  const project = await prisma.project.findUnique({
-    where: {
-      id: task.projectId,
-    },
-  });
-
-  if (project?.status === "ARCHIVED") {
-    throw new ValidationError("Archived projects cannot be modified");
-  }
+  await assertProjectNotArchived(task.projectId);
 
   validateAttachmentMimeType(file.mimetype);
 
@@ -311,15 +323,7 @@ export async function deleteAttachment(
     throw new ForbiddenError("Guests cannot delete attachments.");
   }
 
-  const project = await prisma.project.findUnique({
-    where: {
-      id: attachment.task.projectId,
-    },
-  });
-
-  if (project?.status === "ARCHIVED") {
-    throw new ValidationError("Archived projects cannot be modified");
-  }
+  await assertProjectNotArchived(attachment.task.projectId);
 
   // PostgreSQL is authoritative here: the attachment row and its activity
   // record are deleted/created atomically first. Realtime emission and

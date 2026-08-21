@@ -12,12 +12,7 @@ import { REALTIME_EVENTS } from "../../src/realtime/realtime.constants.js";
 import { emitToWorkspace } from "../../src/realtime/realtime.emitter.js";
 
 import { resetDatabase } from "../setup/reset-database.js";
-import {
-  createProjectDirect,
-  createTaskDirect,
-  createWorkspaceWithMember,
-  signUpTestUser,
-} from "../setup/fixtures.js";
+import { fileExists, setUpTaskWithOwner } from "../setup/fixtures.js";
 import { startTestServer, type TestServer } from "../setup/test-server.js";
 import {
   connectTestSocket,
@@ -28,27 +23,11 @@ import {
 
 // Mirrors LocalStorageProvider's own resolveAbsolutePath (private, not
 // exported) - see the identical helper in
-// tests/attachment/attachment-delete-consistency.test.ts.
+// tests/attachment/attachment-delete-consistency.test.ts. Kept local (not
+// moved to fixtures.ts) since it's only meaningful to attachment-storage
+// tests, unlike fileExists/setUpTaskWithOwner.
 function attachmentFilePath(storageKey: string): string {
   return path.resolve(path.resolve(storageConfig.rootDirectory), storageKey);
-}
-
-async function fileExists(absolutePath: string): Promise<boolean> {
-  try {
-    await fs.access(absolutePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function setUpTaskWithOwner() {
-  const owner = await signUpTestUser(app);
-  const { workspace } = await createWorkspaceWithMember(owner.userId);
-  const project = await createProjectDirect(workspace.id, owner.userId);
-  const task = await createTaskDirect(workspace.id, project.id, owner.userId);
-
-  return { owner, workspace, project, task };
 }
 
 // Direct Prisma write, same rationale as every other *Direct fixture in
@@ -77,11 +56,18 @@ describe("attachment mutations on archived projects (P2-ARCH)", () => {
     openSockets.forEach((socket) => socket.disconnect());
     openSockets.length = 0;
 
+    // Guarantees storage cleanup even when an assertion above throws mid-test
+    // - unlike each test's own upload flow, this always runs.
+    await fs.rm(path.resolve(storageConfig.rootDirectory, "workspaces"), {
+      recursive: true,
+      force: true,
+    });
+
     await resetDatabase();
   });
 
   it("rejects uploading an attachment to a task in an archived project, before any storage or database side effect", async () => {
-    const { owner, workspace, task, project } = await setUpTaskWithOwner();
+    const { owner, workspace, task, project } = await setUpTaskWithOwner(app);
     await archiveProjectDirect(project.id);
 
     const socket = await connectTestSocket(testServer.baseUrl, owner.cookie);
@@ -134,7 +120,7 @@ describe("attachment mutations on archived projects (P2-ARCH)", () => {
   });
 
   it("rejects deleting an attachment once its project is archived, leaving the database row and physical file intact", async () => {
-    const { owner, workspace, task, project } = await setUpTaskWithOwner();
+    const { owner, workspace, task, project } = await setUpTaskWithOwner(app);
 
     // Upload while the project is still active - upload itself would be
     // blocked by the same guard once archived, so the attachment has to
@@ -198,15 +184,10 @@ describe("attachment mutations on archived projects (P2-ARCH)", () => {
       },
     });
     expect(persistedActivity).toBeNull();
-
-    // Cleanup - this test intentionally leaves the file behind to prove
-    // deletion didn't happen, so remove it manually now the assertions
-    // are done.
-    await fs.unlink(absolutePath);
   });
 
   it("still allows downloading an attachment from an archived project", async () => {
-    const { owner, task, project } = await setUpTaskWithOwner();
+    const { owner, task, project } = await setUpTaskWithOwner(app);
 
     const uploadRes = await request(app)
       .post(`/api/v1/tasks/${task.id}/attachments`)
@@ -224,17 +205,10 @@ describe("attachment mutations on archived projects (P2-ARCH)", () => {
       .expect(200);
 
     expect(downloadRes.text).toBe("still downloadable");
-
-    // Leave no file behind.
-    const stored = await prisma.attachment.findUniqueOrThrow({
-      where: { id: attachmentId },
-      select: { storageKey: true },
-    });
-    await fs.unlink(attachmentFilePath(stored.storageKey));
   });
 
   it("still allows listing attachments on an archived project", async () => {
-    const { owner, task, project } = await setUpTaskWithOwner();
+    const { owner, task, project } = await setUpTaskWithOwner(app);
 
     const uploadRes = await request(app)
       .post(`/api/v1/tasks/${task.id}/attachments`)
@@ -253,11 +227,5 @@ describe("attachment mutations on archived projects (P2-ARCH)", () => {
 
     expect(listRes.body.data.attachments).toHaveLength(1);
     expect(listRes.body.data.attachments[0].id).toBe(attachmentId);
-
-    const stored = await prisma.attachment.findUniqueOrThrow({
-      where: { id: attachmentId },
-      select: { storageKey: true },
-    });
-    await fs.unlink(attachmentFilePath(stored.storageKey));
   });
 });

@@ -12,12 +12,7 @@ import { REALTIME_EVENTS } from "../../src/realtime/realtime.constants.js";
 import { emitToWorkspace } from "../../src/realtime/realtime.emitter.js";
 
 import { resetDatabase } from "../setup/reset-database.js";
-import {
-  createProjectDirect,
-  createTaskDirect,
-  createWorkspaceWithMember,
-  signUpTestUser,
-} from "../setup/fixtures.js";
+import { fileExists, setUpTaskWithOwner } from "../setup/fixtures.js";
 import { startTestServer, type TestServer } from "../setup/test-server.js";
 import {
   connectTestSocket,
@@ -31,18 +26,11 @@ import {
 // storageKey resolved against that. Duplicated here (not imported) since
 // resolveAbsolutePath is a private method on the provider class, not
 // exported - this is the same computation done independently, to assert
-// against the real filesystem rather than through the code under test.
+// against the real filesystem rather than through the code under test. Kept
+// local to this file (not moved to fixtures.ts) since it's only meaningful
+// to attachment-storage tests, unlike fileExists/setUpTaskWithOwner.
 function attachmentFilePath(storageKey: string): string {
   return path.resolve(path.resolve(storageConfig.rootDirectory), storageKey);
-}
-
-async function fileExists(absolutePath: string): Promise<boolean> {
-  try {
-    await fs.access(absolutePath);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 /**
@@ -90,15 +78,6 @@ async function withActivityInsertFailure(
   }
 }
 
-async function setUpTaskWithOwner() {
-  const owner = await signUpTestUser(app);
-  const { workspace } = await createWorkspaceWithMember(owner.userId);
-  const project = await createProjectDirect(workspace.id, owner.userId);
-  const task = await createTaskDirect(workspace.id, project.id, owner.userId);
-
-  return { owner, workspace, project, task };
-}
-
 async function uploadRealAttachment(
   owner: { cookie: string },
   taskId: string,
@@ -137,11 +116,18 @@ describe("attachment deletion consistency (F-18)", () => {
     openSockets.forEach((socket) => socket.disconnect());
     openSockets.length = 0;
 
+    // Guarantees storage cleanup even when an assertion above throws mid-test
+    // - unlike each test's own upload/delete flow, this always runs.
+    await fs.rm(path.resolve(storageConfig.rootDirectory, "workspaces"), {
+      recursive: true,
+      force: true,
+    });
+
     await resetDatabase();
   });
 
   it("deletes the database row, the physical file, and records an ATTACHMENT_DELETED activity", async () => {
-    const { owner, workspace, task } = await setUpTaskWithOwner();
+    const { owner, workspace, task } = await setUpTaskWithOwner(app);
     const { attachmentId, storageKey } = await uploadRealAttachment(owner, task.id);
 
     const absolutePath = attachmentFilePath(storageKey);
@@ -179,7 +165,7 @@ describe("attachment deletion consistency (F-18)", () => {
    * not prevent the row from being deleted.
    */
   it("still deletes the database row when the physical file is already missing", async () => {
-    const { owner, workspace, task } = await setUpTaskWithOwner();
+    const { owner, workspace, task } = await setUpTaskWithOwner(app);
     const { attachmentId, storageKey } = await uploadRealAttachment(owner, task.id);
 
     const absolutePath = attachmentFilePath(storageKey);
@@ -214,7 +200,7 @@ describe("attachment deletion consistency (F-18)", () => {
    * transaction commits - the physical file must be untouched too.
    */
   it("rolls back the attachment deletion and never emits ATTACHMENT_DELETED when the transaction fails", async () => {
-    const { owner, workspace, task } = await setUpTaskWithOwner();
+    const { owner, workspace, task } = await setUpTaskWithOwner(app);
     const { attachmentId, storageKey } = await uploadRealAttachment(owner, task.id);
     const absolutePath = attachmentFilePath(storageKey);
 
@@ -237,7 +223,7 @@ describe("attachment deletion consistency (F-18)", () => {
         .delete(`/api/v1/attachments/${attachmentId}`)
         .set("Cookie", owner.cookie);
 
-      expect(res.status).toBeGreaterThanOrEqual(500);
+      expect(res.status).toBe(500);
       expect(res.body.success).toBe(false);
     });
 
@@ -268,9 +254,8 @@ describe("attachment deletion consistency (F-18)", () => {
     expect(persistedActivity).toBeNull();
 
     // Storage cleanup only runs after a successful commit, so a rolled-back
-    // transaction must never have attempted it.
+    // transaction must never have attempted it. (afterEach clears the
+    // storage directory, so no manual cleanup is needed here.)
     expect(await fileExists(absolutePath)).toBe(true);
-
-    await fs.unlink(absolutePath);
   });
 });

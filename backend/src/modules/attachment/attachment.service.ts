@@ -143,6 +143,16 @@ export async function uploadAttachment(
     throw new ForbiddenError("Guests cannot upload attachments.");
   }
 
+  const project = await prisma.project.findUnique({
+    where: {
+      id: task.projectId,
+    },
+  });
+
+  if (project?.status === "ARCHIVED") {
+    throw new ValidationError("Archived projects cannot be modified");
+  }
+
   validateAttachmentMimeType(file.mimetype);
 
   const { buffer, originalname, mimetype, size } = file;
@@ -299,6 +309,16 @@ export async function deleteAttachment(
 
   if (membership.role === WorkspaceRole.GUEST) {
     throw new ForbiddenError("Guests cannot delete attachments.");
+  }
+
+  const project = await prisma.project.findUnique({
+    where: {
+      id: attachment.task.projectId,
+    },
+  });
+
+  if (project?.status === "ARCHIVED") {
+    throw new ValidationError("Archived projects cannot be modified");
   }
 
   // PostgreSQL is authoritative here: the attachment row and its activity

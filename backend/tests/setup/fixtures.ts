@@ -1,3 +1,5 @@
+import fs from "node:fs/promises";
+
 import request from "supertest";
 import type { Express } from "express";
 
@@ -159,6 +161,21 @@ export async function createTaskDirect(
 }
 
 /**
+ * Composes signUpTestUser + createWorkspaceWithMember + createProjectDirect
+ * + createTaskDirect - the common setup shared by every attachment test
+ * (tests/attachment/*.test.ts): an authenticated owner, a workspace they
+ * belong to, a project, and a task inside it.
+ */
+export async function setUpTaskWithOwner(app: Express) {
+  const owner = await signUpTestUser(app);
+  const { workspace } = await createWorkspaceWithMember(owner.userId);
+  const project = await createProjectDirect(workspace.id, owner.userId);
+  const task = await createTaskDirect(workspace.id, project.id, owner.userId);
+
+  return { owner, workspace, project, task };
+}
+
+/**
  * Direct Prisma insert, same rationale as createProjectDirect. Sprint
  * names only need to be unique within a project (see the
  * @@unique([projectId, name]) constraint), so a random suffix avoids
@@ -290,4 +307,18 @@ export async function createAttachmentDirect(
       size: 128,
     },
   });
+}
+
+/**
+ * Generic filesystem existence check - shared by any test asserting on the
+ * local storage provider's physical files (see tests/attachment/*.test.ts),
+ * not tied to any single Prisma model the way the fixtures above are.
+ */
+export async function fileExists(absolutePath: string): Promise<boolean> {
+  try {
+    await fs.access(absolutePath);
+    return true;
+  } catch {
+    return false;
+  }
 }

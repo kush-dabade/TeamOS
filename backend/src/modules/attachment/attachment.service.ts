@@ -1,10 +1,11 @@
 import { prisma } from "../../lib/prisma.js";
 import type { Prisma } from "../../generated/prisma/client.js";
-import { storageService } from "../../storage/index.js";
+import { storageService, FileNotFoundError } from "../../storage/index.js";
 
 import {
   ActivityEntityType,
   ActivityType,
+  ProjectStatus,
   WorkspaceRole,
 } from "../../generated/prisma/enums.js";
 
@@ -91,6 +92,25 @@ async function findAttachmentById(attachmentId: string) {
   return attachment;
 }
 
+// Mirrors the archived-project mutation guard already duplicated in
+// task.service.ts, comments.service.ts, and sprint.service.ts - kept local
+// to this module rather than shared, since each of those call sites has its
+// own project-lookup shape.
+async function assertProjectNotArchived(projectId: string): Promise<void> {
+  const project = await prisma.project.findUnique({
+    where: {
+      id: projectId,
+    },
+    select: {
+      status: true,
+    },
+  });
+
+  if (project?.status === ProjectStatus.ARCHIVED) {
+    throw new ValidationError("Archived projects cannot be modified");
+  }
+}
+
 function validateAttachmentMimeType(mimeType: string): void {
   if (
     !ALLOWED_ATTACHMENT_MIME_TYPES.includes(
@@ -142,6 +162,8 @@ export async function uploadAttachment(
   if (membership.role === WorkspaceRole.GUEST) {
     throw new ForbiddenError("Guests cannot upload attachments.");
   }
+
+  await assertProjectNotArchived(task.projectId);
 
   validateAttachmentMimeType(file.mimetype);
 
@@ -301,31 +323,45 @@ export async function deleteAttachment(
     throw new ForbiddenError("Guests cannot delete attachments.");
   }
 
-  await storageService.delete(attachment.storageKey);
+  await assertProjectNotArchived(attachment.task.projectId);
 
-  await prisma.attachment.delete({
-    where: {
-      id: attachment.id,
-    },
+  // PostgreSQL is authoritative here: the attachment row and its activity
+  // record are deleted/created atomically first. Realtime emission and
+  // storage cleanup only happen after that transaction has committed, so a
+  // storage failure (including the file already being gone) can never
+  // block or roll back the database deletion.
+  let emitActivityCreated: () => void = () => {};
+
+  await prisma.$transaction(async (tx) => {
+    await tx.attachment.delete({
+      where: {
+        id: attachment.id,
+      },
+    });
+
+    emitActivityCreated = await createActivity(
+      {
+        workspaceId: attachment.task.workspaceId,
+        actorId,
+
+        type: ActivityType.ATTACHMENT_DELETED,
+
+        entityType: ActivityEntityType.ATTACHMENT,
+        entityId: attachment.id,
+
+        taskId: attachment.task.id,
+        projectId: attachment.task.projectId,
+
+        metadata: {
+          attachmentName: attachment.originalName,
+          taskTitle: attachment.task.title,
+        },
+      },
+      tx,
+    );
   });
 
-  await createActivity({
-    workspaceId: attachment.task.workspaceId,
-    actorId,
-
-    type: ActivityType.ATTACHMENT_DELETED,
-
-    entityType: ActivityEntityType.ATTACHMENT,
-    entityId: attachment.id,
-
-    taskId: attachment.task.id,
-    projectId: attachment.task.projectId,
-
-    metadata: {
-      attachmentName: attachment.originalName,
-      taskTitle: attachment.task.title,
-    },
-  });
+  emitActivityCreated();
 
   emitToWorkspace(
     attachment.task.workspaceId,
@@ -338,4 +374,18 @@ export async function deleteAttachment(
       },
     },
   );
+
+  try {
+    await storageService.delete(attachment.storageKey);
+  } catch (error) {
+    if (!(error instanceof FileNotFoundError)) {
+      console.error(
+        `Failed to delete attachment file (attachmentId: ${attachment.id}, storageKey: ${attachment.storageKey}):`,
+        error,
+      );
+    }
+    // Best-effort cleanup; the database record is already gone. A missing
+    // physical file (FileNotFoundError) is not logged as a failure - it
+    // means there is nothing left to clean up.
+  }
 }

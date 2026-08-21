@@ -5,7 +5,6 @@ import { APIError as BetterAuthAPIError } from "better-auth";
 
 import { Prisma } from "../generated/prisma/client.js";
 
-import { logger } from "../lib/logger.js";
 import { ValidationError } from "../shared/errors/validation-error.js";
 import { NotFoundError } from "../shared/errors/not-found-error.js";
 import { ForbiddenError } from "../shared/errors/forbidden-error.js";
@@ -46,7 +45,7 @@ function multerErrorMessage(error: multer.MulterError): string {
 
 export function errorHandler(
   error: unknown,
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ) {
@@ -88,7 +87,7 @@ export function errorHandler(
   // client exposure — no need to re-classify by message content.
   if (error instanceof BetterAuthAPIError) {
     if (error.statusCode >= 500) {
-      logger.error({ err: error }, "Better Auth internal error");
+      req.log.error({ err: error }, "Better Auth internal error");
     }
 
     return sendError(
@@ -121,7 +120,7 @@ export function errorHandler(
       return sendError(res, 404, "NOT_FOUND", "Resource not found");
     }
 
-    logger.error({ err: error }, "Unhandled Prisma error");
+    req.log.error({ err: error }, "Unhandled Prisma error");
 
     return sendError(
       res,
@@ -132,7 +131,7 @@ export function errorHandler(
   }
 
   if (error instanceof StorageError) {
-    logger.error({ err: error }, "Storage error");
+    req.log.error({ err: error }, "Storage error");
 
     return sendError(
       res,
@@ -142,7 +141,7 @@ export function errorHandler(
     );
   }
 
-  logger.error({ err: error }, "Unhandled error");
+  req.log.error({ err: error }, "Unhandled error");
 
   return sendError(res, 500, "INTERNAL_ERROR", "An internal error occurred");
 }

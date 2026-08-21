@@ -6,7 +6,7 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 
 import { prisma } from "./prisma.js";
 import { incrementRateLimitCounter, rateLimitRedis } from "./redis.js";
-import { trustedOrigins } from "../config/security.config.js";
+import { isProduction, trustedOrigins } from "../config/security.config.js";
 import {
   enqueuePasswordResetEmail,
   enqueueVerificationEmail,
@@ -115,12 +115,48 @@ function signInAccountRateLimitKey(normalizedEmail: string): string {
   return `rl:auth:signin:account:${digest}`;
 }
 
+// P2-COOKIE: previously left implicit (Better Auth's own defaults). Values
+// below are unchanged from what those defaults already were - this is a
+// deliberate-vs-implicit change, not a behavior change. Verified against the
+// installed better-auth (dist/context/create-context.mjs): `expiresIn`
+// defaults to 3600 * 24 * 7 and `updateAge` to 1440 * 60 whenever
+// `session.expiresIn`/`session.updateAge` are left unset.
+const SESSION_EXPIRES_IN_SECONDS = 60 * 60 * 24 * 7;
+const SESSION_UPDATE_AGE_SECONDS = 60 * 60 * 24;
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
 
   trustedOrigins,
+
+  session: {
+    // How long a session is valid for before it requires a fresh sign-in,
+    // and how old a session must be before a request against it pushes its
+    // expiry back out (a rolling window, not a fixed one) - both already
+    // Better Auth's own defaults, now recorded here as an explicit,
+    // reviewed decision rather than an implicit library default.
+    expiresIn: SESSION_EXPIRES_IN_SECONDS,
+    updateAge: SESSION_UPDATE_AGE_SECONDS,
+  },
+
+  advanced: {
+    // Without this, Better Auth infers the cookie's Secure attribute from
+    // whether BETTER_AUTH_URL happens to start with "https://" (see the
+    // installed better-auth's dist/cookies/index.mjs) - NOT from NODE_ENV.
+    // That means a production deploy with a misconfigured BETTER_AUTH_URL
+    // (e.g. left as an http:// value) would silently ship a session cookie
+    // without the Secure attribute despite NODE_ENV=production, with no
+    // warning. Tying this directly to isProduction instead - the same
+    // signal middleware/security-headers.ts already gates HSTS on - removes
+    // that footgun. This is the one deliberate behavior change in this
+    // commit: identical in every environment this app currently runs in
+    // (dev/test/CI all resolve isProduction to false either way), but no
+    // longer silently dependent on BETTER_AUTH_URL's exact string value in
+    // production.
+    useSecureCookies: isProduction,
+  },
 
   emailAndPassword: {
     enabled: true,

@@ -1,6 +1,6 @@
 import { prisma } from "../../lib/prisma.js";
 import type { Prisma } from "../../generated/prisma/client.js";
-import { storageService } from "../../storage/index.js";
+import { storageService, FileNotFoundError } from "../../storage/index.js";
 
 import {
   ActivityEntityType,
@@ -301,31 +301,43 @@ export async function deleteAttachment(
     throw new ForbiddenError("Guests cannot delete attachments.");
   }
 
-  await storageService.delete(attachment.storageKey);
+  // PostgreSQL is authoritative here: the attachment row and its activity
+  // record are deleted/created atomically first. Realtime emission and
+  // storage cleanup only happen after that transaction has committed, so a
+  // storage failure (including the file already being gone) can never
+  // block or roll back the database deletion.
+  let emitActivityCreated: () => void = () => {};
 
-  await prisma.attachment.delete({
-    where: {
-      id: attachment.id,
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.attachment.delete({
+      where: {
+        id: attachment.id,
+      },
+    });
+
+    emitActivityCreated = await createActivity(
+      {
+        workspaceId: attachment.task.workspaceId,
+        actorId,
+
+        type: ActivityType.ATTACHMENT_DELETED,
+
+        entityType: ActivityEntityType.ATTACHMENT,
+        entityId: attachment.id,
+
+        taskId: attachment.task.id,
+        projectId: attachment.task.projectId,
+
+        metadata: {
+          attachmentName: attachment.originalName,
+          taskTitle: attachment.task.title,
+        },
+      },
+      tx,
+    );
   });
 
-  await createActivity({
-    workspaceId: attachment.task.workspaceId,
-    actorId,
-
-    type: ActivityType.ATTACHMENT_DELETED,
-
-    entityType: ActivityEntityType.ATTACHMENT,
-    entityId: attachment.id,
-
-    taskId: attachment.task.id,
-    projectId: attachment.task.projectId,
-
-    metadata: {
-      attachmentName: attachment.originalName,
-      taskTitle: attachment.task.title,
-    },
-  });
+  emitActivityCreated();
 
   emitToWorkspace(
     attachment.task.workspaceId,
@@ -338,4 +350,18 @@ export async function deleteAttachment(
       },
     },
   );
+
+  try {
+    await storageService.delete(attachment.storageKey);
+  } catch (error) {
+    if (!(error instanceof FileNotFoundError)) {
+      console.error(
+        `Failed to delete attachment file (attachmentId: ${attachment.id}, storageKey: ${attachment.storageKey}):`,
+        error,
+      );
+    }
+    // Best-effort cleanup; the database record is already gone. A missing
+    // physical file (FileNotFoundError) is not logged as a failure - it
+    // means there is nothing left to clean up.
+  }
 }

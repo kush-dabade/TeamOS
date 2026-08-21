@@ -20,7 +20,7 @@
 --
 -- Confirmed before authoring this migration that no existing Sprint data
 -- violates the constraint (no projectId has more than one ACTIVE row, in
--- either the local dev or test database) - see the PR A commit 2 report.
+-- either the local dev or test database).
 --
 -- Operational recovery, if this specific CREATE UNIQUE INDEX CONCURRENTLY
 -- fails partway through (e.g. the migration is interrupted, or a

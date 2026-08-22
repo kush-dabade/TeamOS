@@ -18,6 +18,18 @@ export interface AttachmentResponse {
   createdAt: Date;
 }
 
+export interface ListTaskAttachmentsOptions {
+  taskId: string;
+
+  page: number;
+  limit: number;
+}
+
+export interface ListTaskAttachmentsResult {
+  attachments: AttachmentResponse[];
+  total: number;
+}
+
 export interface DownloadAttachmentResponse {
   stream: NodeJS.ReadableStream;
 

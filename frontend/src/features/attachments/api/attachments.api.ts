@@ -2,12 +2,47 @@ import { apiClient, type ApiSuccess } from "@/lib/api";
 
 import type { Attachment } from "../types";
 
-export async function fetchTaskAttachments(taskId: string): Promise<Attachment[]> {
-  const response = await apiClient.get<ApiSuccess<{ attachments: Attachment[] }>>(
-    `/tasks/${taskId}/attachments`,
-  );
+export interface AttachmentPagination {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
 
-  return response.data.data.attachments;
+// The attachment list endpoint's envelope nests results under
+// `data.attachments` with a sibling `pagination` block, matching the
+// Tasks/Comments list endpoints' own local response shape - not a shared
+// generic type, since none of those endpoints use one either.
+interface AttachmentListResponse {
+  success: true;
+  data: {
+    attachments: Attachment[];
+  };
+  pagination: AttachmentPagination;
+}
+
+export interface ListTaskAttachmentsParams {
+  page?: number;
+  limit?: number;
+}
+
+export interface ListTaskAttachmentsResult {
+  attachments: Attachment[];
+  pagination: AttachmentPagination;
+}
+
+export async function fetchTaskAttachments(
+  taskId: string,
+  params: ListTaskAttachmentsParams = {},
+): Promise<ListTaskAttachmentsResult> {
+  const response = await apiClient.get<AttachmentListResponse>(`/tasks/${taskId}/attachments`, {
+    params,
+  });
+
+  return {
+    attachments: response.data.data.attachments,
+    pagination: response.data.pagination,
+  };
 }
 
 export async function uploadAttachment(taskId: string, file: File): Promise<Attachment> {

@@ -296,12 +296,20 @@ export async function createCommentDirect(
  * positive control asserting a successful download streams real file
  * content - that would need a file actually written through the local
  * storage provider.
+ *
+ * `createdAt` is optional and appended last, same backward-compatible
+ * pattern as createCommentDirect - every existing caller predates
+ * attachment pagination and has no reason to control it, so it's only
+ * included in `data` (overriding the column's own @default(now())) when a
+ * caller explicitly needs a deterministic timestamp, e.g. to prove
+ * pagination ordering under tied createdAt values.
  */
 export async function createAttachmentDirect(
   workspaceId: string,
   taskId: string,
   uploadedById: string,
   originalName = "test-file.txt",
+  createdAt?: Date,
 ) {
   return prisma.attachment.create({
     data: {
@@ -313,6 +321,7 @@ export async function createAttachmentDirect(
       storageFileName: crypto.randomUUID(),
       mimeType: "text/plain",
       size: 128,
+      ...(createdAt !== undefined && { createdAt }),
     },
   });
 }

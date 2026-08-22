@@ -20,6 +20,8 @@ import { ALLOWED_ATTACHMENT_MIME_TYPES } from "./attachment.config.js";
 import type {
   AttachmentResponse,
   DownloadAttachmentResponse,
+  ListTaskAttachmentsOptions,
+  ListTaskAttachmentsResult,
 } from "./attachment.types.js";
 
 import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
@@ -264,31 +266,47 @@ export async function uploadAttachment(
 
 export async function listTaskAttachments(
   actorId: string,
-  taskId: string,
-): Promise<AttachmentResponse[]> {
-  const task = await findTaskById(taskId);
+  options: ListTaskAttachmentsOptions,
+): Promise<ListTaskAttachmentsResult> {
+  const task = await findTaskById(options.taskId);
 
   await requireWorkspaceMembership(task.workspaceId, actorId);
 
-  const attachments = await prisma.attachment.findMany({
-    where: {
-      taskId: task.id,
-    },
-    include: {
-      uploadedBy: {
-        select: {
-          id: true,
-          name: true,
-          image: true,
+  const where = {
+    taskId: task.id,
+  };
+
+  const skip = (options.page - 1) * options.limit;
+
+  const [total, attachments] = await Promise.all([
+    prisma.attachment.count({
+      where,
+    }),
+
+    prisma.attachment.findMany({
+      where,
+
+      include: {
+        uploadedBy: {
+          select: {
+            id: true,
+            name: true,
+            image: true,
+          },
         },
       },
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
 
-  return attachments.map(toAttachmentResponse);
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+
+      skip,
+      take: options.limit,
+    }),
+  ]);
+
+  return {
+    attachments: attachments.map(toAttachmentResponse),
+    total,
+  };
 }
 
 export async function downloadAttachment(

@@ -8,6 +8,8 @@ import {
   deleteAttachment,
 } from "./attachment.service.js";
 
+import { listAttachmentsQuerySchema } from "./attachment.schema.js";
+
 import { logger } from "../../lib/logger.js";
 import { ValidationError } from "../../shared/errors/validation-error.js";
 import { buildAttachmentContentDisposition } from "../../shared/http/content-disposition.js";
@@ -34,15 +36,25 @@ export async function uploadAttachmentHandler(req: Request, res: Response) {
 }
 
 export async function listTaskAttachmentsHandler(req: Request, res: Response) {
-  const attachments = await listTaskAttachments(
-    req.user!.id,
-    req.params.taskId as string,
-  );
+  const query = listAttachmentsQuerySchema.parse(req.query);
+
+  const result = await listTaskAttachments(req.user!.id, {
+    taskId: req.params.taskId as string,
+
+    page: query.page,
+    limit: query.limit,
+  });
 
   return res.status(200).json({
     success: true,
     data: {
-      attachments,
+      attachments: result.attachments,
+    },
+    pagination: {
+      page: query.page,
+      limit: query.limit,
+      total: result.total,
+      pages: Math.ceil(result.total / query.limit),
     },
   });
 }

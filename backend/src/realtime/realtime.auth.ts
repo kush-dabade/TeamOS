@@ -21,6 +21,7 @@ export async function authenticateSocket(
     (socket as AuthenticatedSocket).data.user = {
       id: session.user.id,
       sessionId: session.session.id,
+      sessionExpiresAt: session.session.expiresAt,
     };
 
     next();

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import request from "supertest";
 
 import app from "../../src/app.js";
 import { logger } from "../../src/lib/logger.js";
@@ -79,6 +80,50 @@ describe("workspace membership mutations tolerate a fully unavailable realtime l
 
       expect(errorSpy).toHaveBeenCalledWith(
         expect.objectContaining({ err: expect.anything() }),
+        expect.stringContaining("SECURITY"),
+      );
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+});
+
+/**
+ * Same fault injection as above (no startTestServer()/initializeRealtime()
+ * in this file, so getIO() throws exactly as it would if the realtime layer
+ * were genuinely down), applied to session revocation's own best-effort
+ * contract instead of workspace membership's: lib/auth.ts's
+ * databaseHooks.session.delete.after must not let a failing
+ * evictUserSession() call break sign-out itself.
+ */
+describe("session revocation tolerates a fully unavailable realtime layer", () => {
+  afterEach(async () => {
+    await resetDatabase();
+  });
+
+  it("sign-out still deletes the session and reports success when getIO() throws", async () => {
+    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => undefined);
+
+    try {
+      const user = await signUpTestUser(app);
+
+      const signOutResponse = await request(app)
+        .post("/api/auth/sign-out")
+        .set("Cookie", user.cookie)
+        .expect(200);
+
+      expect(signOutResponse.body).toEqual({ success: true });
+
+      const remainingSessions = await prisma.session.findMany({
+        where: { userId: user.userId },
+      });
+      expect(remainingSessions).toHaveLength(0);
+
+      // Confirms the failure was surfaced loudly rather than swallowed
+      // silently - see the databaseHooks.session.delete.after hook's own
+      // "SECURITY:"-prefixed log message in lib/auth.ts.
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ err: expect.anything(), userId: user.userId }),
         expect.stringContaining("SECURITY"),
       );
     } finally {

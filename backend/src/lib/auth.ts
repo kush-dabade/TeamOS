@@ -242,6 +242,55 @@ export const auth = betterAuth({
     },
   },
 
+  // F-07: fires after Better Auth deletes a session row - verified against
+  // the installed better-auth (db/with-hooks.mjs's deleteWithHooks): every
+  // explicit revocation path (POST /sign-out, /revoke-session,
+  // /revoke-sessions & revokeOtherSessions, and revokeSessionsOnPasswordReset
+  // above) funnels through internalAdapter.deleteSession -> deleteWithHooks,
+  // which fetches the full row before deleting it and calls this hook with
+  // that row - so session.userId/session.id are always populated here,
+  // covering every one of those paths from this single hook rather than
+  // matching on ctx.path the way the sign-in rate limiter below has to.
+  //
+  // realtime.eviction.js is imported dynamically, not statically, to avoid a
+  // real circular import: realtime.auth.ts already imports `auth` from this
+  // file, and realtime.eviction.ts transitively imports realtime.server.ts
+  // -> realtime.auth.ts. A static import here would close that cycle
+  // (lib/auth.ts -> realtime.eviction.ts -> realtime.server.ts ->
+  // realtime.auth.ts -> lib/auth.ts); deferring resolution until the hook
+  // actually runs (well after both modules have finished initializing)
+  // avoids relying on that cycle happening to be safe.
+  databaseHooks: {
+    session: {
+      delete: {
+        after: async (session) => {
+          // Must never throw: this hook runs via
+          // @better-auth/core's queueAfterTransactionHook, whose pending
+          // hooks are awaited outside the try/catch that guards the
+          // triggering call's own errors (verified against the installed
+          // @better-auth/core's context/transaction.mjs) - an uncaught
+          // rejection here would propagate out of deleteSession() and fail
+          // the sign-out/revoke-session/revoke-sessions/password-reset
+          // request itself, not just this best-effort cleanup. Mirrors the
+          // same try/catch + "SECURITY:"-prefixed logger.error convention
+          // workspace.service.ts already uses around evictFromWorkspace.
+          try {
+            const { evictUserSession } = await import("../realtime/realtime.eviction.js");
+
+            await evictUserSession(session.userId, session.id);
+          } catch (error) {
+            logger.error(
+              { err: error, userId: session.userId, sessionId: session.id },
+              "SECURITY: failed to evict revoked session's sockets - they may " +
+                "continue receiving realtime events until their socket disconnects " +
+                "or reconnects on its own",
+            );
+          }
+        },
+      },
+    },
+  },
+
   hooks: {
     // Better Auth builds the verification link from the request's own
     // callbackURL, defaulting to this API server's own root ("/") when

@@ -88,3 +88,41 @@ export async function evictFromWorkspace(
     socket.emit(REALTIME_EVENTS.WORKSPACE_ACCESS_REVOKED, { workspaceId });
   }
 }
+
+/**
+ * Called from lib/auth.ts's databaseHooks.session.delete.after, which fires
+ * for every explicit Better Auth revocation path (sign-out, revoke-session,
+ * revoke-sessions/revokeOtherSessions, revokeSessionsOnPasswordReset) since
+ * they all funnel through internalAdapter.deleteSession -> deleteWithHooks.
+ *
+ * Deliberately session-scoped, not user-scoped: a user can hold multiple
+ * concurrent sessions (e.g. laptop + phone), each authenticating its own
+ * socket via socket.data.user.sessionId (set in realtime.auth.ts). Revoking
+ * one session must not disconnect another still-valid session's socket for
+ * the same user - fetchUserSocketsWithRetry only narrows to this user's
+ * sockets, so the sessionId filter below is what actually enforces the
+ * per-session boundary, not the room lookup itself.
+ *
+ * Unlike evictFromWorkspace, this disconnects the socket outright rather
+ * than leaving a single room: a revoked session must lose every realtime
+ * event it could otherwise still receive, not just one workspace's.
+ * disconnect(true) closes the underlying connection (not just this
+ * namespace), so the client can't keep using it and must re-handshake -
+ * which re-runs authenticateSocket() and is rejected for good, since the
+ * session row is already gone.
+ */
+export async function evictUserSession(
+  userId: string,
+  sessionId: string,
+): Promise<void> {
+  const sockets = await fetchUserSocketsWithRetry(userId);
+
+  for (const socket of sockets) {
+    if (socket.data.user.sessionId !== sessionId) {
+      continue;
+    }
+
+    socket.emit(REALTIME_EVENTS.SESSION_REVOKED, { sessionId });
+    socket.disconnect(true);
+  }
+}

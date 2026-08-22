@@ -44,6 +44,8 @@ export const REALTIME_EVENTS = {
   OWNERSHIP_TRANSFERRED: "workspace.ownership_transferred",
 
   WORKSPACE_ACCESS_REVOKED: "workspace.access_revoked",
+
+  SESSION_REVOKED: "session.revoked",
 } as const;
 
 export type RealtimeEvent =

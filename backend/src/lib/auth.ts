@@ -242,6 +242,94 @@ export const auth = betterAuth({
     },
   },
 
+  // F-07: fires after Better Auth deletes a session row - verified against
+  // the installed better-auth (db/with-hooks.mjs's deleteWithHooks): every
+  // explicit revocation path (POST /sign-out, /revoke-session,
+  // /revoke-sessions & revokeOtherSessions, and revokeSessionsOnPasswordReset
+  // above) funnels through internalAdapter.deleteSession -> deleteWithHooks,
+  // which fetches the full row before deleting it and calls this hook with
+  // that row - so session.userId/session.id are always populated here,
+  // covering every one of those paths from this single hook rather than
+  // matching on ctx.path the way the sign-in rate limiter below has to.
+  //
+  // realtime.eviction.js is imported dynamically, not statically, to avoid a
+  // real circular import: realtime.auth.ts already imports `auth` from this
+  // file, and realtime.eviction.ts transitively imports realtime.server.ts
+  // -> realtime.auth.ts. A static import here would close that cycle
+  // (lib/auth.ts -> realtime.eviction.ts -> realtime.server.ts ->
+  // realtime.auth.ts -> lib/auth.ts); deferring resolution until the hook
+  // actually runs (well after both modules have finished initializing)
+  // avoids relying on that cycle happening to be safe.
+  databaseHooks: {
+    session: {
+      delete: {
+        after: async (session) => {
+          // Must never throw: this hook runs via
+          // @better-auth/core's queueAfterTransactionHook, whose pending
+          // hooks are awaited outside the try/catch that guards the
+          // triggering call's own errors (verified against the installed
+          // @better-auth/core's context/transaction.mjs) - an uncaught
+          // rejection here would propagate out of deleteSession() and fail
+          // the sign-out/revoke-session/revoke-sessions/password-reset
+          // request itself, not just this best-effort cleanup. Mirrors the
+          // same try/catch + "SECURITY:"-prefixed logger.error convention
+          // workspace.service.ts already uses around evictFromWorkspace.
+          try {
+            const { evictUserSession } = await import("../realtime/realtime.eviction.js");
+
+            await evictUserSession(session.userId, session.id);
+          } catch (error) {
+            logger.error(
+              { err: error, userId: session.userId, sessionId: session.id },
+              "SECURITY: failed to evict revoked session's sockets - they may " +
+                "continue receiving realtime events until their socket disconnects " +
+                "or reconnects on its own",
+            );
+          }
+        },
+      },
+
+      // Rolling-session resync: fires whenever internalAdapter.updateSession() runs - on this
+      // app's configuration (session.updateAge below), that's Better Auth's
+      // own rolling-session refresh: any authenticated request (HTTP or a
+      // socket reconnect) against a session older than updateAge pushes its
+      // persisted expiresAt out to a fresh `expiresIn` window (verified
+      // against the installed better-auth's api/routes/session.mjs). A
+      // realtime socket's own expiry timer (realtime.server.ts's
+      // scheduleSessionExpiry) is set once, from the expiresAt captured at
+      // handshake time - without this hook, that timer would stay pinned to
+      // the ORIGINAL deadline and disconnect a session that Better Auth
+      // itself considers still valid.
+      //
+      // Same dynamic-import (breaks the lib/auth.ts -> realtime.eviction.ts
+      // -> realtime.server.ts -> realtime.auth.ts -> lib/auth.ts cycle) and
+      // best-effort try/catch shape as the delete hook above, for the same
+      // reason: this must never fail the authenticated request that
+      // triggered the refresh. Logged as a plain warning, not
+      // "SECURITY:" - unlike the delete hook's failure mode (a socket stays
+      // connected when it should be evicted), a failure here only makes a
+      // socket disconnect too early at its stale deadline, which is an
+      // availability regression, not an unauthorized-access one.
+      update: {
+        after: async (session) => {
+          try {
+            const { rescheduleUserSessionExpiry } = await import(
+              "../realtime/realtime.eviction.js"
+            );
+
+            await rescheduleUserSessionExpiry(session.userId, session.id, session.expiresAt);
+          } catch (error) {
+            logger.warn(
+              { err: error, userId: session.userId, sessionId: session.id },
+              "Failed to reschedule refreshed session's socket expiry - its socket " +
+                "may disconnect early at the previous (stale) deadline",
+            );
+          }
+        },
+      },
+    },
+  },
+
   hooks: {
     // Better Auth builds the verification link from the request's own
     // callbackURL, defaulting to this API server's own root ("/") when

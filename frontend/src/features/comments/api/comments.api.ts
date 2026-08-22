@@ -22,6 +22,35 @@ export interface UpdateCommentInput {
   content: string;
 }
 
+export interface CommentPagination {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
+
+// The comment list endpoint's envelope nests results under `data.comments`
+// with a sibling `pagination` block, matching the Tasks/Activity list
+// endpoints' own local response shape - not a shared generic type, since
+// none of those endpoints use one either.
+interface CommentListResponse {
+  success: true;
+  data: {
+    comments: BackendComment[];
+  };
+  pagination: CommentPagination;
+}
+
+export interface ListTaskCommentsParams {
+  page?: number;
+  limit?: number;
+}
+
+export interface ListTaskCommentsResult {
+  comments: Comment[];
+  pagination: CommentPagination;
+}
+
 function toComment(comment: BackendComment): Comment {
   return {
     id: comment.id,
@@ -32,12 +61,18 @@ function toComment(comment: BackendComment): Comment {
   };
 }
 
-export async function fetchTaskComments(taskId: string): Promise<Comment[]> {
-  const response = await apiClient.get<ApiSuccess<{ comments: BackendComment[] }>>(
-    `/tasks/${taskId}/comments`,
-  );
+export async function fetchTaskComments(
+  taskId: string,
+  params: ListTaskCommentsParams = {},
+): Promise<ListTaskCommentsResult> {
+  const response = await apiClient.get<CommentListResponse>(`/tasks/${taskId}/comments`, {
+    params,
+  });
 
-  return response.data.data.comments.map(toComment);
+  return {
+    comments: response.data.data.comments.map(toComment),
+    pagination: response.data.pagination,
+  };
 }
 
 export async function createComment(

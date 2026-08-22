@@ -1,6 +1,7 @@
 import { REALTIME_EVENTS } from "./realtime.constants.js";
 import { getUserRoom, getWorkspaceRoom } from "./realtime.rooms.js";
-import { getIO } from "./realtime.server.js";
+import { getIO, rescheduleSessionExpiry } from "./realtime.server.js";
+import type { AuthenticatedSocket } from "./realtime.types.js";
 
 const FETCH_SOCKETS_RETRY_ATTEMPTS = 3;
 const FETCH_SOCKETS_RETRY_DELAY_MS = 100;
@@ -86,5 +87,87 @@ export async function evictFromWorkspace(
     // room state and could race with (or simply never reach) it. A direct
     // emit on the socket itself doesn't depend on room membership at all.
     socket.emit(REALTIME_EVENTS.WORKSPACE_ACCESS_REVOKED, { workspaceId });
+  }
+}
+
+/**
+ * Called from lib/auth.ts's databaseHooks.session.delete.after, which fires
+ * for every explicit Better Auth revocation path (sign-out, revoke-session,
+ * revoke-sessions/revokeOtherSessions, revokeSessionsOnPasswordReset) since
+ * they all funnel through internalAdapter.deleteSession -> deleteWithHooks.
+ *
+ * Deliberately session-scoped, not user-scoped: a user can hold multiple
+ * concurrent sessions (e.g. laptop + phone), each authenticating its own
+ * socket via socket.data.user.sessionId (set in realtime.auth.ts). Revoking
+ * one session must not disconnect another still-valid session's socket for
+ * the same user - fetchUserSocketsWithRetry only narrows to this user's
+ * sockets, so the sessionId filter below is what actually enforces the
+ * per-session boundary, not the room lookup itself.
+ *
+ * Unlike evictFromWorkspace, this disconnects the socket outright rather
+ * than leaving a single room: a revoked session must lose every realtime
+ * event it could otherwise still receive, not just one workspace's.
+ * disconnect(true) closes the underlying connection (not just this
+ * namespace), so the client can't keep using it and must re-handshake -
+ * which re-runs authenticateSocket() and is rejected for good, since the
+ * session row is already gone.
+ */
+export async function evictUserSession(
+  userId: string,
+  sessionId: string,
+): Promise<void> {
+  const sockets = await fetchUserSocketsWithRetry(userId);
+
+  for (const socket of sockets) {
+    if (socket.data.user.sessionId !== sessionId) {
+      continue;
+    }
+
+    socket.emit(REALTIME_EVENTS.SESSION_REVOKED, { sessionId });
+    socket.disconnect(true);
+  }
+}
+
+/**
+ * Called from lib/auth.ts's databaseHooks.session.update.after, which fires
+ * whenever Better Auth's internalAdapter.updateSession() runs - in
+ * practice, on this app's own configuration, that's exactly its rolling-
+ * session refresh (session.updateAge, checked on every getSession() call
+ * whose session is old enough - see api/routes/session.mjs in the installed
+ * better-auth). Without this, a socket's own scheduleSessionExpiry timer
+ * (realtime.server.ts) stays pinned to the expiresAt captured at handshake
+ * time forever, so a session a user legitimately kept alive through normal
+ * HTTP activity would still get disconnected at that original, now-stale
+ * deadline.
+ *
+ * Mirrors evictUserSession's own userId -> user-room lookup + exact-
+ * sessionId filter exactly, for the same reason: a user can hold multiple
+ * concurrent sessions, and refreshing one must never touch a socket
+ * authenticated with a different one.
+ *
+ * Deliberately does not check socket.connected before rescheduling: on the
+ * in-memory adapter fetchSockets() only ever returns sockets that are
+ * genuinely still joined to the room being queried, and a disconnected
+ * socket is removed from all rooms as part of disconnecting - so a result
+ * from fetchUserSocketsWithRetry is already known-live by construction. If
+ * one somehow raced its own disconnect, rescheduleSessionExpiry's
+ * clearTimeout/setTimeout pair is inert either way (Node clearTimeout on an
+ * unset handle is a no-op, and a stray timer later calling
+ * revokeSocketSession on an already-gone socket is exactly the case the
+ * passive-expiry test suite already proves is harmless).
+ */
+export async function rescheduleUserSessionExpiry(
+  userId: string,
+  sessionId: string,
+  expiresAt: Date,
+): Promise<void> {
+  const sockets = await fetchUserSocketsWithRetry(userId);
+
+  for (const socket of sockets) {
+    if (socket.data.user.sessionId !== sessionId) {
+      continue;
+    }
+
+    rescheduleSessionExpiry(socket as unknown as AuthenticatedSocket, expiresAt);
   }
 }

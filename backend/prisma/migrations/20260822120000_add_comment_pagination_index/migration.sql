@@ -1,0 +1,16 @@
+-- CreateIndex
+-- Supports comments.service.ts's listComments pagination: filters by taskId
+-- and orders by (createdAt, id) for deterministic page boundaries (the id
+-- tiebreak matters whenever two comments share a createdAt, which plain
+-- createdAt ordering alone can't distinguish). Same rationale as the Task
+-- pagination indexes added in 20260817163939_add_task_pagination_index and
+-- 20260819111131_add_workspace_task_pagination_index - this index's column
+-- order matches the query's own where(taskId) + orderBy(createdAt, id)
+-- shape exactly, so Postgres can satisfy both without a separate sort step.
+-- Uses CONCURRENTLY so this build doesn't hold the ACCESS EXCLUSIVE-adjacent
+-- lock a plain CREATE INDEX takes against concurrent writes to Comment.
+-- This is the migration's only statement, so Prisma Migrate applies it
+-- outside a transaction (it only wraps multi-statement migration files) -
+-- required, since CONCURRENTLY is rejected by Postgres inside a transaction
+-- block.
+CREATE INDEX CONCURRENTLY "Comment_taskId_createdAt_id_idx" ON "Comment"("taskId", "createdAt", "id");

@@ -1,6 +1,10 @@
 import type { Request, Response } from "express";
 
-import { createCommentSchema, updateCommentSchema } from "./comments.validation.js";
+import {
+  createCommentSchema,
+  listCommentsQuerySchema,
+  updateCommentSchema,
+} from "./comments.validation.js";
 
 import {
   createComment,
@@ -26,14 +30,25 @@ export async function createCommentHandler(req: Request, res: Response) {
 }
 
 export async function listCommentsHandler(req: Request, res: Response) {
-  const comments = await listComments(req.user!.id, {
+  const query = listCommentsQuerySchema.parse(req.query);
+
+  const result = await listComments(req.user!.id, {
     taskId: req.params.taskId as string,
+
+    page: query.page,
+    limit: query.limit,
   });
 
   return res.status(200).json({
     success: true,
     data: {
-      comments,
+      comments: result.comments,
+    },
+    pagination: {
+      page: query.page,
+      limit: query.limit,
+      total: result.total,
+      pages: Math.ceil(result.total / query.limit),
     },
   });
 }

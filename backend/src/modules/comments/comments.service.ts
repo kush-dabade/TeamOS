@@ -6,6 +6,7 @@ import type {
   CreateCommentData,
   DeleteCommentOptions,
   ListCommentsOptions,
+  ListCommentsResult,
   UpdateCommentData,
 } from "./comments.types.js";
 
@@ -160,7 +161,7 @@ export async function createComment(
 export async function listComments(
   actorId: string,
   options: ListCommentsOptions,
-): Promise<CommentResponse[]> {
+): Promise<ListCommentsResult> {
   const task = await prisma.task.findFirst({
     where: {
       id: options.taskId,
@@ -174,27 +175,43 @@ export async function listComments(
 
   await requireWorkspaceMembership(task.workspaceId, actorId);
 
-  const comments = await prisma.comment.findMany({
-    where: {
-      workspaceId: task.workspaceId,
-      taskId: options.taskId,
-      deletedAt: null,
-    },
-    include: {
-      author: {
-        select: {
-          id: true,
-          name: true,
-          image: true,
+  const where = {
+    workspaceId: task.workspaceId,
+    taskId: options.taskId,
+    deletedAt: null,
+  };
+
+  const skip = (options.page - 1) * options.limit;
+
+  const [total, comments] = await Promise.all([
+    prisma.comment.count({
+      where,
+    }),
+
+    prisma.comment.findMany({
+      where,
+
+      include: {
+        author: {
+          select: {
+            id: true,
+            name: true,
+            image: true,
+          },
         },
       },
-    },
-    orderBy: {
-      createdAt: "asc",
-    },
-  });
 
-  return comments.map(toCommentResponse);
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+
+      skip,
+      take: options.limit,
+    }),
+  ]);
+
+  return {
+    comments: comments.map(toCommentResponse),
+    total,
+  };
 }
 
 export async function updateComment(

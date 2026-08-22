@@ -346,6 +346,7 @@ model Comment {
   @@index([taskId])
   @@index([authorId])
   @@index([deletedAt])
+  @@index([taskId, createdAt, id])
 }
 
 model Attachment {

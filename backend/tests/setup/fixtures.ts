@@ -260,13 +260,20 @@ export async function createInvitationDirect(
 }
 
 /**
- * Direct Prisma insert, same rationale as createProjectDirect.
+ * Direct Prisma insert, same rationale as createProjectDirect. `createdAt`
+ * is optional and appended last (unlike createActivityDirect's required,
+ * positional equivalent) since every existing caller of this fixture
+ * predates comment pagination and has no reason to control it - only
+ * omitted entirely (letting the column's own @default(now()) apply) unless
+ * a caller explicitly needs a deterministic timestamp, e.g. to prove
+ * pagination ordering under tied createdAt values.
  */
 export async function createCommentDirect(
   workspaceId: string,
   taskId: string,
   authorId: string,
   content = "Test comment",
+  createdAt?: Date,
 ) {
   return prisma.comment.create({
     data: {
@@ -274,6 +281,7 @@ export async function createCommentDirect(
       taskId,
       authorId,
       content,
+      ...(createdAt !== undefined && { createdAt }),
     },
   });
 }

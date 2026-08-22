@@ -19,6 +19,14 @@ export interface CreateCommentData {
 
 export interface ListCommentsOptions {
   taskId: string;
+
+  page: number;
+  limit: number;
+}
+
+export interface ListCommentsResult {
+  comments: CommentResponse[];
+  total: number;
 }
 
 export interface UpdateCommentData {

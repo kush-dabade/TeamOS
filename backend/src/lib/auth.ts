@@ -288,6 +288,45 @@ export const auth = betterAuth({
           }
         },
       },
+
+      // Rolling-session resync: fires whenever internalAdapter.updateSession() runs - on this
+      // app's configuration (session.updateAge below), that's Better Auth's
+      // own rolling-session refresh: any authenticated request (HTTP or a
+      // socket reconnect) against a session older than updateAge pushes its
+      // persisted expiresAt out to a fresh `expiresIn` window (verified
+      // against the installed better-auth's api/routes/session.mjs). A
+      // realtime socket's own expiry timer (realtime.server.ts's
+      // scheduleSessionExpiry) is set once, from the expiresAt captured at
+      // handshake time - without this hook, that timer would stay pinned to
+      // the ORIGINAL deadline and disconnect a session that Better Auth
+      // itself considers still valid.
+      //
+      // Same dynamic-import (breaks the lib/auth.ts -> realtime.eviction.ts
+      // -> realtime.server.ts -> realtime.auth.ts -> lib/auth.ts cycle) and
+      // best-effort try/catch shape as the delete hook above, for the same
+      // reason: this must never fail the authenticated request that
+      // triggered the refresh. Logged as a plain warning, not
+      // "SECURITY:" - unlike the delete hook's failure mode (a socket stays
+      // connected when it should be evicted), a failure here only makes a
+      // socket disconnect too early at its stale deadline, which is an
+      // availability regression, not an unauthorized-access one.
+      update: {
+        after: async (session) => {
+          try {
+            const { rescheduleUserSessionExpiry } = await import(
+              "../realtime/realtime.eviction.js"
+            );
+
+            await rescheduleUserSessionExpiry(session.userId, session.id, session.expiresAt);
+          } catch (error) {
+            logger.warn(
+              { err: error, userId: session.userId, sessionId: session.id },
+              "Failed to reschedule refreshed session's socket expiry - its socket " +
+                "may disconnect early at the previous (stale) deadline",
+            );
+          }
+        },
+      },
     },
   },
 

@@ -13,5 +13,12 @@ export interface RealtimeUser {
 export interface AuthenticatedSocket extends Socket {
   data: Socket["data"] & {
     user: RealtimeUser;
+    // Connection lifecycle state, not identity - deliberately kept out of
+    // RealtimeUser (which mirrors Better Auth's own session fields
+    // verbatim). Set by scheduleSessionExpiry/rescheduleSessionExpiry in
+    // realtime.server.ts, read by rescheduleUserSessionExpiry in
+    // realtime.eviction.ts when Better Auth's rolling-session refresh
+    // extends this socket's session and its timer needs to move with it.
+    sessionExpiryTimer?: NodeJS.Timeout;
   };
 }

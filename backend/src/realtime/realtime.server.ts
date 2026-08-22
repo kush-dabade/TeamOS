@@ -140,11 +140,50 @@ function joinUserRoom(socket: AuthenticatedSocket): void {
  * the affected socket is already the exact one this timer was scheduled
  * against, so re-fetching would only add an unnecessary lookup (a real
  * network round trip once a Redis adapter is ever introduced) for no
- * benefit.
+ * benefit. Also reused directly by registerConnectionHandlers's own final
+ * session revalidation below, for the identical reason - that socket is
+ * already known too.
  */
 function revokeSocketSession(socket: AuthenticatedSocket): void {
   socket.emit(REALTIME_EVENTS.SESSION_REVOKED, { sessionId: socket.data.user.sessionId });
   socket.disconnect(true);
+}
+
+/**
+ * Final authoritative check against the persisted session - closes the
+ * handshake-to-eviction race between authenticateSocket() validating a
+ * session and this socket finishing connection setup.
+ *
+ * The race: Socket.IO's own internals (node_modules/socket.io/dist/
+ * namespace.js's _add()) insert a process.nextTick between a middleware
+ * calling next() and the "connection" event actually firing - so there is a
+ * real, if narrow, window between authenticateSocket() reading the session
+ * as valid and this socket joining its user room. A session deleted inside
+ * that window can have its databaseHooks.session.delete.after ->
+ * evictUserSession() run its user-room lookup and find nothing, since this
+ * socket isn't in that room yet - eviction cannot catch what it can't see.
+ * Shrinking the window (e.g. joining the user room earlier) narrows this but
+ * can never close it, since the window exists inside Socket.IO's own
+ * internals, not in this module's code.
+ *
+ * Closing it instead of shrinking it: re-read the session directly by the
+ * id already captured on socket.data.user.sessionId at handshake. Ordering
+ * relative to the rest of connection setup is what makes this sufficient
+ * rather than just another narrower race:
+ *  - It runs AFTER joinUserRoom() (see registerConnectionHandlers below), so
+ *    a revocation landing strictly after this check still finds the socket
+ *    in its user room and is caught by the ordinary evictUserSession path -
+ *    this check only needs to cover the window before that, not replace it.
+ *  - It runs BEFORE joinWorkspaceRooms(), so a revocation that raced this
+ *    check and won can never leave the socket holding workspace-room access
+ *    it queries this exact function to reject.
+ */
+async function isSessionStillActive(sessionId: string): Promise<boolean> {
+  const session = await prisma.session.findUnique({
+    where: { id: sessionId },
+  });
+
+  return session !== null && session.expiresAt > new Date();
 }
 
 /**
@@ -173,18 +212,53 @@ function revokeSocketSession(socket: AuthenticatedSocket): void {
  * before registerConnectionHandlers below has registered its own
  * "disconnect" listener. Always deferring through setTimeout - even by
  * ~1ms - means the caller never has to worry about that ordering.
+ *
+ * Stores the handle on socket.data.sessionExpiryTimer rather than returning
+ * it - this is what lets rescheduleSessionExpiry below find and replace an
+ * already-running timer from outside this closure (a rolling-session
+ * refresh reaches a specific socket via the user-room lookup in
+ * realtime.eviction.ts, not through registerConnectionHandlers's own local
+ * scope), and is also why this is the one central place a timer gets
+ * created - clearSessionExpiry/rescheduleSessionExpiry both call back into
+ * this instead of duplicating the delay math.
  */
-function scheduleSessionExpiry(socket: AuthenticatedSocket): NodeJS.Timeout {
+function scheduleSessionExpiry(socket: AuthenticatedSocket): void {
   const delayMs = Math.max(socket.data.user.sessionExpiresAt.getTime() - Date.now(), 0);
 
-  return setTimeout(() => revokeSocketSession(socket), delayMs);
+  socket.data.sessionExpiryTimer = setTimeout(() => revokeSocketSession(socket), delayMs);
+}
+
+function clearSessionExpiry(socket: AuthenticatedSocket): void {
+  clearTimeout(socket.data.sessionExpiryTimer);
+}
+
+/**
+ * Reschedules a single socket's expiry timer to a new deadline - called
+ * from realtime.eviction.ts's rescheduleUserSessionExpiry when Better
+ * Auth's rolling-session refresh (databaseHooks.session.update.after in
+ * lib/auth.ts) extends the persisted session this socket authenticated
+ * with. Without this, the timer scheduleSessionExpiry set at handshake time
+ * would still fire at the OLD deadline and disconnect a session that, by
+ * then, is genuinely still valid.
+ *
+ * Updates socket.data.user.sessionExpiresAt to the refreshed value first -
+ * scheduleSessionExpiry always reads its delay from that field, so this is
+ * what makes the reused call below schedule against the new deadline
+ * instead of recomputing it separately. clearSessionExpiry, then
+ * scheduleSessionExpiry, mirrors exactly what a fresh connection does, just
+ * replayed against an already-live socket.
+ */
+export function rescheduleSessionExpiry(socket: AuthenticatedSocket, sessionExpiresAt: Date): void {
+  clearSessionExpiry(socket);
+  socket.data.user.sessionExpiresAt = sessionExpiresAt;
+  scheduleSessionExpiry(socket);
 }
 
 function registerConnectionHandlers(io: Server): void {
   io.on("connection", async (socket) => {
     const authenticatedSocket = socket as AuthenticatedSocket;
 
-    const expiryTimer = scheduleSessionExpiry(authenticatedSocket);
+    scheduleSessionExpiry(authenticatedSocket);
 
     // Clears the expiry timer on every disconnect path, including the
     // connection-setup-failure catch block's own socket.disconnect(true)
@@ -193,17 +267,31 @@ function registerConnectionHandlers(io: Server): void {
     // socket (Case A/C: a socket that's already gone must not still act
     // later when the timer would otherwise have fired).
     socket.on("disconnect", (reason) => {
-      clearTimeout(expiryTimer);
+      clearSessionExpiry(authenticatedSocket);
       logger.info({ socketId: socket.id, reason }, "Socket disconnected");
     });
 
     try {
       // Joined first, synchronously, before any database round trip -
       // makes this socket discoverable via fetchSockets() on the user room
-      // (see realtime.eviction.ts) from the earliest possible moment,
-      // which joinWorkspaceRooms's own re-verification above depends on to
-      // close the join/eviction race.
+      // (see realtime.eviction.ts) from the earliest possible moment. Both
+      // joinWorkspaceRooms's own re-verification below and
+      // isSessionStillActive's revalidation depend on this: a revocation
+      // landing any time after this line is guaranteed to find the socket
+      // via the ordinary evictUserSession path.
       joinUserRoom(authenticatedSocket);
+
+      // Closes the handshake-to-eviction race (see isSessionStillActive's
+      // own doc comment) - deliberately BEFORE joinWorkspaceRooms, not
+      // after: a session revoked between authenticateSocket() succeeding
+      // and this check running would otherwise let the socket go on to
+      // join workspace rooms and receive their broadcasts, using a session
+      // that no longer exists. A session revoked after this check succeeds
+      // is still caught normally, since joinUserRoom() above already ran.
+      if (!(await isSessionStillActive(authenticatedSocket.data.user.sessionId))) {
+        revokeSocketSession(authenticatedSocket);
+        return;
+      }
 
       await joinWorkspaceRooms(authenticatedSocket);
 

@@ -14,6 +14,31 @@ import type { Comment } from "../types";
 const PAGE_LIMIT = 100;
 
 /**
+ * Removes duplicate ids from the merged pages, keeping each item's first
+ * occurrence (and therefore its original position) - offset pagination has
+ * no snapshot isolation across the separate requests below, so a comment
+ * created between the first page's request and a later page's can shift
+ * every subsequent page's offset by one, re-returning a comment the
+ * previous page already included. This only fixes the resulting duplicate
+ * (a real problem on its own: duplicate React keys, a comment rendered
+ * twice) - it cannot recover a comment a concurrent *deletion* shifted out
+ * of every page's window instead, since that row was never fetched at all.
+ * Cursor pagination would close that gap too, but is out of scope here.
+ */
+function dedupeById<T extends { id: string }>(items: T[]): T[] {
+  const seen = new Set<string>();
+
+  return items.filter((item) => {
+    if (seen.has(item.id)) {
+      return false;
+    }
+
+    seen.add(item.id);
+    return true;
+  });
+}
+
+/**
  * Fetches every comment on a task by walking GET /tasks/:taskId/comments to
  * completion, rather than exposing pagination state to callers - the
  * product's task detail panel (CommentsPanel) renders the complete thread
@@ -35,7 +60,7 @@ async function fetchAllTaskComments(taskId: string): Promise<Comment[]> {
     ),
   );
 
-  return [...firstPage.comments, ...remainingPages.flatMap((page) => page.comments)];
+  return dedupeById([...firstPage.comments, ...remainingPages.flatMap((page) => page.comments)]);
 }
 
 export function useComments(taskId: string | undefined) {

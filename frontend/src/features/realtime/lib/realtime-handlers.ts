@@ -497,6 +497,26 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
     queryClient.invalidateQueries({ queryKey: workspaceKeys.members(payload.workspaceId) });
   },
 
+  // member.removed is declared in REALTIME_EVENTS but is not yet emitted —
+  // removeWorkspaceMember (workspace.service.ts) doesn't create an activity
+  // or emit this event yet, since its removal transaction is still being
+  // restructured (task-assignee cleanup + ownership precondition) in a
+  // follow-up change — so there is deliberately no handler for it here yet,
+  // matching project.restored's identical treatment above.
+
+  [REALTIME_EVENTS.MEMBER_ROLE_CHANGED]: (payload, queryClient) => {
+    if (!isWorkspaceScopedPayload(payload)) {
+      return;
+    }
+    // Same reasoning as ownership_transferred below: a role change can
+    // change what the *current user's own* role is, if they're the target -
+    // so, alongside the member list, workspace detail/list are invalidated
+    // too, not just members.
+    queryClient.invalidateQueries({ queryKey: workspaceKeys.members(payload.workspaceId) });
+    queryClient.invalidateQueries({ queryKey: workspaceKeys.detail(payload.workspaceId) });
+    queryClient.invalidateQueries({ queryKey: workspaceKeys.list() });
+  },
+
   [REALTIME_EVENTS.OWNERSHIP_TRANSFERRED]: (payload, queryClient) => {
     if (!isWorkspaceScopedPayload(payload)) {
       return;

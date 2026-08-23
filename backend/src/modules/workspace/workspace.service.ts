@@ -276,18 +276,56 @@ export async function updateWorkspaceMemberRole(
     throw new ValidationError("Member already has this role");
   }
 
-  const updatedMember = await prisma.workspaceMember.update({
-    where: {
-      id: memberId,
-    },
+  const oldRole = targetMember.role;
 
-    data: {
-      role,
-    },
+  let emitActivityCreated: () => void = () => {};
 
-    include: {
-      user: true,
+  const updatedMember = await prisma.$transaction(
+    async (tx: Prisma.TransactionClient) => {
+      const updated = await tx.workspaceMember.update({
+        where: {
+          id: memberId,
+        },
+
+        data: {
+          role,
+        },
+
+        include: {
+          user: true,
+        },
+      });
+
+      emitActivityCreated = await createActivity(
+        {
+          workspaceId,
+          actorId,
+
+          type: ActivityType.MEMBER_ROLE_CHANGED,
+
+          entityType: ActivityEntityType.MEMBER,
+          entityId: updated.id,
+
+          metadata: {
+            oldRole,
+            newRole: role,
+          },
+        },
+        tx,
+      );
+
+      return updated;
     },
+  );
+
+  emitActivityCreated();
+
+  emitToWorkspace(workspaceId, REALTIME_EVENTS.MEMBER_ROLE_CHANGED, {
+    workspaceId,
+    memberId: updatedMember.id,
+    userId: updatedMember.userId,
+    oldRole,
+    newRole: updatedMember.role,
   });
 
   return {

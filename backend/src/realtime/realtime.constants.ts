@@ -41,6 +41,8 @@ export const REALTIME_EVENTS = {
   INVITATION_DECLINED: "invitation.declined",
 
   MEMBER_LEFT: "member.left",
+  MEMBER_REMOVED: "member.removed",
+  MEMBER_ROLE_CHANGED: "member.role_changed",
 
   OWNERSHIP_TRANSFERRED: "workspace.ownership_transferred",
 

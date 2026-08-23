@@ -191,6 +191,8 @@ export function ProjectsPage() {
         previewData={selectedProjectPreviewData}
         isPreviewLoading={selectedProjectPreviewQuery.isLoading}
         isArchiving={archiveProject.isPending}
+        workspaceId={workspace?.id ?? ""}
+        actorRole={workspace?.role}
         open={isPreviewOpen}
         onClose={handlePreviewClose}
         onCloseAutoFocus={handlePreviewCloseAutoFocus}

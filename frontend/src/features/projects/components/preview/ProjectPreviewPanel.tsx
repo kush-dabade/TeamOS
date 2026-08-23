@@ -18,9 +18,13 @@ import {
   SheetTitle,
   Skeleton,
 } from "@/components/ui";
+import { useWorkspaceMembers, type WorkspaceRole } from "@/features/workspaces";
+import { isEligibleOwnershipTransferTarget } from "@/features/workspaces/lib/workspace-roles";
 import { formatDate, formatRelativeDate } from "@/utils";
 
 import { ProjectStatusBadge } from "../ProjectStatusBadge";
+
+import { TransferProjectOwnershipDialog } from "./TransferProjectOwnershipDialog";
 
 import type { ProjectListItem, ProjectPreviewData } from "../../types";
 
@@ -29,6 +33,8 @@ interface ProjectPreviewPanelProps {
   previewData: ProjectPreviewData | null;
   isPreviewLoading: boolean;
   isArchiving: boolean;
+  workspaceId: string;
+  actorRole: WorkspaceRole | undefined;
   open: boolean;
   onClose: () => void;
   onCloseAutoFocus: () => void;
@@ -42,6 +48,8 @@ export function ProjectPreviewPanel({
   previewData,
   isPreviewLoading,
   isArchiving,
+  workspaceId,
+  actorRole,
   open,
   onClose,
   onCloseAutoFocus,
@@ -50,12 +58,26 @@ export function ProjectPreviewPanel({
   onArchive,
 }: ProjectPreviewPanelProps) {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
+
+  const membersQuery = useWorkspaceMembers(workspaceId);
 
   if (!project) {
     return null;
   }
 
   const { completedTaskCount, progressPercentage, project: projectDetails, totalTaskCount } = project;
+
+  // Visible only to OWNER/ADMIN, and only when there's at least one eligible
+  // target - mirrors WorkspaceMemberRow's canTransferOwnership gating. The
+  // backend remains authoritative regardless of this check.
+  const canTransferOwnership =
+    (actorRole === "OWNER" || actorRole === "ADMIN") &&
+    previewData !== null &&
+    (membersQuery.data ?? []).some(
+      (member) =>
+        isEligibleOwnershipTransferTarget(member.role) && member.userId !== previewData.ownerId,
+    );
 
   return (
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -134,6 +156,11 @@ export function ProjectPreviewPanel({
             <Button type="button" variant="ghost" onClick={(event) => onEdit(event.currentTarget)}>
               Edit
             </Button>
+            {canTransferOwnership ? (
+              <Button type="button" variant="outline" onClick={() => setIsTransferOpen(true)}>
+                Transfer ownership
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="destructive"
@@ -179,6 +206,17 @@ export function ProjectPreviewPanel({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {canTransferOwnership && previewData !== null ? (
+        <TransferProjectOwnershipDialog
+          projectId={projectDetails.id}
+          projectName={projectDetails.name}
+          workspaceId={workspaceId}
+          currentOwnerId={previewData.ownerId}
+          open={isTransferOpen}
+          onOpenChange={setIsTransferOpen}
+        />
+      ) : null}
     </Sheet>
   );
 }

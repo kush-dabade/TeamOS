@@ -24,6 +24,7 @@ export interface ProjectListItem {
 }
 
 export interface ProjectPreviewData {
+  ownerId: string;
   ownerName: string;
   startDate: string | null;
   targetDate: string | null;

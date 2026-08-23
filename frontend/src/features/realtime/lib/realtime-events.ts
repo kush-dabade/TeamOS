@@ -13,6 +13,7 @@ export const REALTIME_EVENTS = {
   PROJECT_UPDATED: "project.updated",
   PROJECT_ARCHIVED: "project.archived",
   PROJECT_RESTORED: "project.restored",
+  PROJECT_OWNERSHIP_TRANSFERRED: "project.ownership_transferred",
 
   TASK_CREATED: "task.created",
   TASK_UPDATED: "task.updated",

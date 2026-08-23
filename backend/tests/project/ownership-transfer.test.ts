@@ -10,6 +10,7 @@ import { resetDatabase } from "../setup/reset-database.js";
 import {
   addWorkspaceMember,
   createProjectDirect,
+  createTaskDirect,
   createWorkspaceWithMember,
   signUpTestUser,
 } from "../setup/fixtures.js";
@@ -244,6 +245,92 @@ describe("Project ownership transfer", () => {
       previousOwnerId: owner.userId,
       newOwnerId: newOwner.userId,
     });
+  });
+
+  it("resolves a concurrent ownership transfer and member removal for the same target to a consistent final state", async () => {
+    const owner = await signUpTestUser(app);
+    const target = await signUpTestUser(app);
+    const { workspace } = await createWorkspaceWithMember(owner.userId);
+    const targetMembership = await addWorkspaceMember(workspace.id, target.userId, "MEMBER");
+    const project = await createProjectDirect(workspace.id, owner.userId);
+    const otherProject = await createProjectDirect(workspace.id, owner.userId, "Other Project");
+    const task = await createTaskDirect(
+      workspace.id,
+      otherProject.id,
+      owner.userId,
+      "Target's task",
+      target.userId,
+    );
+
+    // Fired concurrently against the real running app / real Postgres
+    // connection pool, mirroring member-removal.test.ts's own
+    // concurrent-removal test - both requests' pre-transaction reads can
+    // genuinely race each other before either transaction's row lock
+    // resolves the outcome. Deliberately not forcing a specific winner (no
+    // artificial delay): the shared lock on target's WorkspaceMember row
+    // must produce a consistent, correct outcome regardless of which
+    // request's transaction reaches it first, so the assertions below cover
+    // both possible outcomes rather than asserting one is "the" outcome.
+    const [transfer, removal] = await Promise.all([
+      request(app)
+        .post(`/api/v1/projects/${project.id}/transfer-ownership`)
+        .set("Cookie", owner.cookie)
+        .send({ newOwnerId: target.userId }),
+      request(app)
+        .delete(`/api/v1/workspaces/${workspace.id}/members/${targetMembership.id}`)
+        .set("Cookie", owner.cookie),
+    ]);
+
+    const [reloadedProject, reloadedMembership, reloadedTask] = await Promise.all([
+      prisma.project.findUniqueOrThrow({ where: { id: project.id } }),
+      prisma.workspaceMember.findUnique({ where: { id: targetMembership.id } }),
+      prisma.task.findUniqueOrThrow({ where: { id: task.id } }),
+    ]);
+
+    if (transfer.status === 200) {
+      // Transfer won the race: removal must have observed the freshly
+      // committed ownership (via the shared lock on target's membership
+      // row) and been rejected as a typed business error, never a raw 500.
+      expect(removal.status).toBe(400);
+      expect(removal.body.error.code).toBe("VALIDATION_ERROR");
+      expect(reloadedProject.ownerId).toBe(target.userId);
+      expect(reloadedMembership).not.toBeNull();
+      // Removal's transaction rolled back in full, including its
+      // task-assignee cleanup - target's unrelated task is untouched, not
+      // partially nulled.
+      expect(reloadedTask.assigneeId).toBe(target.userId);
+    } else {
+      // Removal won the race: transfer must have observed (via the same
+      // shared lock) that the target's membership was gone, and been
+      // rejected as a typed business error - Project.ownerId is never left
+      // pointing at a user who is not a workspace member.
+      expect(transfer.status).toBe(400);
+      expect(transfer.body.error.code).toBe("VALIDATION_ERROR");
+      expect(removal.status).toBe(200);
+      expect(reloadedProject.ownerId).toBe(owner.userId);
+      expect(reloadedMembership).toBeNull();
+      expect(reloadedTask.assigneeId).toBeNull();
+    }
+
+    // The actual invariant under test, asserted directly regardless of
+    // which operation won: the project's current owner is never a departed
+    // member.
+    if (reloadedProject.ownerId === target.userId) {
+      expect(reloadedMembership).not.toBeNull();
+    }
+
+    // Exactly one winner recorded exactly one activity - the loser's
+    // transaction rolled back entirely, same style of assertion as
+    // member-removal.test.ts's concurrent-removal test.
+    const [transferActivities, removalActivities] = await Promise.all([
+      prisma.activity.findMany({
+        where: { type: "PROJECT_OWNERSHIP_TRANSFERRED", entityId: project.id },
+      }),
+      prisma.activity.findMany({
+        where: { type: "MEMBER_REMOVED", entityId: targetMembership.id },
+      }),
+    ]);
+    expect(transferActivities.length + removalActivities.length).toBe(1);
   });
 });
 

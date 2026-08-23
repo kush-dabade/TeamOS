@@ -13,6 +13,7 @@ import { NotFoundError } from "../../shared/errors/not-found-error.js";
 import { ValidationError } from "../../shared/errors/validation-error.js";
 import { isRecordNotFoundError } from "../../shared/errors/prisma-errors.js";
 import {
+  lockWorkspaceMembership,
   requireWorkspaceMembership,
   requireRole,
 } from "../../shared/authorization/workspace-access.js";
@@ -283,19 +284,36 @@ export async function updateWorkspaceMemberRole(
 
   const updatedMember = await prisma.$transaction(
     async (tx: Prisma.TransactionClient) => {
-      const updated = await tx.workspaceMember.update({
-        where: {
-          id: memberId,
-        },
+      // Translates a concurrent removeWorkspaceMember that deletes this
+      // membership between the reads above and this update into the same
+      // typed NotFoundError getWorkspaceMemberById would have thrown had it
+      // read after that removal committed, rather than a raw unhandled
+      // Prisma P2025. No cross-table invariant is at risk here (unlike
+      // transferProjectOwnership/removeWorkspaceMember), so a plain catch is
+      // sufficient - no row lock needed.
+      let updated;
 
-        data: {
-          role,
-        },
+      try {
+        updated = await tx.workspaceMember.update({
+          where: {
+            id: memberId,
+          },
 
-        include: {
-          user: true,
-        },
-      });
+          data: {
+            role,
+          },
+
+          include: {
+            user: true,
+          },
+        });
+      } catch (error) {
+        if (isRecordNotFoundError(error)) {
+          throw new NotFoundError("Workspace member not found");
+        }
+
+        throw error;
+      }
 
       emitActivityCreated = await createActivity(
         {
@@ -374,9 +392,9 @@ export async function removeWorkspaceMember(
   }
 
   // Fail fast, before opening a transaction, for the common case - this
-  // precondition has no side effects of its own. Re-checked again inside
-  // the transaction immediately before the delete (below), since ownership
-  // could theoretically be transferred to this member in the gap between
+  // precondition has no side effects of its own. Not authoritative: the
+  // locked re-check inside the transaction below is what actually guards
+  // against ownership being transferred to this member in the gap between
   // this read and that one.
   const ownedProjectCount = await countOwnedProjects(workspaceId, targetMember.userId);
 
@@ -389,14 +407,28 @@ export async function removeWorkspaceMember(
   let emitActivityCreated: () => void = () => {};
 
   await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    // Re-check immediately before the delete, inside the transaction -
-    // narrows (but, under Read Committed, does not fully eliminate) the
-    // window between the precondition check above and this delete during
-    // which a concurrent transferProjectOwnership could hand this member a
-    // project. Full closure would need SELECT ... FOR UPDATE locking on the
-    // target's owned-project rows - deliberately not introduced here; the
-    // residual race is bounded (a project briefly owned by a departed
-    // member, visible and fixable by any OWNER/ADMIN) and accepted.
+    // First statement in the transaction: locks this member's
+    // WorkspaceMember row, the shared serialization point with
+    // transferProjectOwnership. A concurrent second removal of this same
+    // member (its membership row already gone by the time this transaction
+    // reaches the lock) surfaces here as a typed NotFoundError, the same
+    // one getWorkspaceMemberById would have thrown had it read after that
+    // removal committed.
+    const lockedMembership = await lockWorkspaceMembership(
+      tx,
+      workspaceId,
+      targetMember.userId,
+    );
+
+    if (!lockedMembership) {
+      throw new NotFoundError("Workspace member not found");
+    }
+
+    // Re-checked after acquiring the lock above, not before - this is what
+    // makes it authoritative against a concurrent transferProjectOwnership,
+    // which acquires the same lock before writing Project.ownerId. If a
+    // transfer lands ownership on this member and commits before this
+    // point, this re-check is guaranteed to observe it.
     const recheckedOwnedCount = await countOwnedProjects(
       workspaceId,
       targetMember.userId,
@@ -420,25 +452,14 @@ export async function removeWorkspaceMember(
       },
     });
 
-    // Translates a concurrent second removal of this same member (its
-    // membership row already gone by the time this transaction's delete
-    // runs) into the same typed NotFoundError getWorkspaceMemberById would
-    // have thrown had it read after that removal committed, rather than a
-    // raw unhandled Prisma error. Mirrors cancelInvitation's identical
-    // handling of the same race (invitation.service.ts).
-    try {
-      await tx.workspaceMember.delete({
-        where: {
-          id: memberId,
-        },
-      });
-    } catch (error) {
-      if (isRecordNotFoundError(error)) {
-        throw new NotFoundError("Workspace member not found");
-      }
-
-      throw error;
-    }
+    // No not-found handling needed here: the lock above already holds this
+    // exact row for the rest of the transaction, so no concurrent
+    // delete/update can reach it first.
+    await tx.workspaceMember.delete({
+      where: {
+        id: memberId,
+      },
+    });
 
     emitActivityCreated = await createActivity(
       {

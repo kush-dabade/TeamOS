@@ -118,6 +118,50 @@ describe("Workspace member role change", () => {
     });
     expect(activities).toHaveLength(0);
   });
+
+  it("resolves a concurrent role change and member removal for the same target to a typed outcome, never a raw 500", async () => {
+    const owner = await signUpTestUser(app);
+    const target = await signUpTestUser(app);
+    const { workspace } = await createWorkspaceWithMember(owner.userId);
+    const membership = await addWorkspaceMember(workspace.id, target.userId, "MEMBER");
+
+    // Fired concurrently against the real running app / real Postgres
+    // connection pool, mirroring member-removal.test.ts's own
+    // concurrent-removal test. An OWNER can manage both MEMBER and ADMIN
+    // targets, so removal succeeds regardless of which request's
+    // transaction reaches the shared WorkspaceMember-row lock first - only
+    // the role-change side's outcome depends on who wins.
+    const [roleChange, removal] = await Promise.all([
+      request(app)
+        .patch(`/api/v1/workspaces/${workspace.id}/members/${membership.id}`)
+        .set("Cookie", owner.cookie)
+        .send({ role: "ADMIN" }),
+      request(app)
+        .delete(`/api/v1/workspaces/${workspace.id}/members/${membership.id}`)
+        .set("Cookie", owner.cookie),
+    ]);
+
+    expect(removal.status).toBe(200);
+
+    const reloadedMembership = await prisma.workspaceMember.findUnique({
+      where: { id: membership.id },
+    });
+    expect(reloadedMembership).toBeNull();
+
+    if (roleChange.status !== 200) {
+      // Removal won: the role update must fail with the typed
+      // NotFoundError translated from Prisma's P2025, never an unhandled
+      // 500.
+      expect(roleChange.status).toBe(404);
+      expect(roleChange.body.error.code).toBe("NOT_FOUND");
+    }
+
+    // No MEMBER_ROLE_CHANGED activity from a failed role update.
+    const roleActivities = await prisma.activity.findMany({
+      where: { type: "MEMBER_ROLE_CHANGED", entityId: membership.id },
+    });
+    expect(roleActivities).toHaveLength(roleChange.status === 200 ? 1 : 0);
+  });
 });
 
 describe("Workspace member role change - realtime", () => {

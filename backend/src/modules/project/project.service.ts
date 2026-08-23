@@ -24,6 +24,7 @@ import { NotFoundError } from "../../shared/errors/not-found-error.js";
 import { ValidationError } from "../../shared/errors/validation-error.js";
 import {
   findWorkspaceMembership,
+  lockWorkspaceMembership,
   requireWorkspaceMembership,
   requireRole,
 } from "../../shared/authorization/workspace-access.js";
@@ -277,6 +278,9 @@ export async function transferProjectOwnership(
     throw new ValidationError("Project already has this owner");
   }
 
+  // Fail fast, before opening a transaction - not authoritative (see the
+  // locked re-check inside the transaction below, which is what actually
+  // guards against a concurrent removeWorkspaceMember for this same user).
   const newOwnerMembership = await findWorkspaceMembership(
     project.workspaceId,
     newOwnerId,
@@ -299,6 +303,26 @@ export async function transferProjectOwnership(
   let emitActivityCreated: () => void = () => {};
 
   const updatedProject = await prisma.$transaction(async (tx) => {
+    // First statement in the transaction: locks the new owner's
+    // WorkspaceMember row, the shared serialization point with
+    // removeWorkspaceMember. If a concurrent removal commits first, this
+    // lock query returns null once unblocked (the row is gone), and this
+    // transfer correctly fails instead of ever writing Project.ownerId to a
+    // user who is no longer a member.
+    const lockedMembership = await lockWorkspaceMembership(
+      tx,
+      project.workspaceId,
+      newOwnerId,
+    );
+
+    if (!lockedMembership) {
+      throw new ValidationError("New owner must be a workspace member");
+    }
+
+    if (lockedMembership.role === WorkspaceRole.GUEST) {
+      throw new ValidationError("Ownership cannot be transferred to a guest");
+    }
+
     const updated = await tx.project.update({
       where: {
         id: project.id,

@@ -23,8 +23,8 @@ export async function uploadAvatarHandler(req: Request, res: Response) {
   });
 }
 
-export async function getAvatarHandler(req: Request, res: Response) {
-  const avatar = await getAvatar(req.user!.id);
+async function streamAvatar(userId: string, res: Response): Promise<void> {
+  const avatar = await getAvatar(userId);
 
   res.setHeader("Content-Type", avatar.mimeType);
   res.setHeader("Content-Length", avatar.size.toString());
@@ -60,6 +60,21 @@ export async function getAvatarHandler(req: Request, res: Response) {
       });
     }
   }
+}
+
+export async function getAvatarHandler(req: Request, res: Response) {
+  await streamAvatar(req.user!.id, res);
+}
+
+// getAvatar() is already user-id generic (not implicitly self-scoped) - see
+// its own comment in user.service.ts - so this reuses it directly with the
+// requested :id rather than the caller's own id. Any authenticated user may
+// request any other user's avatar (no workspace-membership check): this
+// mirrors getAvatar()'s existing behavior of returning the same "Avatar not
+// found." 404 for both a nonexistent user and a real user with no avatar,
+// so this endpoint never discloses whether :id refers to a real account.
+export async function getUserAvatarHandler(req: Request, res: Response) {
+  await streamAvatar(req.params.id as string, res);
 }
 
 export async function deleteAvatarHandler(req: Request, res: Response) {

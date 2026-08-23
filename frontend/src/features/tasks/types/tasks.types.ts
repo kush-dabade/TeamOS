@@ -27,6 +27,7 @@ export interface Task {
 export interface TaskAssignee {
   id: string;
   name: string;
+  image: string | null;
 }
 
 export interface TaskProject {

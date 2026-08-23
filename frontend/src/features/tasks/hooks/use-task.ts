@@ -37,7 +37,10 @@ export function useTask(taskId: string | undefined) {
     }
 
     const membersByUserId = new Map(
-      membersQuery.data.map((member) => [member.userId, { id: member.userId, name: member.name }]),
+      membersQuery.data.map((member) => [
+        member.userId,
+        { id: member.userId, name: member.name, image: member.image },
+      ]),
     );
 
     const projectDetails = projectQuery.data.project.project;

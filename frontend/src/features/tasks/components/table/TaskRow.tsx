@@ -1,34 +1,18 @@
 import { useRef } from "react";
 
 import { UserAvatar } from "@/components/ux";
-import { env } from "@/lib/env";
-import { formatDate, formatRelativeDate } from "@/utils";
+import { formatDate, formatRelativeDate, getUserAvatarUrl } from "@/utils";
 
 import { TaskPriorityBadge } from "../TaskPriorityBadge";
 import { TaskStatusBadge } from "../TaskStatusBadge";
 
-import type { TaskAssignee, TaskListItem } from "../../types";
+import type { TaskListItem } from "../../types";
 
 interface TaskRowProps {
   taskItem: TaskListItem;
   isSelected: boolean;
   showProjectColumn?: boolean;
   onSelect: (taskId: string, trigger: HTMLButtonElement | null) => void;
-}
-
-// Builds the URL for an assignee's avatar (Commit 1's
-// GET /users/:id/avatar). Deliberately not routed through the shared
-// getAvatarUrl() util - see workspace-member-row.tsx's identical helper for
-// why (hardcoded to /users/me/avatar, requires `updatedAt` this data
-// doesn't carry). Generalizing that helper is P4-AVATAR-RENDER's job
-// (Commit 4), which should also fold this and workspace-member-row's copy
-// into one.
-function getAssigneeAvatarUrl(assignee: TaskAssignee): string | null {
-  if (!assignee.image) {
-    return null;
-  }
-
-  return `${env.apiUrl}/api/v1/users/${assignee.id}/avatar`;
 }
 
 export function TaskRow({ taskItem, isSelected, showProjectColumn = true, onSelect }: TaskRowProps) {
@@ -71,7 +55,7 @@ export function TaskRow({ taskItem, isSelected, showProjectColumn = true, onSele
           <div className="flex items-center gap-2 whitespace-nowrap">
             <UserAvatar
               name={assignee.name}
-              image={getAssigneeAvatarUrl(assignee)}
+              image={getUserAvatarUrl(assignee.id, assignee.image)}
               size="sm"
               shape="square"
             />

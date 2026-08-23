@@ -1,5 +1,5 @@
 import { UserAvatar } from "@/components/ux";
-import { formatRelativeDate } from "@/utils";
+import { formatRelativeDate, getUserAvatarUrl } from "@/utils";
 
 import { describeActivity } from "../lib/describe-activity";
 import type { Activity } from "../types";
@@ -22,7 +22,7 @@ export function ActivityItem({ activity }: ActivityItemProps) {
     <div className="flex items-start gap-3 rounded-md px-2 py-2.5 transition-colors duration-150 hover:bg-muted/40">
       <UserAvatar
         name={activity.actor.name}
-        image={activity.actor.image}
+        image={getUserAvatarUrl(activity.actor.id, activity.actor.image)}
         size="sm"
         shape="square"
       />

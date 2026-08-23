@@ -22,7 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/ux";
-import { env } from "@/lib/env";
+import { getUserAvatarUrl } from "@/utils";
 
 import { useRemoveWorkspaceMember } from "../hooks/use-remove-workspace-member";
 import { useTransferWorkspaceOwnership } from "../hooks/use-transfer-workspace-ownership";
@@ -36,20 +36,6 @@ import {
 import type { WorkspaceMember, WorkspaceRole } from "../types";
 
 import { WorkspaceRoleBadge } from "./workspace-role-badge";
-
-// Builds the URL for another member's avatar (Commit 1's
-// GET /users/:id/avatar). Deliberately not routed through the shared
-// getAvatarUrl() util - that helper is hardcoded to GET /users/me/avatar
-// and requires `updatedAt` for cache-busting, neither of which
-// WorkspaceMember carries. Generalizing that helper for any user (and
-// adding cache-busting) is P4-AVATAR-RENDER's job, not this commit's.
-function getMemberAvatarUrl(member: WorkspaceMember): string | null {
-  if (!member.image) {
-    return null;
-  }
-
-  return `${env.apiUrl}/api/v1/users/${member.userId}/avatar`;
-}
 
 interface WorkspaceMemberRowProps {
   workspaceId: string;
@@ -113,7 +99,7 @@ export function WorkspaceMemberRow({
         <div className="flex min-w-0 items-center gap-2">
           <UserAvatar
             name={member.name}
-            image={getMemberAvatarUrl(member)}
+            image={getUserAvatarUrl(member.userId, member.image)}
             size="sm"
             shape="square"
           />

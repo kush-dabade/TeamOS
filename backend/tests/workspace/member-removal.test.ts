@@ -37,7 +37,7 @@ describe("Workspace member removal", () => {
       .set("Cookie", owner.cookie)
       .expect(200);
 
-    expect(response.body.success).toBe(true);
+    expect(response.body).toEqual({ success: true, data: null });
 
     const reloaded = await prisma.workspaceMember.findUnique({
       where: { id: membership.id },

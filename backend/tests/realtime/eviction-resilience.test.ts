@@ -40,7 +40,7 @@ describe("workspace membership mutations tolerate a fully unavailable realtime l
 
       const result = await removeWorkspaceMember(owner.userId, workspace.id, membership.id);
 
-      expect(result).toEqual({ success: true });
+      expect(result).toBeUndefined();
 
       const remaining = await prisma.workspaceMember.findUnique({
         where: { id: membership.id },
@@ -71,7 +71,7 @@ describe("workspace membership mutations tolerate a fully unavailable realtime l
 
       const result = await leaveWorkspace(target.userId, workspace.id);
 
-      expect(result).toEqual({ success: true });
+      expect(result).toBeUndefined();
 
       const remaining = await prisma.workspaceMember.findUnique({
         where: { id: membership.id },

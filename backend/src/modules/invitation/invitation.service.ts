@@ -367,7 +367,7 @@ export async function cancelInvitation(
   actorId: string,
   workspaceId: string,
   invitationId: string,
-): Promise<{ success: true }> {
+): Promise<void> {
   const actorMembership = await requireWorkspaceMembership(workspaceId, actorId);
 
   requireRole(actorMembership, [WorkspaceRole.OWNER, WorkspaceRole.ADMIN]);
@@ -391,8 +391,6 @@ export async function cancelInvitation(
 
     throw error;
   }
-
-  return { success: true };
 }
 
 export async function resendInvitation(

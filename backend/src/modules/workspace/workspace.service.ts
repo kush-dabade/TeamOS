@@ -486,10 +486,6 @@ export async function removeWorkspaceMember(
         "next disconnects/reconnects",
     );
   }
-
-  return {
-    success: true,
-  };
 }
 
 export async function transferWorkspaceOwnership(
@@ -726,8 +722,4 @@ export async function leaveWorkspace(actorId: string, workspaceId: string) {
         "next disconnects/reconnects",
     );
   }
-
-  return {
-    success: true,
-  };
 }

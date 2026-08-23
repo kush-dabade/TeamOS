@@ -15,6 +15,7 @@ import { createActivity } from "../activity/activity.service.js";
 import {
   ActivityEntityType,
   ActivityType,
+  WorkspaceRole,
 } from "../../generated/prisma/enums.js";
 
 import type { Project } from "../../generated/prisma/client.js";
@@ -244,6 +245,102 @@ export async function archiveProject(actorId: string, projectId: string) {
     REALTIME_EVENTS.PROJECT_ARCHIVED,
     {
       workspaceId: archivedProject.workspaceId,
+      project: response,
+    },
+  );
+
+  return response;
+}
+
+export async function transferProjectOwnership(
+  actorId: string,
+  projectId: string,
+  newOwnerId: string,
+) {
+  const project = await findProjectById(projectId);
+
+  if (!project) {
+    throw new NotFoundError("Project not found");
+  }
+
+  const membership = await requireWorkspaceMembership(project.workspaceId, actorId);
+
+  requireRole(membership, ["OWNER", "ADMIN"]);
+
+  // Deliberately no `project.status === "ARCHIVED"` guard, unlike
+  // updateProject/archiveProject - ownership transfer must keep working on
+  // an archived project. Otherwise removeWorkspaceMember's "cannot remove a
+  // member who owns projects" gate would be unsatisfiable for a member who
+  // owns an archived project: there would be no way to ever transfer it
+  // away, permanently blocking their removal.
+  if (project.ownerId === newOwnerId) {
+    throw new ValidationError("Project already has this owner");
+  }
+
+  const newOwnerMembership = await findWorkspaceMembership(
+    project.workspaceId,
+    newOwnerId,
+  );
+
+  if (!newOwnerMembership) {
+    throw new ValidationError("New owner must be a workspace member");
+  }
+
+  if (newOwnerMembership.role === WorkspaceRole.GUEST) {
+    // Guests have read-only access (docs/architecture/api-specification.md,
+    // RBAC Rules) - ownership grants full access, so a guest is never an
+    // eligible transfer target. Mirrors transferWorkspaceOwnership's
+    // identical check for workspace ownership.
+    throw new ValidationError("Ownership cannot be transferred to a guest");
+  }
+
+  const previousOwnerId = project.ownerId;
+
+  let emitActivityCreated: () => void = () => {};
+
+  const updatedProject = await prisma.$transaction(async (tx) => {
+    const updated = await tx.project.update({
+      where: {
+        id: project.id,
+      },
+      data: {
+        ownerId: newOwnerId,
+      },
+    });
+
+    emitActivityCreated = await createActivity(
+      {
+        workspaceId: updated.workspaceId,
+        actorId,
+
+        type: ActivityType.PROJECT_OWNERSHIP_TRANSFERRED,
+
+        entityType: ActivityEntityType.PROJECT,
+        entityId: updated.id,
+
+        projectId: updated.id,
+
+        metadata: {
+          projectName: updated.name,
+          previousOwnerId,
+          newOwnerId,
+        },
+      },
+      tx,
+    );
+
+    return updated;
+  });
+
+  emitActivityCreated();
+
+  const response = toProjectResponse(updatedProject);
+
+  emitToWorkspace(
+    updatedProject.workspaceId,
+    REALTIME_EVENTS.PROJECT_OWNERSHIP_TRANSFERRED,
+    {
+      workspaceId: updatedProject.workspaceId,
       project: response,
     },
   );

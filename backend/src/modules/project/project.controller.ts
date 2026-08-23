@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import {
   createProjectSchema,
   listProjectsQuerySchema,
+  transferProjectOwnershipSchema,
   updateProjectSchema,
 } from "./project.schema.js";
 
@@ -11,6 +12,7 @@ import {
   createProject,
   listProjects,
   getProject,
+  transferProjectOwnership,
   updateProject,
 } from "./project.service.js";
 
@@ -77,6 +79,24 @@ export async function archiveProjectHandler(req: Request, res: Response) {
   const project = await archiveProject(
     req.user!.id,
     req.params.projectId as string,
+  );
+
+  return res.status(200).json({
+    success: true,
+    data: project,
+  });
+}
+
+export async function transferProjectOwnershipHandler(
+  req: Request,
+  res: Response,
+) {
+  const body = transferProjectOwnershipSchema.parse(req.body);
+
+  const project = await transferProjectOwnership(
+    req.user!.id,
+    req.params.projectId as string,
+    body.newOwnerId,
   );
 
   return res.status(200).json({

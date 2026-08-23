@@ -24,6 +24,7 @@ import { enqueueWorkspaceInvitationEmail } from "../../queues/email/index.js";
 import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
 import { NotFoundError } from "../../shared/errors/not-found-error.js";
 import { ValidationError } from "../../shared/errors/validation-error.js";
+import { isRecordNotFoundError } from "../../shared/errors/prisma-errors.js";
 import {
   findWorkspaceMembership,
   requireWorkspaceMembership,
@@ -157,15 +158,6 @@ function assertInvitationEligible(
   if (invitation.email !== email.toLowerCase()) {
     throw new ForbiddenError("You do not have access to this invitation");
   }
-}
-
-function isRecordNotFoundError(
-  error: unknown,
-): error is Prisma.PrismaClientKnownRequestError {
-  return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === "P2025"
-  );
 }
 
 type InvitationEntity = {
@@ -375,7 +367,7 @@ export async function cancelInvitation(
   actorId: string,
   workspaceId: string,
   invitationId: string,
-): Promise<{ success: true }> {
+): Promise<void> {
   const actorMembership = await requireWorkspaceMembership(workspaceId, actorId);
 
   requireRole(actorMembership, [WorkspaceRole.OWNER, WorkspaceRole.ADMIN]);
@@ -399,8 +391,6 @@ export async function cancelInvitation(
 
     throw error;
   }
-
-  return { success: true };
 }
 
 export async function resendInvitation(

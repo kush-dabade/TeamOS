@@ -1,3 +1,4 @@
+import { Prisma } from "../../generated/prisma/client.js";
 import { prisma } from "../../lib/prisma.js";
 
 import type { WorkspaceMember } from "../../generated/prisma/client.js";
@@ -41,4 +42,33 @@ export function requireRole(
       "You do not have permission to perform this action",
     );
   }
+}
+
+export interface LockedWorkspaceMembership {
+  id: string;
+  role: WorkspaceRole;
+}
+
+/**
+ * Locks the target's WorkspaceMember row (SELECT ... FOR UPDATE) for the
+ * remainder of the caller's transaction. This is the shared serialization
+ * point between transferProjectOwnership and removeWorkspaceMember: both
+ * must acquire this lock as the FIRST statement in their transaction so
+ * that whichever commits first is the one the other observes. Returns null
+ * if no matching row exists (nothing to lock - the user is not, or is no
+ * longer, a member of this workspace).
+ */
+export async function lockWorkspaceMembership(
+  tx: Prisma.TransactionClient,
+  workspaceId: string,
+  userId: string,
+): Promise<LockedWorkspaceMembership | null> {
+  const rows = await tx.$queryRaw<LockedWorkspaceMembership[]>(Prisma.sql`
+    SELECT "id", "role"
+    FROM "WorkspaceMember"
+    WHERE "workspaceId" = ${workspaceId} AND "userId" = ${userId}
+    FOR UPDATE
+  `);
+
+  return rows[0] ?? null;
 }

@@ -67,6 +67,7 @@ function toProjectDetail(project: BackendProjectDetail): ProjectDetail {
   return {
     project: toProjectListItem(project),
     previewData: {
+      ownerId: project.owner.id,
       ownerName: project.owner.name,
       startDate: project.startDate,
       targetDate: project.endDate,
@@ -121,6 +122,22 @@ export async function updateProject(
 export async function archiveProject(projectId: string): Promise<ProjectListItem> {
   const response = await apiClient.post<ApiSuccess<BackendProject>>(
     `/projects/${projectId}/archive`,
+  );
+
+  return toProjectListItem(response.data.data);
+}
+
+// newOwnerId is a User id, not a WorkspaceMember id - intentionally
+// different from the workspace-level transfer endpoint, which takes a
+// WorkspaceMember id. See transferProjectOwnership in the backend's
+// project.service.ts.
+export async function transferProjectOwnership(
+  projectId: string,
+  newOwnerId: string,
+): Promise<ProjectListItem> {
+  const response = await apiClient.post<ApiSuccess<BackendProject>>(
+    `/projects/${projectId}/transfer-ownership`,
+    { newOwnerId },
   );
 
   return toProjectListItem(response.data.data);

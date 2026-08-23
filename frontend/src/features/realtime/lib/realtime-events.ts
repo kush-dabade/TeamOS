@@ -13,6 +13,7 @@ export const REALTIME_EVENTS = {
   PROJECT_UPDATED: "project.updated",
   PROJECT_ARCHIVED: "project.archived",
   PROJECT_RESTORED: "project.restored",
+  PROJECT_OWNERSHIP_TRANSFERRED: "project.ownership_transferred",
 
   TASK_CREATED: "task.created",
   TASK_UPDATED: "task.updated",
@@ -39,6 +40,8 @@ export const REALTIME_EVENTS = {
   INVITATION_DECLINED: "invitation.declined",
 
   MEMBER_LEFT: "member.left",
+  MEMBER_REMOVED: "member.removed",
+  MEMBER_ROLE_CHANGED: "member.role_changed",
 
   OWNERSHIP_TRANSFERRED: "workspace.ownership_transferred",
 

@@ -103,13 +103,16 @@ export async function removeWorkspaceMemberHandler(
   req: Request,
   res: Response,
 ) {
-  const result = await removeWorkspaceMember(
+  await removeWorkspaceMember(
     req.user!.id,
     req.params.workspaceId as string,
     req.params.memberId as string,
   );
 
-  return res.status(200).json(result);
+  return res.status(200).json({
+    success: true,
+    data: null,
+  });
 }
 
 export async function transferWorkspaceOwnershipHandler(
@@ -131,10 +134,13 @@ export async function transferWorkspaceOwnershipHandler(
 }
 
 export async function leaveWorkspaceHandler(req: Request, res: Response) {
-  const result = await leaveWorkspace(
+  await leaveWorkspace(
     req.user!.id,
     req.params.workspaceId as string,
   );
 
-  return res.status(200).json(result);
+  return res.status(200).json({
+    success: true,
+    data: null,
+  });
 }

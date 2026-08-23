@@ -73,8 +73,16 @@ export const listProjectsQuerySchema = z.object({
   status: z.enum(["PLANNED", "ACTIVE", "COMPLETED", "ARCHIVED"]).optional(),
 });
 
+export const transferProjectOwnershipSchema = z.object({
+  newOwnerId: z.string().trim().min(1, "New owner ID is required"),
+});
+
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 
 export type ListProjectsQueryInput = z.infer<typeof listProjectsQuerySchema>;
 
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
+
+export type TransferProjectOwnershipInput = z.infer<
+  typeof transferProjectOwnershipSchema
+>;

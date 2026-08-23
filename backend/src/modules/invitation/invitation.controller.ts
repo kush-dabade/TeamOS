@@ -52,13 +52,16 @@ export async function listWorkspaceInvitationsHandler(
 }
 
 export async function cancelInvitationHandler(req: Request, res: Response) {
-  const result = await cancelInvitation(
+  await cancelInvitation(
     req.user!.id,
     req.params.workspaceId as string,
     req.params.invitationId as string,
   );
 
-  return res.status(200).json(result);
+  return res.status(200).json({
+    success: true,
+    data: null,
+  });
 }
 
 export async function resendInvitationHandler(req: Request, res: Response) {

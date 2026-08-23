@@ -11,7 +11,9 @@ import {
 import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
 import { NotFoundError } from "../../shared/errors/not-found-error.js";
 import { ValidationError } from "../../shared/errors/validation-error.js";
+import { isRecordNotFoundError } from "../../shared/errors/prisma-errors.js";
 import {
+  lockWorkspaceMembership,
   requireWorkspaceMembership,
   requireRole,
 } from "../../shared/authorization/workspace-access.js";
@@ -276,18 +278,73 @@ export async function updateWorkspaceMemberRole(
     throw new ValidationError("Member already has this role");
   }
 
-  const updatedMember = await prisma.workspaceMember.update({
-    where: {
-      id: memberId,
-    },
+  const oldRole = targetMember.role;
 
-    data: {
-      role,
-    },
+  let emitActivityCreated: () => void = () => {};
 
-    include: {
-      user: true,
+  const updatedMember = await prisma.$transaction(
+    async (tx: Prisma.TransactionClient) => {
+      // Translates a concurrent removeWorkspaceMember that deletes this
+      // membership between the reads above and this update into the same
+      // typed NotFoundError getWorkspaceMemberById would have thrown had it
+      // read after that removal committed, rather than a raw unhandled
+      // Prisma P2025. No cross-table invariant is at risk here (unlike
+      // transferProjectOwnership/removeWorkspaceMember), so a plain catch is
+      // sufficient - no row lock needed.
+      let updated;
+
+      try {
+        updated = await tx.workspaceMember.update({
+          where: {
+            id: memberId,
+          },
+
+          data: {
+            role,
+          },
+
+          include: {
+            user: true,
+          },
+        });
+      } catch (error) {
+        if (isRecordNotFoundError(error)) {
+          throw new NotFoundError("Workspace member not found");
+        }
+
+        throw error;
+      }
+
+      emitActivityCreated = await createActivity(
+        {
+          workspaceId,
+          actorId,
+
+          type: ActivityType.MEMBER_ROLE_CHANGED,
+
+          entityType: ActivityEntityType.MEMBER,
+          entityId: updated.id,
+
+          metadata: {
+            oldRole,
+            newRole: role,
+          },
+        },
+        tx,
+      );
+
+      return updated;
     },
+  );
+
+  emitActivityCreated();
+
+  emitToWorkspace(workspaceId, REALTIME_EVENTS.MEMBER_ROLE_CHANGED, {
+    workspaceId,
+    memberId: updatedMember.id,
+    userId: updatedMember.userId,
+    oldRole,
+    newRole: updatedMember.role,
   });
 
   return {
@@ -298,6 +355,19 @@ export async function updateWorkspaceMemberRole(
     role: updatedMember.role,
     joinedAt: updatedMember.joinedAt,
   };
+}
+
+async function countOwnedProjects(
+  workspaceId: string,
+  ownerId: string,
+  client: Prisma.TransactionClient = prisma,
+): Promise<number> {
+  return client.project.count({
+    where: {
+      workspaceId,
+      ownerId,
+    },
+  });
 }
 
 export async function removeWorkspaceMember(
@@ -321,10 +391,101 @@ export async function removeWorkspaceMember(
     );
   }
 
-  await prisma.workspaceMember.delete({
-    where: {
-      id: memberId,
-    },
+  // Fail fast, before opening a transaction, for the common case - this
+  // precondition has no side effects of its own. Not authoritative: the
+  // locked re-check inside the transaction below is what actually guards
+  // against ownership being transferred to this member in the gap between
+  // this read and that one.
+  const ownedProjectCount = await countOwnedProjects(workspaceId, targetMember.userId);
+
+  if (ownedProjectCount > 0) {
+    throw new ValidationError(
+      `Cannot remove member: they own ${ownedProjectCount} project(s). Transfer ownership before removal.`,
+    );
+  }
+
+  let emitActivityCreated: () => void = () => {};
+
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    // First statement in the transaction: locks this member's
+    // WorkspaceMember row, the shared serialization point with
+    // transferProjectOwnership. A concurrent second removal of this same
+    // member (its membership row already gone by the time this transaction
+    // reaches the lock) surfaces here as a typed NotFoundError, the same
+    // one getWorkspaceMemberById would have thrown had it read after that
+    // removal committed.
+    const lockedMembership = await lockWorkspaceMembership(
+      tx,
+      workspaceId,
+      targetMember.userId,
+    );
+
+    if (!lockedMembership) {
+      throw new NotFoundError("Workspace member not found");
+    }
+
+    // Re-checked after acquiring the lock above, not before - this is what
+    // makes it authoritative against a concurrent transferProjectOwnership,
+    // which acquires the same lock before writing Project.ownerId. If a
+    // transfer lands ownership on this member and commits before this
+    // point, this re-check is guaranteed to observe it.
+    const recheckedOwnedCount = await countOwnedProjects(
+      workspaceId,
+      targetMember.userId,
+      tx,
+    );
+
+    if (recheckedOwnedCount > 0) {
+      throw new ValidationError(
+        `Cannot remove member: they own ${recheckedOwnedCount} project(s). Transfer ownership before removal.`,
+      );
+    }
+
+    await tx.task.updateMany({
+      where: {
+        workspaceId,
+        assigneeId: targetMember.userId,
+        deletedAt: null,
+      },
+      data: {
+        assigneeId: null,
+      },
+    });
+
+    // No not-found handling needed here: the lock above already holds this
+    // exact row for the rest of the transaction, so no concurrent
+    // delete/update can reach it first.
+    await tx.workspaceMember.delete({
+      where: {
+        id: memberId,
+      },
+    });
+
+    emitActivityCreated = await createActivity(
+      {
+        workspaceId,
+        actorId,
+
+        type: ActivityType.MEMBER_REMOVED,
+
+        entityType: ActivityEntityType.MEMBER,
+        entityId: memberId,
+
+        metadata: {
+          removedUserName: targetMember.user.name,
+          removedUserEmail: targetMember.user.email,
+        },
+      },
+      tx,
+    );
+  });
+
+  emitActivityCreated();
+
+  emitToWorkspace(workspaceId, REALTIME_EVENTS.MEMBER_REMOVED, {
+    workspaceId,
+    memberId,
+    userId: targetMember.userId,
   });
 
   // Best-effort: the membership is already gone at this point, so a failure
@@ -346,10 +507,6 @@ export async function removeWorkspaceMember(
         "next disconnects/reconnects",
     );
   }
-
-  return {
-    success: true,
-  };
 }
 
 export async function transferWorkspaceOwnership(
@@ -586,8 +743,4 @@ export async function leaveWorkspace(actorId: string, workspaceId: string) {
         "next disconnects/reconnects",
     );
   }
-
-  return {
-    success: true,
-  };
 }

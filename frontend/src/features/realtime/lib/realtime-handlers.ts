@@ -485,6 +485,14 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
     invalidateProjectLists(queryClient);
   },
 
+  [REALTIME_EVENTS.PROJECT_OWNERSHIP_TRANSFERRED]: (payload, queryClient) => {
+    if (!isProjectEventPayload(payload)) {
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: projectKeys.detail(payload.project.id) });
+    invalidateProjectLists(queryClient);
+  },
+
   // project.restored is declared in REALTIME_EVENTS but is never emitted —
   // no restore/un-archive function exists in project.service.ts — so there is
   // deliberately no handler for it here; adding one would wire up an event
@@ -495,6 +503,32 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
       return;
     }
     queryClient.invalidateQueries({ queryKey: workspaceKeys.members(payload.workspaceId) });
+  },
+
+  [REALTIME_EVENTS.MEMBER_REMOVED]: (payload, queryClient) => {
+    if (!isWorkspaceScopedPayload(payload)) {
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: workspaceKeys.members(payload.workspaceId) });
+    // Removal bulk-nulls the removed member's task assignments across
+    // however many projects they had tasks in - taskKeys.workspaceLists()
+    // (no project id) is the existing broad-invalidation prefix built for
+    // exactly this "don't know which project(s)" case (see its own comment
+    // in task-keys.ts), not a new invalidation primitive.
+    queryClient.invalidateQueries({ queryKey: taskKeys.workspaceLists() });
+  },
+
+  [REALTIME_EVENTS.MEMBER_ROLE_CHANGED]: (payload, queryClient) => {
+    if (!isWorkspaceScopedPayload(payload)) {
+      return;
+    }
+    // Same reasoning as ownership_transferred below: a role change can
+    // change what the *current user's own* role is, if they're the target -
+    // so, alongside the member list, workspace detail/list are invalidated
+    // too, not just members.
+    queryClient.invalidateQueries({ queryKey: workspaceKeys.members(payload.workspaceId) });
+    queryClient.invalidateQueries({ queryKey: workspaceKeys.detail(payload.workspaceId) });
+    queryClient.invalidateQueries({ queryKey: workspaceKeys.list() });
   },
 
   [REALTIME_EVENTS.OWNERSHIP_TRANSFERRED]: (payload, queryClient) => {

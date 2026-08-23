@@ -64,7 +64,10 @@ export function useTasks(workspaceId: string | undefined) {
     }
 
     const assigneesByUserId = new Map(
-      membersQuery.data.map((member) => [member.userId, { id: member.userId, name: member.name }]),
+      membersQuery.data.map((member) => [
+        member.userId,
+        { id: member.userId, name: member.name, image: member.image },
+      ]),
     );
 
     const projectsById = new Map(

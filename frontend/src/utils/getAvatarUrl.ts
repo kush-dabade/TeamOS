@@ -31,3 +31,22 @@ export function getAvatarUrl(user: AvatarUrlUser): string | null {
 
   return `${env.apiUrl}/api/v1/users/me/avatar?v=${version}`;
 }
+
+// Generalized counterpart to getAvatarUrl() above, for rendering someone
+// else's avatar (comments, activity, workspace members, task assignees).
+// Deliberately a separate function rather than a generalized getAvatarUrl():
+// the two existing getAvatarUrl() callers (sidebar-user.tsx,
+// avatar-upload-control.tsx) are both current-user contexts that rely on
+// GET /users/me/avatar and `updatedAt` cache-busting - avatar-upload-control
+// in particular has no user id in scope at all without threading one through
+// two more component layers, and genuinely benefits from cache-busting right
+// after an upload. This helper intentionally has neither: no `/me` special
+// case, no cache-busting param, since none of its callers have an
+// `updatedAt` to key one off.
+export function getUserAvatarUrl(userId: string, image?: string | null): string | null {
+  if (!image) {
+    return null;
+  }
+
+  return `${env.apiUrl}/api/v1/users/${userId}/avatar`;
+}

@@ -1,6 +1,7 @@
 import { useRef } from "react";
 
-import { formatDate, formatRelativeDate, getInitials } from "@/utils";
+import { UserAvatar } from "@/components/ux";
+import { formatDate, formatRelativeDate, getUserAvatarUrl } from "@/utils";
 
 import { TaskPriorityBadge } from "../TaskPriorityBadge";
 import { TaskStatusBadge } from "../TaskStatusBadge";
@@ -52,12 +53,12 @@ export function TaskRow({ taskItem, isSelected, showProjectColumn = true, onSele
       <td className="px-3 py-1.5">
         {assignee ? (
           <div className="flex items-center gap-2 whitespace-nowrap">
-            <span
-              aria-hidden="true"
-              className="flex size-5 items-center justify-center rounded-full bg-muted text-[9px] font-medium text-muted-foreground"
-            >
-              {getInitials(assignee.name)}
-            </span>
+            <UserAvatar
+              name={assignee.name}
+              image={getUserAvatarUrl(assignee.id, assignee.image)}
+              size="sm"
+              shape="square"
+            />
             <span className="text-sm">{assignee.name}</span>
           </div>
         ) : (

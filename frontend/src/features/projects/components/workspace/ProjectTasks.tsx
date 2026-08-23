@@ -62,14 +62,19 @@ export function ProjectTasks({ project, workspaceId }: ProjectTasksProps) {
       new Map(
         (membersQuery.data ?? []).map((member) => [
           member.userId,
-          { id: member.userId, name: member.name },
+          { id: member.userId, name: member.name, image: member.image },
         ]),
       ),
     [membersQuery.data],
   );
 
   const assignees: TaskAssignee[] = useMemo(
-    () => (membersQuery.data ?? []).map((member) => ({ id: member.userId, name: member.name })),
+    () =>
+      (membersQuery.data ?? []).map((member) => ({
+        id: member.userId,
+        name: member.name,
+        image: member.image,
+      })),
     [membersQuery.data],
   );
 

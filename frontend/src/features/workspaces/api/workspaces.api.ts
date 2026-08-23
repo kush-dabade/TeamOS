@@ -23,6 +23,7 @@ interface BackendWorkspaceMember {
   userId: string;
   name: string;
   email: string;
+  image: string | null;
   role: WorkspaceRole;
   joinedAt: string;
 }
@@ -44,6 +45,7 @@ function toWorkspaceMember(member: BackendWorkspaceMember): WorkspaceMember {
     userId: member.userId,
     name: member.name,
     email: member.email,
+    image: member.image,
     role: member.role,
     joinedAt: member.joinedAt,
   };

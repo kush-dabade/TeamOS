@@ -97,7 +97,12 @@ export function TasksPage() {
     [projectsQuery.data],
   );
   const assignees: TaskAssignee[] = useMemo(
-    () => (membersQuery.data ?? []).map((member) => ({ id: member.userId, name: member.name })),
+    () =>
+      (membersQuery.data ?? []).map((member) => ({
+        id: member.userId,
+        name: member.name,
+        image: member.image,
+      })),
     [membersQuery.data],
   );
 

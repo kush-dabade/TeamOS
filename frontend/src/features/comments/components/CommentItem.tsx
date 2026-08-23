@@ -17,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui";
 import { UserAvatar } from "@/components/ux";
-import { cn } from "@/utils";
+import { cn, getUserAvatarUrl } from "@/utils";
 
 import { CommentForm } from "./CommentForm";
 import { formatCompactTime } from "../lib/format-compact-time";
@@ -94,7 +94,7 @@ export function CommentItem({
         >
           <UserAvatar
             name={comment.author.name}
-            image={comment.author.image}
+            image={getUserAvatarUrl(comment.author.id, comment.author.image)}
             size="sm"
             shape="square"
           />

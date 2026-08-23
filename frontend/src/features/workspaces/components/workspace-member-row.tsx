@@ -21,6 +21,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { UserAvatar } from "@/components/ux";
+import { getUserAvatarUrl } from "@/utils";
 
 import { useRemoveWorkspaceMember } from "../hooks/use-remove-workspace-member";
 import { useTransferWorkspaceOwnership } from "../hooks/use-transfer-workspace-ownership";
@@ -94,9 +96,18 @@ export function WorkspaceMemberRow({
   return (
     <tr className="border-b last:border-b-0">
       <td className="px-3 py-2">
-        <div className="flex min-w-0 flex-col">
-          <span className="truncate text-sm font-medium">{member.name}</span>
-          <span className="truncate text-xs text-muted-foreground">{member.email}</span>
+        <div className="flex min-w-0 items-center gap-2">
+          <UserAvatar
+            name={member.name}
+            image={getUserAvatarUrl(member.userId, member.image)}
+            size="sm"
+            shape="square"
+          />
+
+          <div className="flex min-w-0 flex-col">
+            <span className="truncate text-sm font-medium">{member.name}</span>
+            <span className="truncate text-xs text-muted-foreground">{member.email}</span>
+          </div>
         </div>
       </td>
 

@@ -102,6 +102,7 @@ export function TaskWorkspacePage() {
   const assignees: TaskAssignee[] = (membersQuery.data ?? []).map((member) => ({
     id: member.userId,
     name: member.name,
+    image: member.image,
   }));
 
   const handleEdit = (trigger: HTMLButtonElement) => {

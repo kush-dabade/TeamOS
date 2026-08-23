@@ -243,6 +243,7 @@ export async function listWorkspaceMembers(
     userId: member.userId,
     name: member.user.name,
     email: member.user.email,
+    image: member.user.image,
     role: member.role,
     joinedAt: member.joinedAt,
   }));

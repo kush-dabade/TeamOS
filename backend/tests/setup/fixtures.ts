@@ -149,6 +149,7 @@ export async function createTaskDirect(
   projectId: string,
   createdById: string,
   title = "Test Task",
+  assigneeId?: string,
 ) {
   return prisma.task.create({
     data: {
@@ -156,6 +157,7 @@ export async function createTaskDirect(
       projectId,
       title,
       createdById,
+      ...(assigneeId !== undefined && { assigneeId }),
     },
   });
 }

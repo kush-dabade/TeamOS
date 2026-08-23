@@ -497,12 +497,18 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
     queryClient.invalidateQueries({ queryKey: workspaceKeys.members(payload.workspaceId) });
   },
 
-  // member.removed is declared in REALTIME_EVENTS but is not yet emitted —
-  // removeWorkspaceMember (workspace.service.ts) doesn't create an activity
-  // or emit this event yet, since its removal transaction is still being
-  // restructured (task-assignee cleanup + ownership precondition) in a
-  // follow-up change — so there is deliberately no handler for it here yet,
-  // matching project.restored's identical treatment above.
+  [REALTIME_EVENTS.MEMBER_REMOVED]: (payload, queryClient) => {
+    if (!isWorkspaceScopedPayload(payload)) {
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: workspaceKeys.members(payload.workspaceId) });
+    // Removal bulk-nulls the removed member's task assignments across
+    // however many projects they had tasks in - taskKeys.workspaceLists()
+    // (no project id) is the existing broad-invalidation prefix built for
+    // exactly this "don't know which project(s)" case (see its own comment
+    // in task-keys.ts), not a new invalidation primitive.
+    queryClient.invalidateQueries({ queryKey: taskKeys.workspaceLists() });
+  },
 
   [REALTIME_EVENTS.MEMBER_ROLE_CHANGED]: (payload, queryClient) => {
     if (!isWorkspaceScopedPayload(payload)) {

@@ -11,6 +11,7 @@ import {
 import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
 import { NotFoundError } from "../../shared/errors/not-found-error.js";
 import { ValidationError } from "../../shared/errors/validation-error.js";
+import { isRecordNotFoundError } from "../../shared/errors/prisma-errors.js";
 import {
   requireWorkspaceMembership,
   requireRole,
@@ -338,6 +339,19 @@ export async function updateWorkspaceMemberRole(
   };
 }
 
+async function countOwnedProjects(
+  workspaceId: string,
+  ownerId: string,
+  client: Prisma.TransactionClient = prisma,
+): Promise<number> {
+  return client.project.count({
+    where: {
+      workspaceId,
+      ownerId,
+    },
+  });
+}
+
 export async function removeWorkspaceMember(
   actorId: string,
   workspaceId: string,
@@ -359,10 +373,98 @@ export async function removeWorkspaceMember(
     );
   }
 
-  await prisma.workspaceMember.delete({
-    where: {
-      id: memberId,
-    },
+  // Fail fast, before opening a transaction, for the common case - this
+  // precondition has no side effects of its own. Re-checked again inside
+  // the transaction immediately before the delete (below), since ownership
+  // could theoretically be transferred to this member in the gap between
+  // this read and that one.
+  const ownedProjectCount = await countOwnedProjects(workspaceId, targetMember.userId);
+
+  if (ownedProjectCount > 0) {
+    throw new ValidationError(
+      `Cannot remove member: they own ${ownedProjectCount} project(s). Transfer ownership before removal.`,
+    );
+  }
+
+  let emitActivityCreated: () => void = () => {};
+
+  await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    // Re-check immediately before the delete, inside the transaction -
+    // narrows (but, under Read Committed, does not fully eliminate) the
+    // window between the precondition check above and this delete during
+    // which a concurrent transferProjectOwnership could hand this member a
+    // project. Full closure would need SELECT ... FOR UPDATE locking on the
+    // target's owned-project rows - deliberately not introduced here; the
+    // residual race is bounded (a project briefly owned by a departed
+    // member, visible and fixable by any OWNER/ADMIN) and accepted.
+    const recheckedOwnedCount = await countOwnedProjects(
+      workspaceId,
+      targetMember.userId,
+      tx,
+    );
+
+    if (recheckedOwnedCount > 0) {
+      throw new ValidationError(
+        `Cannot remove member: they own ${recheckedOwnedCount} project(s). Transfer ownership before removal.`,
+      );
+    }
+
+    await tx.task.updateMany({
+      where: {
+        workspaceId,
+        assigneeId: targetMember.userId,
+        deletedAt: null,
+      },
+      data: {
+        assigneeId: null,
+      },
+    });
+
+    // Translates a concurrent second removal of this same member (its
+    // membership row already gone by the time this transaction's delete
+    // runs) into the same typed NotFoundError getWorkspaceMemberById would
+    // have thrown had it read after that removal committed, rather than a
+    // raw unhandled Prisma error. Mirrors cancelInvitation's identical
+    // handling of the same race (invitation.service.ts).
+    try {
+      await tx.workspaceMember.delete({
+        where: {
+          id: memberId,
+        },
+      });
+    } catch (error) {
+      if (isRecordNotFoundError(error)) {
+        throw new NotFoundError("Workspace member not found");
+      }
+
+      throw error;
+    }
+
+    emitActivityCreated = await createActivity(
+      {
+        workspaceId,
+        actorId,
+
+        type: ActivityType.MEMBER_REMOVED,
+
+        entityType: ActivityEntityType.MEMBER,
+        entityId: memberId,
+
+        metadata: {
+          removedUserName: targetMember.user.name,
+          removedUserEmail: targetMember.user.email,
+        },
+      },
+      tx,
+    );
+  });
+
+  emitActivityCreated();
+
+  emitToWorkspace(workspaceId, REALTIME_EVENTS.MEMBER_REMOVED, {
+    workspaceId,
+    memberId,
+    userId: targetMember.userId,
   });
 
   // Best-effort: the membership is already gone at this point, so a failure

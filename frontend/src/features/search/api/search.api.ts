@@ -1,7 +1,15 @@
 import { apiClient, type ApiSuccess } from "@/lib/api";
 import type { TaskPriority, TaskStatus } from "@/features/tasks";
+import type { SprintStatus } from "@/features/sprints";
+import type { WorkspaceRole } from "@/features/workspaces";
 
-import type { SearchProject, SearchResults, SearchTask } from "../types";
+import type {
+  SearchMember,
+  SearchProject,
+  SearchResults,
+  SearchSprint,
+  SearchTask,
+} from "../types";
 
 interface BackendSearchProject {
   id: string;
@@ -19,10 +27,28 @@ interface BackendSearchTask {
   projectId: string;
 }
 
+interface BackendSearchSprint {
+  id: string;
+  name: string;
+  goal: string | null;
+  status: SprintStatus;
+  projectId: string;
+}
+
+interface BackendSearchMember {
+  userId: string;
+  name: string;
+  email: string;
+  image: string | null;
+  role: WorkspaceRole;
+}
+
 interface BackendSearchResponse {
   query: string;
   projects: BackendSearchProject[];
   tasks: BackendSearchTask[];
+  sprints: BackendSearchSprint[];
+  members: BackendSearchMember[];
 }
 
 function toSearchProject(project: BackendSearchProject): SearchProject {
@@ -42,6 +68,26 @@ function toSearchTask(task: BackendSearchTask): SearchTask {
     status: task.status,
     priority: task.priority,
     projectId: task.projectId,
+  };
+}
+
+function toSearchSprint(sprint: BackendSearchSprint): SearchSprint {
+  return {
+    id: sprint.id,
+    name: sprint.name,
+    goal: sprint.goal,
+    status: sprint.status,
+    projectId: sprint.projectId,
+  };
+}
+
+function toSearchMember(member: BackendSearchMember): SearchMember {
+  return {
+    userId: member.userId,
+    name: member.name,
+    email: member.email,
+    image: member.image,
+    role: member.role,
   };
 }
 
@@ -70,5 +116,7 @@ export async function fetchSearch(
     query: data.query,
     projects: data.projects.map(toSearchProject),
     tasks: data.tasks.map(toSearchTask),
+    sprints: data.sprints.map(toSearchSprint),
+    members: data.members.map(toSearchMember),
   };
 }

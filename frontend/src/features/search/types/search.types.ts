@@ -1,4 +1,6 @@
 import type { TaskPriority, TaskStatus } from "@/features/tasks";
+import type { SprintStatus } from "@/features/sprints";
+import type { WorkspaceRole } from "@/features/workspaces";
 
 export interface SearchProject {
   id: string;
@@ -16,8 +18,26 @@ export interface SearchTask {
   projectId: string;
 }
 
+export interface SearchSprint {
+  id: string;
+  name: string;
+  goal: string | null;
+  status: SprintStatus;
+  projectId: string;
+}
+
+export interface SearchMember {
+  userId: string;
+  name: string;
+  email: string;
+  image: string | null;
+  role: WorkspaceRole;
+}
+
 export interface SearchResults {
   query: string;
   projects: SearchProject[];
   tasks: SearchTask[];
+  sprints: SearchSprint[];
+  members: SearchMember[];
 }

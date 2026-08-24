@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FolderIcon, ListTodoIcon, SearchIcon } from "lucide-react";
+import { CalendarRangeIcon, FolderIcon, ListTodoIcon, SearchIcon } from "lucide-react";
 
 import {
   Command,
@@ -10,7 +10,9 @@ import {
   CommandSeparator,
   Skeleton,
 } from "@/components/ui";
-import { EmptyState, ListErrorState } from "@/components/ux";
+import { EmptyState, ListErrorState, UserAvatar } from "@/components/ux";
+import { useProjects } from "@/features/projects";
+import { getUserAvatarUrl } from "@/utils";
 
 import { useDebouncedValue } from "../hooks/use-debounced-value";
 import { useSearch } from "../hooks/use-search";
@@ -24,6 +26,8 @@ interface SearchCommandContentProps {
   workspaceId: string | undefined;
   onSelectProject: (slug: string) => void;
   onSelectTask: (taskId: string) => void;
+  onSelectSprint: (projectSlug: string) => void;
+  onSelectMember: () => void;
 }
 
 // SearchCommand gives this a fresh `key` every time the dialog closes, so it
@@ -33,6 +37,8 @@ export function SearchCommandContent({
   workspaceId,
   onSelectProject,
   onSelectTask,
+  onSelectSprint,
+  onSelectMember,
 }: SearchCommandContentProps) {
   const [query, setQuery] = useState("");
   const trimmedQuery = query.trim();
@@ -49,16 +55,38 @@ export function SearchCommandContent({
     enabled: isQueryReady,
   });
 
+  // Sprint results only carry their parent project's id, not its slug (see
+  // SearchSprintResult) - the project list is already the canonical
+  // workspace-scoped source for that mapping (same data ProjectWorkspacePage
+  // itself resolves a slug from), so this reuses it instead of teaching the
+  // backend search response to duplicate project fields it doesn't
+  // otherwise need. The default (no status filter) listing already excludes
+  // ARCHIVED projects, matching searchSprints' own exclusion, so every
+  // sprint result's project is guaranteed to be resolvable here.
+  const projectsQuery = useProjects(workspaceId);
+
   const projects = searchQuery.data?.projects ?? [];
   const tasks = searchQuery.data?.tasks ?? [];
+  const sprints = searchQuery.data?.sprints ?? [];
+  const members = searchQuery.data?.members ?? [];
   const hasProjectResults = projects.length > 0;
   const hasTaskResults = tasks.length > 0;
+  const hasSprintResults = sprints.length > 0;
+  const hasMemberResults = members.length > 0;
+
+  function resolveProjectSlug(projectId: string): string | undefined {
+    return projectsQuery.data?.find((item) => item.project.id === projectId)?.project.slug;
+  }
 
   const firstResultValue = hasProjectResults
     ? `project-${projects[0].id}`
     : hasTaskResults
       ? `task-${tasks[0].id}`
-      : "";
+      : hasSprintResults
+        ? `sprint-${sprints[0].id}`
+        : hasMemberResults
+          ? `member-${members[0].userId}`
+          : "";
 
   const [selectedValue, setSelectedValue] = useState(firstResultValue);
   const [syncedResultValue, setSyncedResultValue] = useState(firstResultValue);
@@ -91,7 +119,7 @@ export function SearchCommandContent({
   // same state renderEmptyState() already branches on, once per settled
   // state rather than per keystroke, since it's derived from `debouncedQuery`
   // and query status rather than the raw input.
-  const resultCount = projects.length + tasks.length;
+  const resultCount = projects.length + tasks.length + sprints.length + members.length;
   const statusMessage = !isQueryReady
     ? ""
     : searchQuery.isError
@@ -106,7 +134,7 @@ export function SearchCommandContent({
         <EmptyState
           icon={SearchIcon}
           title="Search TeamOS"
-          description="Find projects and tasks by name. Keep typing to search."
+          description="Find projects, tasks, sprints, and people by name. Keep typing to search."
         />
       );
     }
@@ -141,7 +169,7 @@ export function SearchCommandContent({
       <EmptyState
         icon={SearchIcon}
         title="No results found"
-        description={`No projects or tasks match "${debouncedQuery}".`}
+        description={`No projects, tasks, sprints, or people match "${debouncedQuery}".`}
       />
     );
   }
@@ -155,14 +183,14 @@ export function SearchCommandContent({
       <Command
         shouldFilter={false}
         vimBindings={false}
-        label="Search projects and tasks"
+        label="Search projects, tasks, sprints, and people"
         value={selectedValue}
         onValueChange={setSelectedValue}
       >
         <CommandInput
           value={query}
           onValueChange={setQuery}
-          placeholder="Search projects and tasks..."
+          placeholder="Search projects, tasks, sprints, and people..."
         />
 
         <CommandList>
@@ -197,6 +225,58 @@ export function SearchCommandContent({
                   status={task.status}
                   priority={task.priority}
                   onSelect={() => onSelectTask(task.id)}
+                />
+              ))}
+            </CommandGroup>
+          ) : null}
+
+          {(hasProjectResults || hasTaskResults) && hasSprintResults ? (
+            <CommandSeparator />
+          ) : null}
+
+          {hasSprintResults ? (
+            <CommandGroup heading="Sprints">
+              {sprints.map((sprint) => {
+                const projectSlug = resolveProjectSlug(sprint.projectId);
+
+                return (
+                  <SearchResultItem
+                    key={sprint.id}
+                    value={`sprint-${sprint.id}`}
+                    icon={CalendarRangeIcon}
+                    title={sprint.name}
+                    description={sprint.goal}
+                    onSelect={() => {
+                      if (projectSlug) {
+                        onSelectSprint(projectSlug);
+                      }
+                    }}
+                  />
+                );
+              })}
+            </CommandGroup>
+          ) : null}
+
+          {(hasProjectResults || hasTaskResults || hasSprintResults) && hasMemberResults ? (
+            <CommandSeparator />
+          ) : null}
+
+          {hasMemberResults ? (
+            <CommandGroup heading="People">
+              {members.map((member) => (
+                <SearchResultItem
+                  key={member.userId}
+                  value={`member-${member.userId}`}
+                  avatar={
+                    <UserAvatar
+                      name={member.name}
+                      image={getUserAvatarUrl(member.userId, member.image)}
+                      size="sm"
+                    />
+                  }
+                  title={member.name}
+                  description={member.email}
+                  onSelect={onSelectMember}
                 />
               ))}
             </CommandGroup>

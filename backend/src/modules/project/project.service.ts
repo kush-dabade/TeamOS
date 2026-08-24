@@ -253,6 +253,93 @@ export async function archiveProject(actorId: string, projectId: string) {
   return response;
 }
 
+export async function restoreProject(actorId: string, projectId: string) {
+  const project = await findProjectById(projectId);
+
+  if (!project) {
+    throw new NotFoundError("Project not found");
+  }
+
+  const membership = await requireWorkspaceMembership(project.workspaceId, actorId);
+
+  requireRole(membership, ["OWNER", "ADMIN"]);
+
+  if (project.status !== "ARCHIVED") {
+    throw new ValidationError("Project is not archived");
+  }
+
+  let emitActivityCreated: () => void = () => {};
+
+  const restoredProject = await prisma.$transaction(async (tx) => {
+    // Compare-and-set: only proceed if the project is still ARCHIVED at the
+    // moment this transaction runs. The status check above was read outside
+    // the transaction, so a second concurrent restore could otherwise have
+    // already committed by the time this one reaches the transaction -
+    // blindly updating by id here would let both "succeed" and each create
+    // its own PROJECT_RESTORED activity/realtime event for the same restore.
+    // Same pattern as acceptResolvedInvitation's PENDING->ACCEPTED guard in
+    // invitation.service.ts.
+    const result = await tx.project.updateMany({
+      where: {
+        id: project.id,
+        status: "ARCHIVED",
+      },
+      data: {
+        status: "ACTIVE",
+      },
+    });
+
+    if (result.count === 0) {
+      throw new ValidationError("Project is not archived");
+    }
+
+    // updateMany doesn't return the updated row - same follow-up pattern as
+    // transferWorkspaceOwnership's analogous compare-and-set in
+    // workspace.service.ts.
+    const restored = await tx.project.findUniqueOrThrow({
+      where: {
+        id: project.id,
+      },
+    });
+
+    emitActivityCreated = await createActivity(
+      {
+        workspaceId: restored.workspaceId,
+        actorId,
+
+        type: ActivityType.PROJECT_RESTORED,
+
+        entityType: ActivityEntityType.PROJECT,
+        entityId: restored.id,
+
+        projectId: restored.id,
+
+        metadata: {
+          projectName: restored.name,
+        },
+      },
+      tx,
+    );
+
+    return restored;
+  });
+
+  emitActivityCreated();
+
+  const response = toProjectResponse(restoredProject);
+
+  emitToWorkspace(
+    restoredProject.workspaceId,
+    REALTIME_EVENTS.PROJECT_RESTORED,
+    {
+      workspaceId: restoredProject.workspaceId,
+      project: response,
+    },
+  );
+
+  return response;
+}
+
 export async function transferProjectOwnership(
   actorId: string,
   projectId: string,

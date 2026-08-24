@@ -12,6 +12,7 @@ import {
   createProject,
   listProjects,
   getProject,
+  restoreProject,
   transferProjectOwnership,
   updateProject,
 } from "./project.service.js";
@@ -77,6 +78,18 @@ export async function updateProjectHandler(req: Request, res: Response) {
 
 export async function archiveProjectHandler(req: Request, res: Response) {
   const project = await archiveProject(
+    req.user!.id,
+    req.params.projectId as string,
+  );
+
+  return res.status(200).json({
+    success: true,
+    data: project,
+  });
+}
+
+export async function restoreProjectHandler(req: Request, res: Response) {
+  const project = await restoreProject(
     req.user!.id,
     req.params.projectId as string,
   );

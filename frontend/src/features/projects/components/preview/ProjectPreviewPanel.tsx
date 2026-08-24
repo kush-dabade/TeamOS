@@ -33,6 +33,7 @@ interface ProjectPreviewPanelProps {
   previewData: ProjectPreviewData | null;
   isPreviewLoading: boolean;
   isArchiving: boolean;
+  isRestoring: boolean;
   workspaceId: string;
   actorRole: WorkspaceRole | undefined;
   open: boolean;
@@ -41,6 +42,7 @@ interface ProjectPreviewPanelProps {
   onOpenProject: (slug: string) => void;
   onEdit: (trigger: HTMLButtonElement) => void;
   onArchive: () => void | Promise<void>;
+  onRestore: () => void | Promise<void>;
 }
 
 export function ProjectPreviewPanel({
@@ -48,6 +50,7 @@ export function ProjectPreviewPanel({
   previewData,
   isPreviewLoading,
   isArchiving,
+  isRestoring,
   workspaceId,
   actorRole,
   open,
@@ -56,6 +59,7 @@ export function ProjectPreviewPanel({
   onOpenProject,
   onEdit,
   onArchive,
+  onRestore,
 }: ProjectPreviewPanelProps) {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
@@ -161,14 +165,25 @@ export function ProjectPreviewPanel({
                 Transfer ownership
               </Button>
             ) : null}
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={() => setIsConfirmOpen(true)}
-              disabled={isArchiving || projectDetails.status === "ARCHIVED"}
-            >
-              {isArchiving ? "Archiving..." : "Archive"}
-            </Button>
+            {projectDetails.status === "ARCHIVED" ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onRestore()}
+                disabled={isRestoring}
+              >
+                {isRestoring ? "Restoring..." : "Restore"}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => setIsConfirmOpen(true)}
+                disabled={isArchiving}
+              >
+                {isArchiving ? "Archiving..." : "Archive"}
+              </Button>
+            )}
           </div>
           <Button type="button" onClick={() => onOpenProject(projectDetails.slug)}>Open project</Button>
         </SheetFooter>
@@ -180,8 +195,8 @@ export function ProjectPreviewPanel({
             <AlertDialogTitle>Archive project?</AlertDialogTitle>
             <AlertDialogDescription>
               This will archive &quot;{projectDetails.name}&quot;. Archived projects can no longer
-              be edited, and their tasks can no longer be created, updated, or deleted. This
-              action cannot be undone.
+              be edited, and their tasks can no longer be created, updated, or deleted. You can
+              restore the project later to make it active again.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

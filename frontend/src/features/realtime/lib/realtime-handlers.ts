@@ -493,10 +493,13 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
     invalidateProjectLists(queryClient);
   },
 
-  // project.restored is declared in REALTIME_EVENTS but is never emitted —
-  // no restore/un-archive function exists in project.service.ts — so there is
-  // deliberately no handler for it here; adding one would wire up an event
-  // that structurally cannot fire.
+  [REALTIME_EVENTS.PROJECT_RESTORED]: (payload, queryClient) => {
+    if (!isProjectEventPayload(payload)) {
+      return;
+    }
+    queryClient.invalidateQueries({ queryKey: projectKeys.detail(payload.project.id) });
+    invalidateProjectLists(queryClient);
+  },
 
   [REALTIME_EVENTS.MEMBER_LEFT]: (payload, queryClient) => {
     if (!isWorkspaceScopedPayload(payload)) {

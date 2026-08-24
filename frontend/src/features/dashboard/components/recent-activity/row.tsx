@@ -39,6 +39,8 @@ function describeActivity(item: RecentActivityItem): {
       return { action: "updated a project", entity: projectName };
     case "PROJECT_ARCHIVED":
       return { action: "archived a project", entity: projectName };
+    case "PROJECT_RESTORED":
+      return { action: "restored a project", entity: projectName };
     case "COMMENT_CREATED":
       return { action: "left a comment", entity: null };
     default:

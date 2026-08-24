@@ -219,6 +219,49 @@ describe("GET /api/v1/search - sprints and people", () => {
     ]);
   });
 
+  // Guards the exact contract frontend/src/features/search/api/search.api.ts
+  // relies on: fetchSearch() calls .map() on data.projects/tasks/sprints/
+  // members with no fallback, so any of the four being absent (not just
+  // empty) throws "Cannot read properties of undefined (reading 'map')" at
+  // the frontend/backend boundary - a category with zero matches must still
+  // come back as [], never as a missing key. Asserting Object.keys directly
+  // (not just .toEqual on each field) is what actually catches a key being
+  // missing entirely, which `expect(res.body.data.sprints).toEqual([])`
+  // alone cannot distinguish from `undefined` after JSON round-tripping
+  // through res.body - a plain equality check against [] would still pass
+  // if the field were coerced somewhere, but Object.keys() would not.
+  it("always returns projects, tasks, sprints, and members as arrays, even when only one category matches", async () => {
+    const owner = await signUpTestUser(app);
+    const { workspace } = await createWorkspaceWithMember(owner.userId);
+    const member = await signUpTestUser(app);
+    await renameUserDirect(member.userId, "Peopleonlymatch Fox", member.email);
+    await addWorkspaceMember(workspace.id, member.userId, "MEMBER");
+
+    const res = await request(app)
+      .get("/api/v1/search")
+      .query({ workspaceId: workspace.id, q: "Peopleonlymatch" })
+      .set("Cookie", owner.cookie)
+      .expect(200);
+
+    expect(Object.keys(res.body.data).sort()).toEqual(
+      ["members", "projects", "query", "sprints", "tasks"].sort(),
+    );
+    expect(Array.isArray(res.body.data.projects)).toBe(true);
+    expect(Array.isArray(res.body.data.tasks)).toBe(true);
+    expect(Array.isArray(res.body.data.sprints)).toBe(true);
+    expect(Array.isArray(res.body.data.members)).toBe(true);
+
+    expect(res.body.data.projects).toEqual([]);
+    expect(res.body.data.tasks).toEqual([]);
+    expect(res.body.data.sprints).toEqual([]);
+    expect(res.body.data.members).toHaveLength(1);
+    expect(res.body.data.members[0]).toMatchObject({
+      userId: member.userId,
+      name: "Peopleonlymatch Fox",
+      role: "MEMBER",
+    });
+  });
+
   it("still returns existing project and task results unaffected by the new entity types", async () => {
     const owner = await signUpTestUser(app);
     const { workspace } = await createWorkspaceWithMember(owner.userId);

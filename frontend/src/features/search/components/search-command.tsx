@@ -77,6 +77,25 @@ export function SearchCommand() {
     navigate(`/tasks/${taskId}`);
   }
 
+  // Deep-links into the project's Sprints tab via router location state
+  // rather than a URL/query param - ProjectWorkspacePage's tab selection is
+  // (and stays) local component state, not URL-addressable, so this passes
+  // an initial-tab hint the same way any other one-shot navigation intent
+  // would. Consumed by ProjectWorkspacePage.
+  function handleSelectSprint(projectSlug: string) {
+    handleOpenChange(false);
+    navigate(`/projects/${projectSlug}`, { state: { initialTab: "sprints" } });
+  }
+
+  // People results have no per-member page - Workspace Settings is where
+  // the member list already lives (WorkspaceMembersCard), so this matches
+  // the same "navigate to the page that already shows this" precedent as
+  // project/task selection, not a new destination.
+  function handleSelectMember() {
+    handleOpenChange(false);
+    navigate("/workspace/settings");
+  }
+
   return (
     <>
       {/* Ctrl/Cmd+K requires a keyboard, so below `md` (no room for the wide
@@ -116,7 +135,7 @@ export function SearchCommand() {
         open={open}
         onOpenChange={handleOpenChange}
         title="Search workspace"
-        description="Find projects and tasks by name."
+        description="Find projects, tasks, sprints, and people by name."
         className="sm:max-w-lg"
       >
         <SearchCommandContent
@@ -124,6 +143,8 @@ export function SearchCommand() {
           workspaceId={workspaceId ?? undefined}
           onSelectProject={handleSelectProject}
           onSelectTask={handleSelectTask}
+          onSelectSprint={handleSelectSprint}
+          onSelectMember={handleSelectMember}
         />
       </CommandDialog>
     </>

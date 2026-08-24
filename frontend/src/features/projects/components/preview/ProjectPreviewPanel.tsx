@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { MoreHorizontal } from "lucide-react";
 
 import {
   AlertDialog,
@@ -10,6 +11,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   Separator,
   Sheet,
   SheetContent,
@@ -63,6 +68,7 @@ export function ProjectPreviewPanel({
 }: ProjectPreviewPanelProps) {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const actionsMenuTriggerRef = useRef<HTMLButtonElement>(null);
 
   const membersQuery = useWorkspaceMembers(workspaceId);
 
@@ -156,35 +162,73 @@ export function ProjectPreviewPanel({
         <Separator />
 
         <SheetFooter className="flex-row items-center justify-between p-4">
-          <div className="flex items-center gap-1">
-            <Button type="button" variant="ghost" onClick={(event) => onEdit(event.currentTarget)}>
-              Edit
-            </Button>
-            {canTransferOwnership ? (
-              <Button type="button" variant="outline" onClick={() => setIsTransferOpen(true)}>
-                Transfer ownership
-              </Button>
-            ) : null}
-            {projectDetails.status === "ARCHIVED" ? (
+          {/* Edit/Transfer/Archive collapse into one overflow menu, the same
+              pattern WorkspaceMemberRow uses for its own (also
+              Transfer-ownership-inclusive) action set - a fixed ~440px-wide
+              sheet has no viewport breakpoint to grow into, so adding
+              Transfer ownership as a fourth visible button here would
+              overflow on every screen size, not just small ones. */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
               <Button
+                ref={actionsMenuTriggerRef}
                 type="button"
-                variant="outline"
-                onClick={() => onRestore()}
-                disabled={isRestoring}
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Project actions"
               >
-                {isRestoring ? "Restoring..." : "Restore"}
+                <MoreHorizontal />
               </Button>
-            ) : (
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={() => setIsConfirmOpen(true)}
-                disabled={isArchiving}
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem
+                onSelect={(event) => {
+                  event.preventDefault();
+                  if (actionsMenuTriggerRef.current) {
+                    onEdit(actionsMenuTriggerRef.current);
+                  }
+                }}
               >
-                {isArchiving ? "Archiving..." : "Archive"}
-              </Button>
-            )}
-          </div>
+                Edit
+              </DropdownMenuItem>
+
+              {canTransferOwnership ? (
+                <DropdownMenuItem
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    setIsTransferOpen(true);
+                  }}
+                >
+                  Transfer ownership
+                </DropdownMenuItem>
+              ) : null}
+
+              {projectDetails.status === "ARCHIVED" ? (
+                <DropdownMenuItem
+                  disabled={isRestoring}
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    onRestore();
+                  }}
+                >
+                  {isRestoring ? "Restoring..." : "Restore"}
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  variant="destructive"
+                  disabled={isArchiving}
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    setIsConfirmOpen(true);
+                  }}
+                >
+                  {isArchiving ? "Archiving..." : "Archive"}
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <Button type="button" onClick={() => onOpenProject(projectDetails.slug)}>Open project</Button>
         </SheetFooter>
       </SheetContent>

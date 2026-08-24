@@ -1,0 +1,13 @@
+-- DropIndex
+-- Uses CONCURRENTLY for the same lock-avoidance reason as the CREATE INDEX
+-- CONCURRENTLY in the following migration
+-- (20260824150001_create_sprint_search_idx_concurrently). The original
+-- 20260824140000_add_sprint_search_index migration is already applied and is
+-- left unmodified, so the corrective fix is this drop-then-recreate pair
+-- instead. Split into its own single-statement migration file so Prisma
+-- Migrate applies it outside a transaction, which Postgres requires for
+-- CONCURRENTLY - a combined drop+create file would still get wrapped in a
+-- transaction and fail. Sprint's full-text search briefly falls back to a
+-- sequential scan between this migration and the next one, which is
+-- acceptable at Sprint's current low row count and query volume.
+DROP INDEX CONCURRENTLY "Sprint_search_idx";

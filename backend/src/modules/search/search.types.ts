@@ -1,4 +1,4 @@
-import { TaskPriority, TaskStatus } from "../../generated/prisma/enums.js";
+import { SprintStatus, TaskPriority, TaskStatus, WorkspaceRole } from "../../generated/prisma/enums.js";
 
 export interface SearchProjectResult {
   id: string;
@@ -16,8 +16,26 @@ export interface SearchTaskResult {
   projectId: string;
 }
 
+export interface SearchSprintResult {
+  id: string;
+  name: string;
+  goal: string | null;
+  status: SprintStatus;
+  projectId: string;
+}
+
+export interface SearchMemberResult {
+  userId: string;
+  name: string;
+  email: string;
+  image: string | null;
+  role: WorkspaceRole;
+}
+
 export interface SearchResponse {
   query: string;
   projects: SearchProjectResult[];
   tasks: SearchTaskResult[];
+  sprints: SearchSprintResult[];
+  members: SearchMemberResult[];
 }

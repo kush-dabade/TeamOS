@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { SearchX, TriangleAlert } from "lucide-react";
 
 import { Button, Skeleton } from "@/components/ui";
@@ -17,6 +17,7 @@ import type { ProjectFormData } from "../validation/project";
 
 export function ProjectWorkspacePage() {
   const { slug } = useParams();
+  const location = useLocation();
   const { workspaceId } = useActiveWorkspace();
   const projectsQuery = useProjects(workspaceId ?? undefined);
 
@@ -26,14 +27,34 @@ export function ProjectWorkspacePage() {
   const projectDetailQuery = useProjectWithTaskCounts(resolvedProjectId);
   const updateProject = useUpdateProject();
 
+  // A sprint search result (see SearchCommand's handleSelectSprint) navigates
+  // here with `{ state: { initialTab: "sprints" } }` instead of a URL/query
+  // param, since tab selection is local component state, not
+  // URL-addressable - same typed location.state narrowing idiom as
+  // features/auth/lib/redirect.ts's `from`. Anything else - no state, a
+  // normal navigation, or a refresh - falls back to the existing "tasks"
+  // default exactly as before.
+  const initialTabFromNavigation: ProjectWorkspaceTab =
+    (location.state as { initialTab?: ProjectWorkspaceTab } | null)?.initialTab === "sprints"
+      ? "sprints"
+      : "tasks";
+
   const [tabSelection, setTabSelection] = useState<{
     projectSlug: string | undefined;
     tab: ProjectWorkspaceTab;
-  }>({ projectSlug: slug, tab: "tasks" });
+  }>({ projectSlug: slug, tab: initialTabFromNavigation });
   const [isFormPanelOpen, setIsFormPanelOpen] = useState(false);
   const [formPanelTrigger, setFormPanelTrigger] = useState<HTMLButtonElement | null>(null);
 
-  const activeTab = tabSelection.projectSlug === slug ? tabSelection.tab : "tasks";
+  // Reusing the existing slug-mismatch guard: this route element is reused
+  // (not remounted) when navigating between two projects, so a plain
+  // useState seed alone would miss a second sprint-search navigation that
+  // lands while this page is already mounted on a different project. When
+  // the tracked slug no longer matches the current one, falling back to
+  // initialTabFromNavigation (rather than a hardcoded "tasks") re-derives
+  // the correct tab for that case too, purely at render time - no effect.
+  const activeTab =
+    tabSelection.projectSlug === slug ? tabSelection.tab : initialTabFromNavigation;
 
   const isResolvingProject = projectsQuery.isPending;
   const isLoadingDetail = Boolean(resolvedProjectId) && projectDetailQuery.isLoading;

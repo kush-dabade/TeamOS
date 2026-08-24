@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 
 import { CommandItem } from "@/components/ui";
@@ -7,7 +8,8 @@ import type { TaskPriority, TaskStatus } from "@/features/tasks";
 
 interface SearchResultItemProps {
   value: string;
-  icon: LucideIcon;
+  icon?: LucideIcon;
+  avatar?: ReactNode;
   title: string;
   description: string | null;
   status?: TaskStatus;
@@ -29,18 +31,23 @@ function humanizeEnumValue(value: string): string {
 }
 
 // Deliberately dumb/presentational - it doesn't know whether it's rendering
-// a project or a task, only whether it was given status/priority to show.
-// SearchCommand picks the icon and the navigation target per result type;
-// this just lays the row out. Project rows never pass status/priority, so
-// the badges simply don't render for them.
+// a project, task, sprint, or person, only whether it was given status/
+// priority to show and whether it was given an icon or an avatar to lead
+// with. SearchCommand picks the leading visual and the navigation target
+// per result type; this just lays the row out. Project/sprint rows pass
+// `icon`; people rows pass `avatar` (a UserAvatar) instead, since a person
+// is identified by their picture, not a category glyph - exactly one of the
+// two is ever passed for a given result type. Project/sprint rows never
+// pass status/priority, so the badges simply don't render for them.
 //
 // `value` is an explicit, stable identifier (not derived from title text) -
 // cmdk uses it to key keyboard highlighting/selection, and relying on its
-// text-content fallback would break if a project and a task ever shared a
-// name.
+// text-content fallback would break if two different result types ever
+// shared a name.
 export function SearchResultItem({
   value,
   icon: Icon,
+  avatar,
   title,
   description,
   status,
@@ -64,7 +71,10 @@ export function SearchResultItem({
       aria-label={ariaLabel}
       className="items-start gap-2.5 py-2"
     >
-      <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      {avatar ??
+        (Icon ? (
+          <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        ) : null)}
       <div className="flex min-w-0 flex-col">
         <span className="truncate text-sm">{title}</span>
         {description ? (

@@ -181,18 +181,24 @@ export async function setUpTaskWithOwner(app: Express) {
  * Direct Prisma insert, same rationale as createProjectDirect. Sprint
  * names only need to be unique within a project (see the
  * @@unique([projectId, name]) constraint), so a random suffix avoids
- * collisions across tests without needing a caller-supplied name.
+ * collisions across tests without needing a caller-supplied name. `goal`
+ * is optional and appended last, same backward-compatible pattern as
+ * createCommentDirect/createAttachmentDirect's trailing optional params -
+ * every existing caller predates sprint search and has no reason to set
+ * it.
  */
 export async function createSprintDirect(
   workspaceId: string,
   projectId: string,
   name = `Test Sprint ${crypto.randomUUID().slice(0, 8)}`,
+  goal?: string,
 ) {
   return prisma.sprint.create({
     data: {
       workspaceId,
       projectId,
       name,
+      ...(goal !== undefined && { goal }),
     },
   });
 }

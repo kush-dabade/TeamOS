@@ -6,6 +6,8 @@ import { requireWorkspaceMembership } from "../../shared/authorization/workspace
 import type {
   SearchProjectResult,
   SearchTaskResult,
+  SearchSprintResult,
+  SearchMemberResult,
   SearchResponse,
 } from "./search.types.js";
 import type { SearchQuery } from "./search.schema.js";
@@ -24,6 +26,22 @@ interface SearchTaskRow {
   status: SearchTaskResult["status"];
   priority: SearchTaskResult["priority"];
   projectId: string;
+}
+
+interface SearchSprintRow {
+  id: string;
+  name: string;
+  goal: string | null;
+  status: SearchSprintResult["status"];
+  projectId: string;
+}
+
+interface SearchMemberRow {
+  userId: string;
+  name: string;
+  email: string;
+  image: string | null;
+  role: SearchMemberResult["role"];
 }
 
 // The single implementation of prefix search, shared by searchProjects and
@@ -132,20 +150,105 @@ LIMIT ${limit};
   `);
 }
 
+// Sprints have no ARCHIVED status of their own (SprintStatus is PLANNED /
+// ACTIVE / COMPLETED), so "no longer searchable" is inherited from the
+// parent Project instead - a sprint under an archived project would
+// otherwise be findable even though the project it belongs to no longer
+// is, via searchProjects' own "status" <> 'ARCHIVED' filter.
+async function searchSprints(
+  workspaceId: string,
+  query: string,
+  limit: number,
+): Promise<SearchSprintResult[]> {
+  return prisma.$queryRaw<SearchSprintRow[]>(Prisma.sql`
+${buildPrefixSearchCte(query)}
+SELECT
+  s.id,
+  s.name,
+  s.goal,
+  s.status,
+  s."projectId"
+FROM "Sprint" s
+JOIN "Project" p ON p.id = s."projectId"
+, search_query
+WHERE
+  s."workspaceId" = ${workspaceId}
+  AND p."status" <> 'ARCHIVED'
+  AND to_tsvector(
+    'simple',
+    s.name || ' ' || coalesce(s.goal, '')
+  ) @@ search_query.tsquery
+ORDER BY
+  ts_rank(
+    to_tsvector(
+      'simple',
+      s.name || ' ' || coalesce(s.goal, '')
+    ),
+    search_query.tsquery
+  ) DESC,
+  s."createdAt" DESC
+LIMIT ${limit};
+  `);
+}
+
+// Deliberately starts FROM "WorkspaceMember", not "user" - the workspace
+// scope is enforced by joining outward from the membership row, not by
+// filtering a global user query after the fact. Never query "user" first
+// and narrow down; this must stay a workspace member directory, not a
+// cross-workspace user directory.
+async function searchMembers(
+  workspaceId: string,
+  query: string,
+  limit: number,
+): Promise<SearchMemberResult[]> {
+  return prisma.$queryRaw<SearchMemberRow[]>(Prisma.sql`
+${buildPrefixSearchCte(query)}
+SELECT
+  wm."userId",
+  u.name,
+  u.email,
+  u.image,
+  wm.role
+FROM "WorkspaceMember" wm
+JOIN "user" u ON u.id = wm."userId"
+, search_query
+WHERE
+  wm."workspaceId" = ${workspaceId}
+  AND to_tsvector(
+    'simple',
+    u.name || ' ' || coalesce(u.email, '')
+  ) @@ search_query.tsquery
+ORDER BY
+  ts_rank(
+    to_tsvector(
+      'simple',
+      u.name || ' ' || coalesce(u.email, '')
+    ),
+    search_query.tsquery
+  ) DESC,
+  wm."joinedAt" DESC
+LIMIT ${limit};
+  `);
+}
+
 export async function search(
   actorId: string,
   query: SearchQuery,
 ): Promise<SearchResponse> {
   await requireWorkspaceMembership(query.workspaceId, actorId);
 
-  const [projects, tasks] = await Promise.all([
+  const [projects, tasks, sprints, members] = await Promise.all([
     searchProjects(query.workspaceId, query.q, query.limit),
     searchTasks(query.workspaceId, query.q, query.limit),
+    searchSprints(query.workspaceId, query.q, query.limit),
+    searchMembers(query.workspaceId, query.q, query.limit),
   ]);
 
   return {
     query: query.q,
     projects,
     tasks,
+    sprints,
+    members,
   };
 }

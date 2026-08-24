@@ -271,12 +271,34 @@ export async function restoreProject(actorId: string, projectId: string) {
   let emitActivityCreated: () => void = () => {};
 
   const restoredProject = await prisma.$transaction(async (tx) => {
-    const restored = await tx.project.update({
+    // Compare-and-set: only proceed if the project is still ARCHIVED at the
+    // moment this transaction runs. The status check above was read outside
+    // the transaction, so a second concurrent restore could otherwise have
+    // already committed by the time this one reaches the transaction -
+    // blindly updating by id here would let both "succeed" and each create
+    // its own PROJECT_RESTORED activity/realtime event for the same restore.
+    // Same pattern as acceptResolvedInvitation's PENDING->ACCEPTED guard in
+    // invitation.service.ts.
+    const result = await tx.project.updateMany({
       where: {
         id: project.id,
+        status: "ARCHIVED",
       },
       data: {
         status: "ACTIVE",
+      },
+    });
+
+    if (result.count === 0) {
+      throw new ValidationError("Project is not archived");
+    }
+
+    // updateMany doesn't return the updated row - same follow-up pattern as
+    // transferWorkspaceOwnership's analogous compare-and-set in
+    // workspace.service.ts.
+    const restored = await tx.project.findUniqueOrThrow({
+      where: {
+        id: project.id,
       },
     });
 

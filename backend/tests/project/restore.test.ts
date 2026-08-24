@@ -264,6 +264,56 @@ describe("Project restore", () => {
       projectName: project.name,
     });
   });
+
+  it("resolves two concurrent restore requests for the same project to exactly one success", async () => {
+    const owner = await signUpTestUser(app);
+    const { workspace } = await createWorkspaceWithMember(owner.userId);
+    const project = await createProjectDirect(workspace.id, owner.userId);
+    await archiveProjectDirect(project.id);
+
+    // Fired concurrently against the real running app / real Postgres
+    // connection pool, mirroring ownership-transfer.test.ts's own
+    // concurrent-transfer test - both requests' pre-transaction status reads
+    // can genuinely race each other before either transaction's conditional
+    // updateMany resolves the outcome. Deliberately not forcing a specific
+    // winner (no artificial delay): the compare-and-set guard must produce a
+    // consistent, correct outcome regardless of which request's transaction
+    // reaches the row first.
+    const [first, second] = await Promise.all([
+      request(app)
+        .post(`/api/v1/projects/${project.id}/restore`)
+        .set("Cookie", owner.cookie),
+      request(app)
+        .post(`/api/v1/projects/${project.id}/restore`)
+        .set("Cookie", owner.cookie),
+    ]);
+
+    const responses = [first, second];
+    const successes = responses.filter((response) => response.status === 200);
+    const failures = responses.filter((response) => response.status !== 200);
+
+    expect(successes).toHaveLength(1);
+    expect(successes[0]?.body.data.status).toBe("ACTIVE");
+
+    expect(failures).toHaveLength(1);
+    expect(failures[0]?.status).toBe(400);
+    expect(failures[0]?.body.error.code).toBe("VALIDATION_ERROR");
+
+    const reloaded = await prisma.project.findUniqueOrThrow({
+      where: { id: project.id },
+    });
+    expect(reloaded.status).toBe("ACTIVE");
+
+    // The loser's transaction rolled back entirely - it must not have
+    // created a second PROJECT_RESTORED activity for the same project.
+    const activities = await prisma.activity.findMany({
+      where: {
+        type: "PROJECT_RESTORED",
+        entityId: project.id,
+      },
+    });
+    expect(activities).toHaveLength(1);
+  });
 });
 
 describe("Project restore - realtime", () => {

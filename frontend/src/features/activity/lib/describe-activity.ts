@@ -42,6 +42,8 @@ export function describeActivity(activity: Activity): ActivityDescription {
       return { action: "updated project", entity: projectName };
     case "PROJECT_ARCHIVED":
       return { action: "archived project", entity: projectName };
+    case "PROJECT_RESTORED":
+      return { action: "restored project", entity: projectName };
     case "COMMENT_CREATED":
       return { action: "commented", entity: taskTitle };
     case "COMMENT_UPDATED":

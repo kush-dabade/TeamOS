@@ -127,6 +127,14 @@ export async function archiveProject(projectId: string): Promise<ProjectListItem
   return toProjectListItem(response.data.data);
 }
 
+export async function restoreProject(projectId: string): Promise<ProjectListItem> {
+  const response = await apiClient.post<ApiSuccess<BackendProject>>(
+    `/projects/${projectId}/restore`,
+  );
+
+  return toProjectListItem(response.data.data);
+}
+
 // newOwnerId is a User id, not a WorkspaceMember id - intentionally
 // different from the workspace-level transfer endpoint, which takes a
 // WorkspaceMember id. See transferProjectOwnership in the backend's

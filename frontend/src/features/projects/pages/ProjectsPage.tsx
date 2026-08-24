@@ -9,6 +9,7 @@ import { useArchiveProject } from "../hooks/use-archive-project";
 import { useCreateProject } from "../hooks/use-create-project";
 import { useProject } from "../hooks/use-project";
 import { useProjectsWithTaskCounts } from "../hooks/use-projects-with-task-counts";
+import { useRestoreProject } from "../hooks/use-restore-project";
 import { useUpdateProject } from "../hooks/use-update-project";
 import { ProjectFormPanel } from "../components/form";
 import { ProjectPreviewPanel } from "../components/preview";
@@ -46,6 +47,7 @@ export function ProjectsPage() {
   const createProject = useCreateProject(workspace?.id ?? "");
   const updateProject = useUpdateProject();
   const archiveProject = useArchiveProject();
+  const restoreProject = useRestoreProject();
 
   const projects = useMemo(() => {
     const normalizedSearchQuery = searchQuery.trim().toLowerCase();
@@ -158,6 +160,21 @@ export function ProjectsPage() {
     }
   };
 
+  const handleRestoreProject = async () => {
+    if (!selectedProjectId) {
+      return;
+    }
+
+    try {
+      await restoreProject.mutateAsync(selectedProjectId);
+      // Panel stays open (unlike archive above) - the project remains fully
+      // accessible after restore, so there's no reason to close it, and
+      // staying open lets the user see it flip back to ACTIVE immediately.
+    } catch {
+      // Failure feedback is already surfaced via the mutation's onError toast.
+    }
+  };
+
   return (
     <PageLayout>
       <div className="mt-3">
@@ -191,6 +208,7 @@ export function ProjectsPage() {
         previewData={selectedProjectPreviewData}
         isPreviewLoading={selectedProjectPreviewQuery.isLoading}
         isArchiving={archiveProject.isPending}
+        isRestoring={restoreProject.isPending}
         workspaceId={workspace?.id ?? ""}
         actorRole={workspace?.role}
         open={isPreviewOpen}
@@ -199,6 +217,7 @@ export function ProjectsPage() {
         onOpenProject={(slug) => navigate(`/projects/${slug}`)}
         onEdit={handleEditProject}
         onArchive={handleArchiveProject}
+        onRestore={handleRestoreProject}
       />
 
       <ProjectFormPanel

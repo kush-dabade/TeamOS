@@ -1,9 +1,8 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { fetchProjectTasks } from "@/features/tasks/api/tasks.api";
+import { fetchProjectTasks, type ListProjectTasksResult } from "@/features/tasks/api/tasks.api";
 import { taskKeys } from "@/features/tasks/lib/task-keys";
-import type { Task } from "@/features/tasks/types";
 import type { AppError } from "@/lib/api";
 
 import { countTasks } from "../lib/task-counts";
@@ -23,9 +22,18 @@ export function useProjectWithTaskCounts(projectId: string | undefined) {
   // paginated endpoint's max page size rather than page-walking. Projects
   // beyond 100 tasks are a known, accepted gap (same limitation accepted for
   // the All Tasks page's fan-out - see use-tasks.ts).
-  const tasksQuery = useQuery<Task[], AppError>({
+  //
+  // Caches the full ListProjectTasksResult (not just its .tasks array) -
+  // this queryKey is also populated by use-projects-with-task-counts.ts
+  // (the Projects list) and SprintsView.tsx with that same full shape, so
+  // extracting .tasks inside the queryFn here would let whichever of those
+  // fetches lands first silently poison this cache entry for the other:
+  // countTasks() would receive a {tasks, pagination} object instead of an
+  // array and throw "tasks.filter is not a function" the moment this page
+  // read a cache entry the Projects list had already warmed.
+  const tasksQuery = useQuery<ListProjectTasksResult, AppError>({
     queryKey: taskKeys.listPage(projectId ?? "", 1, 100),
-    queryFn: async () => (await fetchProjectTasks(projectId as string, { limit: 100 })).tasks,
+    queryFn: () => fetchProjectTasks(projectId as string, { limit: 100 }),
     enabled: Boolean(projectId),
   });
 
@@ -38,7 +46,7 @@ export function useProjectWithTaskCounts(projectId: string | undefined) {
       ...projectQuery.data,
       project: {
         ...projectQuery.data.project,
-        ...countTasks(tasksQuery.data ?? []),
+        ...countTasks(tasksQuery.data?.tasks ?? []),
       },
     };
   }, [projectQuery.data, tasksQuery.data]);

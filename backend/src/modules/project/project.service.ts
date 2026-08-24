@@ -253,6 +253,71 @@ export async function archiveProject(actorId: string, projectId: string) {
   return response;
 }
 
+export async function restoreProject(actorId: string, projectId: string) {
+  const project = await findProjectById(projectId);
+
+  if (!project) {
+    throw new NotFoundError("Project not found");
+  }
+
+  const membership = await requireWorkspaceMembership(project.workspaceId, actorId);
+
+  requireRole(membership, ["OWNER", "ADMIN"]);
+
+  if (project.status !== "ARCHIVED") {
+    throw new ValidationError("Project is not archived");
+  }
+
+  let emitActivityCreated: () => void = () => {};
+
+  const restoredProject = await prisma.$transaction(async (tx) => {
+    const restored = await tx.project.update({
+      where: {
+        id: project.id,
+      },
+      data: {
+        status: "ACTIVE",
+      },
+    });
+
+    emitActivityCreated = await createActivity(
+      {
+        workspaceId: restored.workspaceId,
+        actorId,
+
+        type: ActivityType.PROJECT_RESTORED,
+
+        entityType: ActivityEntityType.PROJECT,
+        entityId: restored.id,
+
+        projectId: restored.id,
+
+        metadata: {
+          projectName: restored.name,
+        },
+      },
+      tx,
+    );
+
+    return restored;
+  });
+
+  emitActivityCreated();
+
+  const response = toProjectResponse(restoredProject);
+
+  emitToWorkspace(
+    restoredProject.workspaceId,
+    REALTIME_EVENTS.PROJECT_RESTORED,
+    {
+      workspaceId: restoredProject.workspaceId,
+      project: response,
+    },
+  );
+
+  return response;
+}
+
 export async function transferProjectOwnership(
   actorId: string,
   projectId: string,

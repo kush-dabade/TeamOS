@@ -141,9 +141,12 @@ describe("One ACTIVE sprint per project invariant", () => {
     expect(activeSprints[0]?.id).toBe(winners[0]?.sprintId);
 
     // The loser's sprint is untouched - still PLANNED, not left in some
-    // partially-applied state.
+    // partially-applied state. `losers` was already asserted to have
+    // exactly one element above, so the non-null assertion is safe here -
+    // same pattern as tests/queues/deterministic-job-ids.test.ts's
+    // `matching[0]!.data...` after an equivalent length assertion.
     const loserSprint = await prisma.sprint.findUniqueOrThrow({
-      where: { id: losers[0]?.sprintId },
+      where: { id: losers[0]!.sprintId },
     });
     expect(loserSprint.status).toBe("PLANNED");
 

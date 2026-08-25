@@ -137,11 +137,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      # Typechecks tsconfig.json (src/) only, which is clean.
-      # tsconfig.test.json currently has one known, unrelated failure in
-      # tests/sprint/sprint-active-invariant.test.ts, tracked separately.
+      # Typechecks tsconfig.test.json, which extends tsconfig.json's src/
+      # boundary to also cover tests/ and vitest.config.ts - so CI now
+      # typechecks the test suite alongside application source.
       - name: Typecheck
-        run: npx tsc --noEmit -p tsconfig.json
+        run: npx tsc --noEmit -p tsconfig.test.json
 
       - name: Test
         run: npm test

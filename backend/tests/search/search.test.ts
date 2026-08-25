@@ -137,7 +137,7 @@ describe("GET /api/v1/search - sprints and people", () => {
     const owner = await signUpTestUser(app);
     const { workspace } = await createWorkspaceWithMember(owner.userId);
     const member = await signUpTestUser(app);
-    await renameUserDirect(member.userId, member.name, "bobsearchable@example.com");
+    await renameUserDirect(member.userId, "Bobsearchable Chen", "bobsearchable@example.com");
     await addWorkspaceMember(workspace.id, member.userId, "MEMBER");
 
     const res = await request(app)

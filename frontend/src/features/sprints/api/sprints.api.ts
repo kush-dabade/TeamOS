@@ -94,10 +94,11 @@ export async function completeSprint(sprintId: string): Promise<Sprint> {
   return toSprint(response.data.data);
 }
 
-// These three endpoints bypass the backend's toTaskResponse mapper and return
-// the raw Task row (confirmed against schema.prisma), so - unlike the Sprint
-// endpoints above - there is no separate Backend*/mapper pair: the wire shape
-// already matches the frontend Task type field-for-field.
+// Unlike the Sprint endpoints above, these three endpoints already serialize
+// through the backend's toTaskResponse mapper, so there is no separate
+// Backend*/mapper pair: the wire shape matches the frontend Task type
+// field-for-field (aside from deletedAt, which toTaskResponse omits and no
+// consumer here reads).
 export async function fetchSprintTasks(sprintId: string): Promise<Task[]> {
   const response = await apiClient.get<ApiSuccess<Task[]>>(`/sprints/${sprintId}/tasks`);
 

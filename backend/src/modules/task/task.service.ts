@@ -29,7 +29,7 @@ import {
   NotificationType,
 } from "../../generated/prisma/enums.js";
 
-function toTaskResponse(task: Task) {
+export function toTaskResponse(task: Task) {
   return {
     id: task.id,
 

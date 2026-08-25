@@ -1,5 +1,6 @@
 import { prisma } from "../../lib/prisma.js";
 import { createActivity } from "../activity/activity.service.js";
+import { toTaskResponse } from "../task/task.service.js";
 
 import type { Sprint } from "../../generated/prisma/client.js";
 
@@ -170,7 +171,7 @@ export async function assignTaskToSprint(
     },
   );
 
-  return updatedTask;
+  return toTaskResponse(updatedTask);
 }
 
 export async function removeTaskFromSprint(
@@ -258,7 +259,7 @@ export async function removeTaskFromSprint(
     },
   );
 
-  return updatedTask;
+  return toTaskResponse(updatedTask);
 }
 
 export async function listSprintTasks(userId: string, sprintId: string) {
@@ -270,7 +271,7 @@ export async function listSprintTasks(userId: string, sprintId: string) {
 
   await requireWorkspaceMembership(sprint.workspaceId, userId);
 
-  return prisma.task.findMany({
+  const tasks = await prisma.task.findMany({
     where: {
       sprintId: sprint.id,
       deletedAt: null,
@@ -279,4 +280,6 @@ export async function listSprintTasks(userId: string, sprintId: string) {
       createdAt: "desc",
     },
   });
+
+  return tasks.map(toTaskResponse);
 }

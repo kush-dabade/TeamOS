@@ -64,6 +64,20 @@ async function connectAndConfirmJoined(baseUrl: string, cookie: string, workspac
   return socket;
 }
 
+/**
+ * Bounded pause used only to give a forbidden-event tracker (trackEvent) a
+ * window to observe an event that could arrive immediately after the
+ * expected event's own waitForEvent already resolved - the tracker's
+ * listener stays registered the whole time, this just delays the
+ * wasReceived()/stop() check long enough that a near-immediate stray
+ * emission isn't missed. Not a substitute for waitForEvent's own
+ * listener-before-trigger ordering, and not used anywhere else in this
+ * file.
+ */
+function observeForbiddenEventWindow(ms = 100): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 describe("task realtime event contracts", () => {
   let testServer: TestServer;
   const openSockets: Socket[] = [];
@@ -129,6 +143,9 @@ describe("task realtime event contracts", () => {
     expect(payload.workspaceId).toBe(workspace.id);
     expect(payload.task.id).toBe(task.id);
     expect(payload.task.title).toBe("Renamed via realtime test");
+
+    await observeForbiddenEventWindow();
+
     expect(completedTracker.wasReceived()).toBe(false);
     completedTracker.stop();
   });
@@ -159,6 +176,9 @@ describe("task realtime event contracts", () => {
     expect(payload.workspaceId).toBe(workspace.id);
     expect(payload.task.id).toBe(task.id);
     expect(payload.task.status).toBe("DONE");
+
+    await observeForbiddenEventWindow();
+
     expect(updatedTracker.wasReceived()).toBe(false);
     updatedTracker.stop();
   });

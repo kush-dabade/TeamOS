@@ -7,6 +7,7 @@ import { prisma } from "../../src/lib/prisma.js";
 import {
   ActivityEntityType,
   ActivityType,
+  NotificationType,
   WorkspaceRole,
 } from "../../src/generated/prisma/enums.js";
 
@@ -330,6 +331,49 @@ export async function createAttachmentDirect(
       mimeType: "text/plain",
       size: 128,
       ...(createdAt !== undefined && { createdAt }),
+    },
+  });
+}
+
+/**
+ * Direct Prisma insert, same rationale as createActivityDirect - `createdAt`
+ * is required and positional (not optional/trailing like
+ * createCommentDirect/createAttachmentDirect) since every caller of this
+ * fixture is a notification-pagination or read-state test that needs to
+ * control ordering deterministically, unlike those two fixtures' callers.
+ * `overrides` covers the handful of fields notification-service tests need
+ * to set directly rather than through the real markRead/markAllRead flow
+ * (e.g. seeding an already-deleted or already-read row to prove it's
+ * excluded/unaffected) - `workspaceId` only satisfies the schema's required
+ * FK and is never filtered on by notification.service.ts itself.
+ */
+export async function createNotificationDirect(
+  workspaceId: string,
+  recipientId: string,
+  createdAt: Date,
+  overrides: Partial<{
+    type: NotificationType;
+    title: string;
+    message: string;
+    isRead: boolean;
+    readAt: Date | null;
+    deletedAt: Date | null;
+  }> = {},
+) {
+  return prisma.notification.create({
+    data: {
+      workspaceId,
+      recipientId,
+      createdAt,
+
+      type: overrides.type ?? NotificationType.TASK_ASSIGNED,
+
+      title: overrides.title ?? "Test Notification",
+      message: overrides.message ?? "Test notification message",
+
+      ...(overrides.isRead !== undefined && { isRead: overrides.isRead }),
+      ...(overrides.readAt !== undefined && { readAt: overrides.readAt }),
+      ...(overrides.deletedAt !== undefined && { deletedAt: overrides.deletedAt }),
     },
   });
 }

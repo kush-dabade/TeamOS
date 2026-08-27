@@ -125,6 +125,17 @@ function signInAccountRateLimitKey(normalizedEmail: string): string {
 const SESSION_EXPIRES_IN_SECONDS = 60 * 60 * 24 * 7;
 const SESSION_UPDATE_AGE_SECONDS = 60 * 60 * 24;
 
+// Every Better Auth endpoint that can persist a client-supplied `image`
+// straight onto User.image with no ownership/format check - verified
+// against the installed better-auth's api/routes/update-user.mjs and
+// sign-up.mjs. Both are otherwise-legitimate generic Better Auth endpoints
+// (profile update, account creation) that TeamOS's own uploadAvatar()/
+// deleteAvatar() (modules/user/user.service.ts) never go through - those
+// are the only endpoints that may ever write User.image, and they always
+// derive the storage key themselves. Defined once, module-level, so the
+// `before` hook below doesn't allocate a new Set on every request.
+const AVATAR_IMAGE_PROTECTED_PATHS = new Set(["/update-user", "/sign-up/email"]);
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql",
@@ -339,6 +350,25 @@ export const auth = betterAuth({
     // or resend-verification to pass it) is Better Auth's own supported
     // mechanism for this: https://www.better-auth.com/docs/concepts/hooks
     before: createAuthMiddleware(async (ctx) => {
+      // A client who learns another user's real storage key (routinely
+      // exposed wherever `image` is serialized: workspace member lists,
+      // comments, activity, attachments) could plant it onto either of
+      // AVATAR_IMAGE_PROTECTED_PATHS's endpoints (their own profile via
+      // update-user, or a brand-new account's row via sign-up), then use
+      // their own /me/avatar GET/DELETE to read or delete that victim's
+      // file. Rejecting any request to either path that includes an
+      // `image` key at all (not merely validating its shape) is what
+      // actually closes this: a shape check alone wouldn't stop a real,
+      // correctly-formatted key belonging to someone else from being
+      // planted.
+      if (AVATAR_IMAGE_PROTECTED_PATHS.has(ctx.path) && ctx.body?.image !== undefined) {
+        throw new APIError("BAD_REQUEST", {
+          code: "AVATAR_NOT_EDITABLE_HERE",
+          message:
+            "Avatar image cannot be set through this endpoint. Use the avatar upload/delete endpoints instead.",
+        });
+      }
+
       // Runs before Better Auth even attempts to verify the password -
       // deliberately incrementing first and comparing after (the same
       // "increment first, then compare" order the Express-level limiters

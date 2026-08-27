@@ -141,6 +141,26 @@ export function errorHandler(
     );
   }
 
+  // express.json() (app.ts) surfaces malformed/oversized request bodies as
+  // plain Error instances (a SyntaxError from JSON.parse, or raw-body's own
+  // PayloadTooLargeError) decorated with a `.type` property by body-parser's
+  // read.js - neither has a dedicated exported class to instanceof-check
+  // against, so `.type` is the only reliable discriminator. Checked here,
+  // ahead of the generic fallback, so these remain real client errors
+  // instead of being misreported as a 500.
+  if (error instanceof Error && (error as { type?: string }).type === "entity.parse.failed") {
+    return sendError(res, 400, "VALIDATION_ERROR", "Malformed JSON in request body");
+  }
+
+  if (error instanceof Error && (error as { type?: string }).type === "entity.too.large") {
+    return sendError(
+      res,
+      413,
+      "PAYLOAD_TOO_LARGE",
+      "Request body exceeds the maximum allowed size",
+    );
+  }
+
   req.log.error({ err: error }, "Unhandled error");
 
   return sendError(res, 500, "INTERNAL_ERROR", "An internal error occurred");

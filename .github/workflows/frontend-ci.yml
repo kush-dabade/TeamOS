@@ -4,7 +4,7 @@ name: Frontend CI
   pull_request:
   push:
     branches:
-      - master
+      - main
 
 permissions:
   contents: read
@@ -46,6 +46,9 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: Test
+        run: npm run test
 
       # `build` runs `tsc -b && vite build` - the tsc phase is the
       # typecheck (no separate typecheck script exists), and vite build

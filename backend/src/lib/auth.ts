@@ -339,6 +339,30 @@ export const auth = betterAuth({
     // or resend-verification to pass it) is Better Auth's own supported
     // mechanism for this: https://www.better-auth.com/docs/concepts/hooks
     before: createAuthMiddleware(async (ctx) => {
+      // Better Auth's own POST /update-user (update-user.mjs) accepts any
+      // client-supplied `image` string with no ownership/format check and
+      // persists it straight onto the caller's own User.image. getAvatar()/
+      // deleteAvatar() (modules/user/user.service.ts) then trust that same
+      // column on the caller's own record as an opaque storage key - so a
+      // client who learns another user's real storage key (routinely
+      // exposed wherever `image` is serialized: workspace member lists,
+      // comments, activity, attachments) could plant it here, then use
+      // their own /me/avatar GET/DELETE to read or delete that victim's
+      // file. uploadAvatar()/deleteAvatar() are the only endpoints that may
+      // ever write User.image - they always derive a storage key this app
+      // generated itself, scoped under users/{userId}/avatar/. Rejecting
+      // any request that includes an `image` key at all (not merely
+      // validating its shape) is what actually closes this: a shape check
+      // alone wouldn't stop a real, correctly-formatted key belonging to
+      // someone else from being planted.
+      if (ctx.path === "/update-user" && ctx.body?.image !== undefined) {
+        throw new APIError("BAD_REQUEST", {
+          code: "AVATAR_NOT_EDITABLE_HERE",
+          message:
+            "Avatar image cannot be changed through this endpoint. Use the avatar upload/delete endpoints instead.",
+        });
+      }
+
       // Runs before Better Auth even attempts to verify the password -
       // deliberately incrementing first and comparing after (the same
       // "increment first, then compare" order the Express-level limiters

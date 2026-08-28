@@ -1,6 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { activityKeys } from "@/features/activity";
 import { taskKeys } from "@/features/tasks";
 import { sprintKeys } from "@/features/sprints";
 import { createTestQueryClient } from "@/test/create-test-query-client";
@@ -147,5 +148,111 @@ describe("realtimeHandlers - sprint assignment invalidation (regression)", () =>
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: taskKeys.detail("task-1") });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: taskKeys.list("project-1") });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: sprintKeys.tasks("sprint-1") });
+  });
+});
+
+describe("realtimeHandlers - ACTIVITY_CREATED", () => {
+  let queryClient: QueryClient;
+  let invalidateSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    queryClient = createTestQueryClient();
+    invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+  });
+
+  it("invalidates the entity-scoped list and the workspace-wide feed for a self-referential TASK activity", () => {
+    const handler = getHandler(REALTIME_EVENTS.ACTIVITY_CREATED);
+
+    handler(
+      {
+        workspaceId: "workspace-1",
+        activity: { entityType: "TASK", entityId: "task-1", taskId: "task-1", projectId: null },
+      },
+      queryClient,
+    );
+
+    expect(invalidateSpy).toHaveBeenCalledTimes(2);
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: activityKeys.list("workspace-1", "TASK", "task-1"),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: activityKeys.workspaceFeed("workspace-1"),
+    });
+  });
+
+  it("does not double-invalidate a self-referential PROJECT activity's own list", () => {
+    const handler = getHandler(REALTIME_EVENTS.ACTIVITY_CREATED);
+
+    handler(
+      {
+        workspaceId: "workspace-1",
+        activity: {
+          entityType: "PROJECT",
+          entityId: "project-1",
+          taskId: null,
+          projectId: "project-1",
+        },
+      },
+      queryClient,
+    );
+
+    expect(invalidateSpy).toHaveBeenCalledTimes(2);
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: activityKeys.list("workspace-1", "PROJECT", "project-1"),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: activityKeys.workspaceFeed("workspace-1"),
+    });
+  });
+
+  it("also invalidates the task and project ancestry feeds for a non-self-referential activity, alongside the workspace feed", () => {
+    const handler = getHandler(REALTIME_EVENTS.ACTIVITY_CREATED);
+
+    handler(
+      {
+        workspaceId: "workspace-1",
+        activity: {
+          entityType: "COMMENT",
+          entityId: "comment-1",
+          taskId: "task-1",
+          projectId: "project-1",
+        },
+      },
+      queryClient,
+    );
+
+    expect(invalidateSpy).toHaveBeenCalledTimes(4);
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: activityKeys.list("workspace-1", "COMMENT", "comment-1"),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: activityKeys.workspaceFeed("workspace-1"),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: activityKeys.list("workspace-1", "TASK", "task-1"),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: activityKeys.list("workspace-1", "PROJECT", "project-1"),
+    });
+  });
+
+  it("invalidates the workspace-wide feed unconditionally, even without taskId/projectId ancestry", () => {
+    const handler = getHandler(REALTIME_EVENTS.ACTIVITY_CREATED);
+
+    handler(
+      {
+        workspaceId: "workspace-2",
+        activity: { entityType: "SPRINT", entityId: "sprint-1" },
+      },
+      queryClient,
+    );
+
+    expect(invalidateSpy).toHaveBeenCalledTimes(2);
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: activityKeys.list("workspace-2", "SPRINT", "sprint-1"),
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: activityKeys.workspaceFeed("workspace-2"),
+    });
   });
 });

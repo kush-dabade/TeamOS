@@ -382,6 +382,15 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
       queryKey: activityKeys.list(workspaceId, activity.entityType, activity.entityId),
     });
 
+    // Every activity affects the workspace-wide recent feed (the dashboard
+    // panel), regardless of entity type - unconditional, unlike the
+    // task/project ancestry invalidations below. workspaceFeed is a sibling
+    // of lists() (see activity-keys.ts), so this can't also invalidate, or be
+    // invalidated by, the entity-scoped list key above.
+    queryClient.invalidateQueries({
+      queryKey: activityKeys.workspaceFeed(workspaceId),
+    });
+
     if (
       activity.taskId &&
       !(activity.entityType === "TASK" && activity.entityId === activity.taskId)

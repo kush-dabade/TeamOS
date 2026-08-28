@@ -1,51 +1,14 @@
 import { ChevronRight } from "lucide-react";
 
 import { getInitials, formatRelativeDate } from "@/utils";
-
-import type { RecentActivityItem } from "../../types";
+import { describeActivity, type Activity } from "@/features/activity";
 
 interface ActivityRowProps {
-  item: RecentActivityItem;
+  item: Activity;
   // Whether this activity resolves to a navigable destination. The panel owns
   // that decision; the row only renders a button vs. static row accordingly.
   interactive: boolean;
-  onSelect: (item: RecentActivityItem) => void;
-}
-
-// Frontend-generated description for the MVP. Tasks, projects, and comments are
-// described explicitly; every other type gets a neutral fallback so an
-// unmapped backend enum value still renders. A backend presenter can replace
-// this later without changing the row.
-function describeActivity(item: RecentActivityItem): {
-  action: string;
-  entity: string | null;
-} {
-  const metadata = item.metadata ?? {};
-  const taskTitle = typeof metadata.taskTitle === "string" ? metadata.taskTitle : null;
-  const projectName = typeof metadata.projectName === "string" ? metadata.projectName : null;
-
-  switch (item.type) {
-    case "TASK_CREATED":
-      return { action: "created a task", entity: taskTitle };
-    case "TASK_STATUS_CHANGED":
-      return { action: "updated a task", entity: taskTitle };
-    case "TASK_COMPLETED":
-      return { action: "completed a task", entity: taskTitle };
-    case "TASK_DELETED":
-      return { action: "deleted a task", entity: taskTitle };
-    case "PROJECT_CREATED":
-      return { action: "created a project", entity: projectName };
-    case "PROJECT_UPDATED":
-      return { action: "updated a project", entity: projectName };
-    case "PROJECT_ARCHIVED":
-      return { action: "archived a project", entity: projectName };
-    case "PROJECT_RESTORED":
-      return { action: "restored a project", entity: projectName };
-    case "COMMENT_CREATED":
-      return { action: "left a comment", entity: null };
-    default:
-      return { action: "updated an item", entity: null };
-  }
+  onSelect: (item: Activity) => void;
 }
 
 export function ActivityRow({ item, interactive, onSelect }: ActivityRowProps) {

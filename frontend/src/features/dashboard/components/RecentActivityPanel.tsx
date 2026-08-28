@@ -1,15 +1,15 @@
 import type { ReactNode } from "react";
-import { Activity } from "lucide-react";
+import { Activity as ActivityIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui";
 import { EmptyState } from "@/components/ux";
+import type { Activity } from "@/features/activity";
 
 import { DashboardPanel } from "./layout";
 import { ActivityRow, RecentActivitySkeleton } from "./recent-activity";
 
 import { useRecentActivity } from "../hooks/use-recent-activity";
-import type { RecentActivityItem } from "../types";
 
 const MAX_VISIBLE_ITEMS = 6;
 
@@ -18,7 +18,7 @@ const MAX_VISIBLE_ITEMS = 6;
 // task id, which the task route accepts directly. Projects route by slug, which
 // the Activity contract doesn't yet expose, so project (and every other)
 // activity stays awareness-only until the backend provides routing info.
-function resolveActivityHref(item: RecentActivityItem): string | null {
+function resolveActivityHref(item: Activity): string | null {
   return item.entityType === "TASK" ? `/tasks/${item.entityId}` : null;
 }
 
@@ -28,7 +28,7 @@ export function RecentActivityPanel() {
 
   const visibleItems = data.slice(0, MAX_VISIBLE_ITEMS);
 
-  const handleSelect = (item: RecentActivityItem) => {
+  const handleSelect = (item: Activity) => {
     const href = resolveActivityHref(item);
     if (href) {
       navigate(href);
@@ -55,7 +55,7 @@ export function RecentActivityPanel() {
     content = (
       <div className="flex min-h-40 items-center justify-center">
         <EmptyState
-          icon={Activity}
+          icon={ActivityIcon}
           title="No recent activity"
           description="Updates across your workspace will appear here."
         />

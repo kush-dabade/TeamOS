@@ -126,6 +126,7 @@ export function TaskWorkspacePage() {
         title: data.title,
         description: data.description || null,
         priority: data.priority,
+        status: data.status,
         assigneeId: data.assigneeId || null,
         dueDate: data.dueDate || null,
       },
@@ -141,7 +142,11 @@ export function TaskWorkspacePage() {
     }
 
     try {
-      await deleteTask.mutateAsync({ taskId, projectId: taskItem.task.projectId });
+      await deleteTask.mutateAsync({
+        taskId,
+        projectId: taskItem.task.projectId,
+        sprintId: taskItem.task.sprintId,
+      });
       toast.success("Task deleted");
       navigate("/tasks");
     } catch {

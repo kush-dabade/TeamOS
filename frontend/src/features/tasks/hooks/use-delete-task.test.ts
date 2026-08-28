@@ -4,6 +4,7 @@ import { createElement, type PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AppError } from "@/lib/api";
+import { sprintKeys } from "@/features/sprints/lib/sprint-keys";
 import { createTestQueryClient } from "@/test/create-test-query-client";
 
 import { deleteTask } from "../api/tasks.api";
@@ -35,7 +36,7 @@ describe("useDeleteTask", () => {
       wrapper: createWrapper(queryClient),
     });
 
-    await result.current.mutateAsync({ taskId: "task-1", projectId: "project-1" });
+    await result.current.mutateAsync({ taskId: "task-1", projectId: "project-1", sprintId: null });
 
     await waitFor(() => {
       expect(invalidateSpy).toHaveBeenCalledTimes(3);
@@ -59,9 +60,58 @@ describe("useDeleteTask", () => {
     });
 
     await expect(
-      result.current.mutateAsync({ taskId: "task-1", projectId: "project-1" }),
+      result.current.mutateAsync({ taskId: "task-1", projectId: "project-1", sprintId: null }),
     ).rejects.toEqual(mockError);
 
     expect(invalidateSpy).not.toHaveBeenCalled();
+  });
+
+  // `DeleteTaskVariables` doesn't declare `sprintId` yet (Commit 2 adds it).
+  // Routing the literal through an intermediate `variables` binding, instead
+  // of an inline object literal, sidesteps TypeScript's excess-property check
+  // so this compiles today while still exercising the real `mutateAsync` call
+  // the upcoming implementation must handle.
+  it("invalidates the task's sprint task-list cache when sprintId is supplied", async () => {
+    mockDeleteTask.mockResolvedValue(undefined);
+
+    const queryClient = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const { result } = renderHook(() => useDeleteTask(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    const variables = { taskId: "task-1", projectId: "project-1", sprintId: "sprint-1" };
+    await result.current.mutateAsync(variables);
+
+    await waitFor(() => {
+      expect(invalidateSpy).toHaveBeenCalledTimes(4);
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: sprintKeys.tasks("sprint-1") });
+  });
+
+  it("does not invalidate any sprint task-list cache when sprintId is null", async () => {
+    mockDeleteTask.mockResolvedValue(undefined);
+
+    const queryClient = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const { result } = renderHook(() => useDeleteTask(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    const variables = { taskId: "task-1", projectId: "project-1", sprintId: null };
+    await result.current.mutateAsync(variables);
+
+    await waitFor(() => {
+      expect(invalidateSpy).toHaveBeenCalledTimes(3);
+    });
+
+    const sprintCalls = invalidateSpy.mock.calls.filter((call: unknown[]) => {
+      const key = (call[0] as { queryKey?: unknown } | undefined)?.queryKey;
+      return Array.isArray(key) && key[0] === "sprints";
+    });
+    expect(sprintCalls).toHaveLength(0);
   });
 });

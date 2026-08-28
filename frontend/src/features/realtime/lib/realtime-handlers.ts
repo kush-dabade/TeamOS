@@ -132,10 +132,10 @@ function isActivityCreatedPayload(payload: unknown): payload is ActivityCreatedP
 }
 
 // Task payload shapes, per backend/src/modules/task/task.service.ts. All four
-// carry the full task (workspaceId + task), so projectId/id are always
-// available without a second lookup.
+// carry the full task (workspaceId + task), so projectId/id/sprintId are
+// always available without a second lookup.
 interface TaskEventPayload {
-  task: { id: string; projectId: string };
+  task: { id: string; projectId: string; sprintId?: string | null };
 }
 
 function isTaskEventPayload(payload: unknown): payload is TaskEventPayload {
@@ -148,13 +148,30 @@ function isTaskEventPayload(payload: unknown): payload is TaskEventPayload {
     "id" in payload.task &&
     typeof payload.task.id === "string" &&
     "projectId" in payload.task &&
-    typeof payload.task.projectId === "string"
+    typeof payload.task.projectId === "string" &&
+    (!("sprintId" in payload.task) ||
+      payload.task.sprintId === null ||
+      typeof payload.task.sprintId === "string")
   );
 }
 
-function invalidateTask(taskId: string, projectId: string, queryClient: QueryClient): void {
+// `sprintId` is optional and last: task.assigned_to_sprint/removed_from_sprint
+// below already do their own sprint-list invalidation (including the
+// previousSprintId case, which this helper knows nothing about), so they call
+// this with their existing 3-arg form and get no sprint invalidation from
+// here - only task.updated/completed/deleted pass a 4th argument.
+function invalidateTask(
+  taskId: string,
+  projectId: string,
+  queryClient: QueryClient,
+  sprintId?: string | null,
+): void {
   queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
   queryClient.invalidateQueries({ queryKey: taskKeys.list(projectId) });
+
+  if (sprintId) {
+    queryClient.invalidateQueries({ queryKey: sprintKeys.tasks(sprintId) });
+  }
 }
 
 // task.assigned_to_sprint/removed_from_sprint, per
@@ -365,6 +382,15 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
       queryKey: activityKeys.list(workspaceId, activity.entityType, activity.entityId),
     });
 
+    // Every activity affects the workspace-wide recent feed (the dashboard
+    // panel), regardless of entity type - unconditional, unlike the
+    // task/project ancestry invalidations below. workspaceFeed is a sibling
+    // of lists() (see activity-keys.ts), so this can't also invalidate, or be
+    // invalidated by, the entity-scoped list key above.
+    queryClient.invalidateQueries({
+      queryKey: activityKeys.workspaceFeed(workspaceId),
+    });
+
     if (
       activity.taskId &&
       !(activity.entityType === "TASK" && activity.entityId === activity.taskId)
@@ -395,21 +421,21 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
     if (!isTaskEventPayload(payload)) {
       return;
     }
-    invalidateTask(payload.task.id, payload.task.projectId, queryClient);
+    invalidateTask(payload.task.id, payload.task.projectId, queryClient, payload.task.sprintId);
   },
 
   [REALTIME_EVENTS.TASK_COMPLETED]: (payload, queryClient) => {
     if (!isTaskEventPayload(payload)) {
       return;
     }
-    invalidateTask(payload.task.id, payload.task.projectId, queryClient);
+    invalidateTask(payload.task.id, payload.task.projectId, queryClient, payload.task.sprintId);
   },
 
   [REALTIME_EVENTS.TASK_DELETED]: (payload, queryClient) => {
     if (!isTaskEventPayload(payload)) {
       return;
     }
-    invalidateTask(payload.task.id, payload.task.projectId, queryClient);
+    invalidateTask(payload.task.id, payload.task.projectId, queryClient, payload.task.sprintId);
   },
 
   [REALTIME_EVENTS.TASK_ASSIGNED_TO_SPRINT]: (payload, queryClient) => {

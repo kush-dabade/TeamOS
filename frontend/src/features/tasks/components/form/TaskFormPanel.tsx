@@ -41,6 +41,7 @@ export function TaskFormPanel({
           projectId: taskItem.task.projectId,
           description: taskItem.task.description ?? "",
           priority: taskItem.task.priority,
+          status: taskItem.task.status,
           assigneeId: taskItem.task.assigneeId ?? "",
           dueDate: taskItem.task.dueDate?.slice(0, 10) ?? "",
         }
@@ -49,6 +50,10 @@ export function TaskFormPanel({
           projectId: "",
           description: "",
           priority: "MEDIUM",
+          // Not shown or sent in create mode (TaskForm hides the control,
+          // and TasksPage/ProjectTasks build the createTask payload manually
+          // without status) - only present to satisfy the shared schema.
+          status: "TODO",
           assigneeId: "",
           dueDate: "",
         };

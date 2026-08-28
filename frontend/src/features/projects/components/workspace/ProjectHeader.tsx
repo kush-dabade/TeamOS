@@ -12,6 +12,7 @@ interface ProjectHeaderProps {
 
 export function ProjectHeader({ project, previewData, onEdit }: ProjectHeaderProps) {
   const { completedTaskCount, progressPercentage, project: projectDetails, totalTaskCount } = project;
+  const isArchived = projectDetails.status === "ARCHIVED";
 
   return (
     <header className="flex flex-col gap-3 py-4 md:flex-row md:items-start md:justify-between">
@@ -35,9 +36,11 @@ export function ProjectHeader({ project, previewData, onEdit }: ProjectHeaderPro
         </div>
       </div>
 
-      <Button type="button" variant="outline" onClick={(event) => onEdit(event.currentTarget)}>
-        Edit project
-      </Button>
+      {isArchived ? null : (
+        <Button type="button" variant="outline" onClick={(event) => onEdit(event.currentTarget)}>
+          Edit project
+        </Button>
+      )}
     </header>
   );
 }

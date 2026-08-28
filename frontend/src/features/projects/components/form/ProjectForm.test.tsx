@@ -93,3 +93,16 @@ describe("ProjectForm - error handling", () => {
     });
   });
 });
+
+describe("ProjectForm - status control", () => {
+  it("does not offer Archived as a status option", () => {
+    renderForm();
+
+    fireEvent.click(screen.getByLabelText("Status"));
+
+    expect(screen.getByRole("option", { name: "Planned" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Active" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Completed" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Archived" })).not.toBeInTheDocument();
+  });
+});

@@ -21,8 +21,25 @@ export function ProjectWorkspacePage() {
   const { workspaceId } = useActiveWorkspace();
   const projectsQuery = useProjects(workspaceId ?? undefined);
 
-  const resolvedProjectId = projectsQuery.data?.find((item) => item.project.slug === slug)?.project
+  const primaryProjectId = projectsQuery.data?.find((item) => item.project.slug === slug)?.project
     .id;
+
+  // The default list excludes archived projects, so a slug that isn't found
+  // there might still be a valid archived project - only known once the
+  // primary list has settled. Passing `undefined` as the workspaceId (rather
+  // than always passing the real one) keeps this query disabled - and out of
+  // the normal-project path entirely - until that's actually the case, the
+  // same way `useProjects` already disables itself when its workspaceId is
+  // undefined.
+  const shouldResolveArchived = Boolean(workspaceId) && projectsQuery.isSuccess && !primaryProjectId;
+  const archivedProjectsQuery = useProjects(
+    shouldResolveArchived ? workspaceId ?? undefined : undefined,
+    "ARCHIVED",
+  );
+  const archivedProjectId = archivedProjectsQuery.data?.find((item) => item.project.slug === slug)
+    ?.project.id;
+
+  const resolvedProjectId = primaryProjectId ?? archivedProjectId;
 
   const projectDetailQuery = useProjectWithTaskCounts(resolvedProjectId);
   const updateProject = useUpdateProject();
@@ -56,7 +73,8 @@ export function ProjectWorkspacePage() {
   const activeTab =
     tabSelection.projectSlug === slug ? tabSelection.tab : initialTabFromNavigation;
 
-  const isResolvingProject = projectsQuery.isPending;
+  const isResolvingProject =
+    projectsQuery.isPending || (shouldResolveArchived && archivedProjectsQuery.isPending);
   const isLoadingDetail = Boolean(resolvedProjectId) && projectDetailQuery.isLoading;
 
   if (isResolvingProject || isLoadingDetail) {
@@ -76,10 +94,15 @@ export function ProjectWorkspacePage() {
       return;
     }
 
+    if (archivedProjectsQuery.isError) {
+      archivedProjectsQuery.refetch();
+      return;
+    }
+
     projectDetailQuery.refetch();
   };
 
-  if (projectsQuery.isError || projectDetailQuery.isError) {
+  if (projectsQuery.isError || archivedProjectsQuery.isError || projectDetailQuery.isError) {
     return (
       <PageError>
         <ErrorState

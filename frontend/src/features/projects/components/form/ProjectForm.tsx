@@ -122,7 +122,6 @@ export function ProjectForm({
                         <SelectItem value="PLANNED">Planned</SelectItem>
                         <SelectItem value="ACTIVE">Active</SelectItem>
                         <SelectItem value="COMPLETED">Completed</SelectItem>
-                        <SelectItem value="ARCHIVED">Archived</SelectItem>
                       </SelectGroup>
                     </SelectContent>
                   </Select>

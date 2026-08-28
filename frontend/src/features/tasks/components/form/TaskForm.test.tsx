@@ -123,6 +123,38 @@ describe("TaskForm - status control", () => {
   });
 });
 
+describe("TaskForm - error handling", () => {
+  it("preserves the real AppError message instead of the generic fallback", async () => {
+    const onSubmit = vi
+      .fn()
+      .mockRejectedValue({ type: "validation", message: "Title already exists" });
+    renderForm({ mode: "edit", defaultValues: editDefaultValues, onSubmit });
+
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("Title already exists");
+    });
+
+    expect(
+      screen.queryByText("Unable to save task. Please try again."),
+    ).not.toBeInTheDocument();
+  });
+
+  it("falls back to a generic message when the rejection has no usable message", async () => {
+    const onSubmit = vi.fn().mockRejectedValue("network down");
+    renderForm({ mode: "edit", defaultValues: editDefaultValues, onSubmit });
+
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Something went wrong. Please try again.",
+      );
+    });
+  });
+});
+
 describe("taskSchema - status validation", () => {
   const validBase = {
     title: "Valid task title",

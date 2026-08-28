@@ -77,11 +77,15 @@ export function ProjectPreviewPanel({
   }
 
   const { completedTaskCount, progressPercentage, project: projectDetails, totalTaskCount } = project;
+  const isArchived = projectDetails.status === "ARCHIVED";
 
   // Visible only to OWNER/ADMIN, and only when there's at least one eligible
   // target - mirrors WorkspaceMemberRow's canTransferOwnership gating. The
-  // backend remains authoritative regardless of this check.
+  // backend remains authoritative regardless of this check. Archived
+  // projects are additionally excluded, consistent with Edit/Archive being
+  // hidden for them above.
   const canTransferOwnership =
+    !isArchived &&
     (actorRole === "OWNER" || actorRole === "ADMIN") &&
     previewData !== null &&
     (membersQuery.data ?? []).some(
@@ -182,16 +186,18 @@ export function ProjectPreviewPanel({
             </DropdownMenuTrigger>
 
             <DropdownMenuContent align="start">
-              <DropdownMenuItem
-                onSelect={(event) => {
-                  event.preventDefault();
-                  if (actionsMenuTriggerRef.current) {
-                    onEdit(actionsMenuTriggerRef.current);
-                  }
-                }}
-              >
-                Edit
-              </DropdownMenuItem>
+              {isArchived ? null : (
+                <DropdownMenuItem
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    if (actionsMenuTriggerRef.current) {
+                      onEdit(actionsMenuTriggerRef.current);
+                    }
+                  }}
+                >
+                  Edit
+                </DropdownMenuItem>
+              )}
 
               {canTransferOwnership ? (
                 <DropdownMenuItem
@@ -204,7 +210,7 @@ export function ProjectPreviewPanel({
                 </DropdownMenuItem>
               ) : null}
 
-              {projectDetails.status === "ARCHIVED" ? (
+              {isArchived ? (
                 <DropdownMenuItem
                   disabled={isRestoring}
                   onSelect={(event) => {

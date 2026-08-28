@@ -1,5 +1,4 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 
 import type { AppError } from "@/lib/api";
 
@@ -12,6 +11,8 @@ interface UpdateProjectVariables {
   input: UpdateProjectInput;
 }
 
+// No onError toast, for the same reason as useCreateProject: this backs
+// ProjectForm's edit flow, which already has its own inline error slot.
 export function useUpdateProject() {
   const queryClient = useQueryClient();
 
@@ -20,9 +21,6 @@ export function useUpdateProject() {
     onSuccess: (_data, { projectId }) => {
       queryClient.invalidateQueries({ queryKey: projectKeys.detail(projectId) });
       queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
-    },
-    onError: (error) => {
-      toast.error(error.message);
     },
   });
 }

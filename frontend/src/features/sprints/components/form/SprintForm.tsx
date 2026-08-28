@@ -3,6 +3,7 @@ import { Controller, useForm } from "react-hook-form";
 import type { RefObject } from "react";
 
 import { Button, Field, FieldError, FieldLabel, Input } from "@/components/ui";
+import { getErrorMessage } from "@/utils";
 
 import { sprintSchema, type SprintFormData } from "../../validation/sprint";
 
@@ -30,8 +31,8 @@ export function SprintForm({
   async function handleSubmit(data: SprintFormData) {
     try {
       await onSubmit(data);
-    } catch {
-      form.setError("root", { message: "Unable to save sprint. Please try again." });
+    } catch (error) {
+      form.setError("root", { message: getErrorMessage(error) });
     }
   }
 

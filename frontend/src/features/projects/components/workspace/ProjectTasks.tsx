@@ -209,7 +209,11 @@ export function ProjectTasks({ project, workspaceId }: ProjectTasksProps) {
     }
 
     try {
-      await deleteTask.mutateAsync({ taskId: selectedTaskId, projectId: project.id });
+      await deleteTask.mutateAsync({
+        taskId: selectedTaskId,
+        projectId: project.id,
+        sprintId: selectedTask?.task.sprintId ?? null,
+      });
       toast.success("Task deleted");
       // Redirect the existing close-auto-focus target to the persistent
       // create action (a control guaranteed to still exist) instead of the

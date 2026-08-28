@@ -141,7 +141,11 @@ export function TaskWorkspacePage() {
     }
 
     try {
-      await deleteTask.mutateAsync({ taskId, projectId: taskItem.task.projectId });
+      await deleteTask.mutateAsync({
+        taskId,
+        projectId: taskItem.task.projectId,
+        sprintId: taskItem.task.sprintId,
+      });
       toast.success("Task deleted");
       navigate("/tasks");
     } catch {

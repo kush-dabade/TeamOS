@@ -1,7 +1,10 @@
+import { QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ProjectListItem } from "../../types";
+import { createTestQueryClient } from "@/test/create-test-query-client";
+
+import type { ProjectListItem, ProjectPreviewData } from "../../types";
 
 import { ProjectPreviewPanel } from "./ProjectPreviewPanel";
 
@@ -34,13 +37,17 @@ beforeAll(() => {
 // every render instead (see TaskForm.test.tsx for the same note).
 beforeEach(() => {
   cleanup();
+  mockUseWorkspaceMembers.mockReset();
+  mockUseWorkspaceMembers.mockReturnValue({ data: [], isLoading: false });
 });
 
-// actorRole is left undefined in every test below, which keeps
-// canTransferOwnership false regardless of the members list - so the members
-// query result is irrelevant here and a static empty list is enough.
+// Controllable per test: most tests leave actorRole undefined, which keeps
+// canTransferOwnership false regardless of the members list, so a static
+// empty default is enough for those. The ownership-transfer tests below
+// override this to supply an eligible member.
+const mockUseWorkspaceMembers = vi.fn();
 vi.mock("@/features/workspaces", () => ({
-  useWorkspaceMembers: () => ({ data: [], isLoading: false }),
+  useWorkspaceMembers: (...args: unknown[]) => mockUseWorkspaceMembers(...args),
 }));
 
 function buildProject(overrides: Partial<ProjectListItem["project"]> = {}): ProjectListItem {
@@ -61,29 +68,41 @@ function buildProject(overrides: Partial<ProjectListItem["project"]> = {}): Proj
   };
 }
 
-function renderPanel(overrides: Partial<ProjectListItem["project"]> = {}) {
+interface RenderPanelOptions {
+  project?: Partial<ProjectListItem["project"]>;
+  previewData?: ProjectPreviewData | null;
+  actorRole?: "OWNER" | "ADMIN" | "MEMBER";
+}
+
+function renderPanel({ project = {}, previewData = null, actorRole }: RenderPanelOptions = {}) {
   const onEdit = vi.fn();
   const onArchive = vi.fn();
   const onRestore = vi.fn();
   const onOpenProject = vi.fn();
 
+  // TransferProjectOwnershipDialog (mounted whenever canTransferOwnership is
+  // true) calls useTransferProjectOwnership, which needs a real
+  // QueryClientProvider in the tree even though its mutation is never
+  // triggered by these tests.
   render(
-    <ProjectPreviewPanel
-      project={buildProject(overrides)}
-      previewData={null}
-      isPreviewLoading={false}
-      isArchiving={false}
-      isRestoring={false}
-      workspaceId="workspace-1"
-      actorRole={undefined}
-      open={true}
-      onClose={vi.fn()}
-      onCloseAutoFocus={vi.fn()}
-      onOpenProject={onOpenProject}
-      onEdit={onEdit}
-      onArchive={onArchive}
-      onRestore={onRestore}
-    />,
+    <QueryClientProvider client={createTestQueryClient()}>
+      <ProjectPreviewPanel
+        project={buildProject(project)}
+        previewData={previewData}
+        isPreviewLoading={false}
+        isArchiving={false}
+        isRestoring={false}
+        workspaceId="workspace-1"
+        actorRole={actorRole}
+        open={true}
+        onClose={vi.fn()}
+        onCloseAutoFocus={vi.fn()}
+        onOpenProject={onOpenProject}
+        onEdit={onEdit}
+        onArchive={onArchive}
+        onRestore={onRestore}
+      />
+    </QueryClientProvider>,
   );
 
   return { onEdit, onArchive, onRestore, onOpenProject };
@@ -100,7 +119,7 @@ function openActionsMenu() {
 
 describe("ProjectPreviewPanel - archived edit guard", () => {
   it("offers a usable Edit action for a non-archived project", () => {
-    const { onEdit } = renderPanel({ status: "ACTIVE" });
+    const { onEdit } = renderPanel({ project: { status: "ACTIVE" } });
 
     openActionsMenu();
 
@@ -111,7 +130,7 @@ describe("ProjectPreviewPanel - archived edit guard", () => {
   });
 
   it("does not offer Edit for an archived project", () => {
-    renderPanel({ status: "ARCHIVED" });
+    renderPanel({ project: { status: "ARCHIVED" } });
 
     openActionsMenu();
 
@@ -119,7 +138,7 @@ describe("ProjectPreviewPanel - archived edit guard", () => {
   });
 
   it("keeps Restore available for an archived project", () => {
-    const { onRestore } = renderPanel({ status: "ARCHIVED" });
+    const { onRestore } = renderPanel({ project: { status: "ARCHIVED" } });
 
     openActionsMenu();
 
@@ -130,7 +149,7 @@ describe("ProjectPreviewPanel - archived edit guard", () => {
   });
 
   it("does not offer Archive for an archived project (Restore replaces it, same as before this change)", () => {
-    renderPanel({ status: "ARCHIVED" });
+    renderPanel({ project: { status: "ARCHIVED" } });
 
     openActionsMenu();
 
@@ -138,11 +157,61 @@ describe("ProjectPreviewPanel - archived edit guard", () => {
   });
 
   it("leaves unrelated preview content and the Open project action intact when archived", () => {
-    const { onOpenProject } = renderPanel({ status: "ARCHIVED", name: "Legacy Migration" });
+    const { onOpenProject } = renderPanel({
+      project: { status: "ARCHIVED", name: "Legacy Migration" },
+    });
 
     expect(screen.getByText("Legacy Migration")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Open project" }));
     expect(onOpenProject).toHaveBeenCalledWith("website-redesign");
+  });
+});
+
+describe("ProjectPreviewPanel - archived ownership-transfer guard", () => {
+  const eligiblePreviewData: ProjectPreviewData = {
+    ownerId: "user-owner",
+    ownerName: "Ada Lovelace",
+    startDate: null,
+    targetDate: null,
+  };
+
+  it("offers Transfer ownership for a non-archived project when the actor is eligible", () => {
+    mockUseWorkspaceMembers.mockReturnValue({
+      data: [{ userId: "user-admin", name: "Grace Hopper", role: "ADMIN" }],
+      isLoading: false,
+    });
+
+    renderPanel({
+      project: { status: "ACTIVE" },
+      previewData: eligiblePreviewData,
+      actorRole: "OWNER",
+    });
+
+    openActionsMenu();
+
+    expect(screen.getByRole("menuitem", { name: "Transfer ownership" })).toBeInTheDocument();
+  });
+
+  it("does not offer Transfer ownership for an archived project, even when the actor is eligible", () => {
+    mockUseWorkspaceMembers.mockReturnValue({
+      data: [{ userId: "user-admin", name: "Grace Hopper", role: "ADMIN" }],
+      isLoading: false,
+    });
+
+    renderPanel({
+      project: { status: "ARCHIVED" },
+      previewData: eligiblePreviewData,
+      actorRole: "OWNER",
+    });
+
+    openActionsMenu();
+
+    expect(
+      screen.queryByRole("menuitem", { name: "Transfer ownership" }),
+    ).not.toBeInTheDocument();
+    // Restore must still be there - proves the menu genuinely opened and
+    // this isn't a vacuous pass from a closed dropdown.
+    expect(screen.getByRole("menuitem", { name: "Restore" })).toBeInTheDocument();
   });
 });

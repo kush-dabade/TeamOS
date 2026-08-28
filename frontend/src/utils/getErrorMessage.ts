@@ -1,5 +1,7 @@
+const FALLBACK_MESSAGE = "Something went wrong. Please try again.";
+
 export function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
+  if (error instanceof Error && error.message.trim()) {
     return error.message;
   }
 
@@ -7,10 +9,11 @@ export function getErrorMessage(error: unknown): string {
     typeof error === "object" &&
     error !== null &&
     "message" in error &&
-    typeof error.message === "string"
+    typeof error.message === "string" &&
+    error.message.trim()
   ) {
     return error.message;
   }
 
-  return "Something went wrong. Please try again.";
+  return FALLBACK_MESSAGE;
 }

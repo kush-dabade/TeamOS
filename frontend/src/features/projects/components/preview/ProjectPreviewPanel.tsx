@@ -81,8 +81,11 @@ export function ProjectPreviewPanel({
 
   // Visible only to OWNER/ADMIN, and only when there's at least one eligible
   // target - mirrors WorkspaceMemberRow's canTransferOwnership gating. The
-  // backend remains authoritative regardless of this check.
+  // backend remains authoritative regardless of this check. Archived
+  // projects are additionally excluded, consistent with Edit/Archive being
+  // hidden for them above.
   const canTransferOwnership =
+    !isArchived &&
     (actorRole === "OWNER" || actorRole === "ADMIN") &&
     previewData !== null &&
     (membersQuery.data ?? []).some(

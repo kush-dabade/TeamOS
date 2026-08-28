@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 
 import { Button, Field, FieldError, FieldLabel } from "@/components/ui";
-import { cn } from "@/utils";
+import { cn, getErrorMessage } from "@/utils";
 
 import { commentSchema, type CommentFormData } from "../validation/comment";
 
@@ -46,8 +46,8 @@ export function CommentForm({
       if (mode === "create") {
         form.reset({ content: "" });
       }
-    } catch {
-      form.setError("root", { message: "Unable to save comment. Please try again." });
+    } catch (error) {
+      form.setError("root", { message: getErrorMessage(error) });
     }
   }
 

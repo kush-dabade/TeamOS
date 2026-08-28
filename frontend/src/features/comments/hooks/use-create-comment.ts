@@ -1,5 +1,4 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 
 import type { AppError } from "@/lib/api";
 
@@ -12,6 +11,9 @@ interface CreateCommentVariables {
   input: CreateCommentInput;
 }
 
+// No onError toast: comment creation is form-backed - CommentForm's own
+// try/catch surfaces the failure inline via form.setError("root"), so a
+// toast here would double-report the error.
 export function useCreateComment() {
   const queryClient = useQueryClient();
 
@@ -19,9 +21,6 @@ export function useCreateComment() {
     mutationFn: ({ taskId, input }) => createComment(taskId, input),
     onSuccess: (_comment, { taskId }) => {
       queryClient.invalidateQueries({ queryKey: commentKeys.list(taskId) });
-    },
-    onError: (error) => {
-      toast.error(error.message);
     },
   });
 }

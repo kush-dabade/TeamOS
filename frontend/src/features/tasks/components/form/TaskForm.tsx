@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui";
+import { getErrorMessage } from "@/utils";
 
 const UNASSIGNED_VALUE = "UNASSIGNED";
 
@@ -49,8 +50,8 @@ export function TaskForm({
   async function handleSubmit(data: TaskFormData) {
     try {
       await onSubmit(data);
-    } catch {
-      form.setError("root", { message: "Unable to save task. Please try again." });
+    } catch (error) {
+      form.setError("root", { message: getErrorMessage(error) });
     }
   }
 

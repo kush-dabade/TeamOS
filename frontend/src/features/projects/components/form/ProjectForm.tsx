@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui";
+import { getErrorMessage } from "@/utils";
 
 import { projectSchema, type ProjectFormData } from "../../validation/project";
 
@@ -42,8 +43,8 @@ export function ProjectForm({
   async function handleSubmit(data: ProjectFormData) {
     try {
       await onSubmit(data);
-    } catch {
-      form.setError("root", { message: "Unable to save project. Please try again." });
+    } catch (error) {
+      form.setError("root", { message: getErrorMessage(error) });
     }
   }
 

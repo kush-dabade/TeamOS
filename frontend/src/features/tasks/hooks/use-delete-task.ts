@@ -18,7 +18,7 @@ interface DeleteTaskVariables {
   // be read off the mutation response - callers pass the task's current
   // sprintId (already in scope wherever a task is deleted) the same way they
   // already pass projectId.
-  sprintId?: string | null;
+  sprintId: string | null;
 }
 
 export function useDeleteTask() {

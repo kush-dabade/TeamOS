@@ -36,7 +36,7 @@ describe("useDeleteTask", () => {
       wrapper: createWrapper(queryClient),
     });
 
-    await result.current.mutateAsync({ taskId: "task-1", projectId: "project-1" });
+    await result.current.mutateAsync({ taskId: "task-1", projectId: "project-1", sprintId: null });
 
     await waitFor(() => {
       expect(invalidateSpy).toHaveBeenCalledTimes(3);
@@ -60,7 +60,7 @@ describe("useDeleteTask", () => {
     });
 
     await expect(
-      result.current.mutateAsync({ taskId: "task-1", projectId: "project-1" }),
+      result.current.mutateAsync({ taskId: "task-1", projectId: "project-1", sprintId: null }),
     ).rejects.toEqual(mockError);
 
     expect(invalidateSpy).not.toHaveBeenCalled();

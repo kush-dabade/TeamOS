@@ -193,6 +193,7 @@ export function ProjectTasks({ project, workspaceId }: ProjectTasksProps) {
           title: data.title,
           description: data.description || null,
           priority: data.priority,
+          status: data.status,
           assigneeId: data.assigneeId || null,
           dueDate: data.dueDate || null,
         },

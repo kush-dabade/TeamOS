@@ -46,23 +46,19 @@ const createDefaultValues: TaskFormData = {
   projectId: "",
   description: "",
   priority: "MEDIUM",
+  status: "TODO",
   assigneeId: "",
   dueDate: "",
 };
 
-// `status` isn't part of `TaskFormData` yet - Commit 5 adds it to the schema.
-// Routed through this intermediate binding (same technique as Commit 1's
-// `DeleteTaskVariables` tests) so TypeScript's excess-property check doesn't
-// block the file from compiling today, while still exercising the exact
-// `defaultValues` shape the upcoming edit flow must accept.
-const editDefaultValues = {
+const editDefaultValues: TaskFormData = {
   title: "Existing task",
   projectId: "project-1",
   description: "",
-  priority: "MEDIUM" as const,
+  priority: "MEDIUM",
+  status: "IN_PROGRESS",
   assigneeId: "",
   dueDate: "",
-  status: "IN_PROGRESS",
 };
 
 function renderForm(overrides: Partial<Parameters<typeof TaskForm>[0]> = {}) {

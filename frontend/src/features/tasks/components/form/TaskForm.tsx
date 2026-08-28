@@ -198,6 +198,41 @@ export function TaskForm({
             }}
           />
 
+          {mode === "edit" ? (
+            <Controller
+              name="status"
+              control={form.control}
+              render={({ field, fieldState }) => {
+                const errorId = `${field.name}-error`;
+
+                return (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor={field.name}>Status</FieldLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger
+                        id={field.name}
+                        aria-invalid={fieldState.invalid}
+                        aria-describedby={fieldState.error ? errorId : undefined}
+                        className="w-full"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="TODO">Todo</SelectItem>
+                          <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                          <SelectItem value="REVIEW">Review</SelectItem>
+                          <SelectItem value="DONE">Done</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    <FieldError id={errorId} errors={[fieldState.error]} />
+                  </Field>
+                );
+              }}
+            />
+          ) : null}
+
           <Controller
             name="assigneeId"
             control={form.control}

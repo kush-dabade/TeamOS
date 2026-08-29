@@ -9,7 +9,8 @@
     "start": "node dist/src/server.js",
     "start:worker": "node dist/src/worker.js",
     "test": "vitest run",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "seed": "tsx prisma/seed.ts"
   },
   "keywords": [],
   "author": "",

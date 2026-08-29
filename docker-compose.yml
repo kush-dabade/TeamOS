@@ -118,6 +118,20 @@ services:
     # from the POSTGRES_* parts below instead - the same single-source-of-
     # truth override already used for REDIS_PASSWORD.
     environment:
+      # backend/Dockerfile bakes NODE_ENV=production into the image itself -
+      # the right default for the image, so wherever it eventually runs
+      # outside this Compose file it's secure-by-default without depending
+      # on someone remembering to set this. Overridden here specifically
+      # because this Compose file is the local development entrypoint:
+      # left at production, config/security.config.ts requires
+      # TRUSTED_ORIGINS/TRUST_PROXY_HOPS to be set, and - the more serious
+      # problem - lib/auth.ts sets useSecureCookies: true, which makes the
+      # browser silently refuse to send the session cookie back over this
+      # stack's plain HTTP localhost setup, breaking every sign-in with no
+      # visible error. Same override on the worker service below, for
+      # consistency between the two processes built from this one image,
+      # even though the worker doesn't currently import security.config.ts.
+      NODE_ENV: development
       DATABASE_URL: ""
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
@@ -201,6 +215,10 @@ services:
     # from the POSTGRES_* parts below instead - the same single-source-of-
     # truth override already used for REDIS_PASSWORD.
     environment:
+      # See the identical NODE_ENV comment on the backend service above -
+      # same override, same reason, kept consistent between the two
+      # processes built from this one image.
+      NODE_ENV: development
       DATABASE_URL: ""
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}

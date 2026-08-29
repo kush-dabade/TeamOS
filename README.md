@@ -217,7 +217,9 @@ Uploads go through a four-method interface — `upload`, `delete`, `stream`, `ex
 
 ## Getting started
 
-Requires Docker and Docker Compose.
+Requires Docker and Docker Compose, plus Node.js locally (for the frontend, and for seeding local demo data).
+
+### 1. Clone and configure environment
 
 ```bash
 git clone https://github.com/kush-dabade/TeamOS.git
@@ -225,11 +227,47 @@ cd TeamOS
 
 cp .env.example .env                  # Postgres + Redis credentials for Compose
 cp backend/.env.example backend/.env  # application config for the API and worker
+```
 
+Both files already ship with working local-development values (Postgres/Redis credentials, `localhost` URLs) — local-only placeholders, never production credentials.
+
+One value has no safe default and won't work left blank: `BETTER_AUTH_SECRET` in `backend/.env`, the signing secret for session tokens. Generate one and paste it in:
+
+```bash
+openssl rand -base64 32
+```
+
+`RESEND_API_KEY`/`EMAIL_FROM` can stay blank for now — see [Email verification](#email-verification) below.
+
+### 2. Start Docker
+
+```bash
 docker compose up --build
 ```
 
-That builds the backend image, starts Postgres and Redis, applies pending migrations, then brings up the API on port `3000` and the background worker.
+Builds the backend image, starts Postgres and Redis, applies pending migrations, then brings up the API on port `3000` and the background worker. (The backend image defaults to production behavior; Compose runs the local API/worker services in development mode instead, which is what makes the example values above the right ones to use here.)
+
+Leaving `RESEND_API_KEY`/`EMAIL_FROM` blank means the `worker` service will fail to start — visible as repeated restarts in `docker compose logs worker`. That's expected for now (see [Email verification](#email-verification)) and doesn't block the rest of this setup.
+
+### 3. Seed local demo data
+
+```bash
+cd backend
+npm install
+npm run seed
+```
+
+Creates a deterministic demo workspace — projects, tasks across every status, an active sprint, a couple of comments — so there's something to explore immediately instead of an empty account. Safe to run more than once: it's idempotent, and refuses to run outside local development.
+
+Sign in with:
+
+```text
+demo@teamos.local / TeamOSDemo123!
+```
+
+A local-only demo account with a publicly-documented password — never reuse it, and never point this seed at anything but a local database.
+
+### 4. Start the frontend
 
 The frontend runs outside Compose:
 
@@ -239,6 +277,29 @@ cp .env.example .env
 npm install
 npm run dev
 ```
+
+Sign in with the demo account above, or register your own — see [Email verification](#email-verification) for why that doesn't require a Resend account locally.
+
+<br />
+
+### Email verification
+
+Local development automatically verifies new accounts on sign-up and skips sending the verification email, so signing up and signing in work immediately without a Resend account. This is a local-development convenience, not a security feature — production always runs the real email-verification flow, and this repository's own test suite exercises that real flow too.
+
+`RESEND_API_KEY`/`EMAIL_FROM` are still what workspace invitations and password resets send through. Those stay unset by default and need a real Resend account before that mail can actually be delivered locally.
+
+<br />
+
+### Running tests
+
+```bash
+cd backend
+cp .env.test.example .env.test
+docker compose exec postgres createdb -U postgres teamos_test   # one-time
+npm test
+```
+
+`.env.test.example` already includes the (dummy) email configuration the test suite itself needs — no Resend account required for tests either.
 
 <br />
 

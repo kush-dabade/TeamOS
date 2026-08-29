@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { DestinationStream } from "pino";
 
-import { createLogger, logger, resolveLogLevel } from "../../src/lib/logger.js";
+import {
+  canResolvePinoPretty,
+  createLogger,
+  logger,
+  resolveLogLevel,
+} from "../../src/lib/logger.js";
 
 /**
  * A minimal injectable Pino destination - collects each NDJSON record Pino
@@ -45,6 +50,32 @@ describe("resolveLogLevel", () => {
     expect(resolveLogLevel({ NODE_ENV: "test", LOG_LEVEL: "debug" })).toBe("debug");
     expect(resolveLogLevel({ NODE_ENV: "production", LOG_LEVEL: "warn" })).toBe("warn");
   });
+});
+
+describe("canResolvePinoPretty", () => {
+  it("resolves the real installed package in this environment", () => {
+    // Sanity check on the default (real) resolver - this repo's own
+    // devDependencies include pino-pretty (package.json), so this must be
+    // true wherever this suite runs, including CI.
+    expect(canResolvePinoPretty()).toBe(true);
+  });
+
+  it("returns true when an injected resolver succeeds", () => {
+    expect(canResolvePinoPretty(() => "/fake/path/to/pino-pretty/index.js")).toBe(true);
+  });
+
+  it(
+    "returns false, not a throw, when resolution fails - the exact failure mode of a " +
+      "production image with devDependencies pruned (backend/Dockerfile's npm prune --omit=dev)",
+    () => {
+      const throwingResolve = () => {
+        throw new Error("Cannot find module 'pino-pretty'");
+      };
+
+      expect(() => canResolvePinoPretty(throwingResolve)).not.toThrow();
+      expect(canResolvePinoPretty(throwingResolve)).toBe(false);
+    },
+  );
 });
 
 describe("createLogger", () => {

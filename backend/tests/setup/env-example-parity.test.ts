@@ -53,6 +53,18 @@ describe("backend/.env.test.example parity", () => {
     expect(parsed[key]).toBeTruthy();
   });
 
+  // toBeTruthy() alone previously passed on a literal, never-filled-in
+  // placeholder like "<same password as .env>" - a non-empty string, but
+  // not a usable value, and exactly what broke a verbatim copy of this
+  // file against the real local Postgres/Redis (both auth-rejected it).
+  // Checked across every parsed value, not just unconditionallyRequiredVars
+  // above, so this also catches a placeholder left in an optional var.
+  it("contains no unresolved placeholder syntax in any value", () => {
+    for (const [key, value] of Object.entries(parsed)) {
+      expect(value, `${key}=${value}`).not.toMatch(/[<>]/);
+    }
+  });
+
   it(`points DATABASE_URL at the "${EXPECTED_TEST_DATABASE_NAME}" database reset-database.ts requires`, () => {
     expect(parsed.DATABASE_URL).toBeTruthy();
 

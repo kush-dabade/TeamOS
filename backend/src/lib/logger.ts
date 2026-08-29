@@ -1,3 +1,5 @@
+import { createRequire } from "node:module";
+
 import pino, { type DestinationStream, type Logger } from "pino";
 
 const nodeEnv = process.env.NODE_ENV ?? "development";
@@ -47,14 +49,49 @@ export function resolveLogLevel(env: {
 
 const level = resolveLogLevel({ NODE_ENV: process.env.NODE_ENV, LOG_LEVEL: process.env.LOG_LEVEL });
 
+/**
+ * Exported for the same testability reason as resolveLogLevel above - pure
+ * given an injected resolver, rather than only observable through the
+ * frozen-at-import module-level usePrettyOutput const below.
+ *
+ * pino-pretty is a devDependency (see package.json), deliberately not
+ * promoted to a production dependency: a real production deployment never
+ * wants it (a real log consumer wants plain JSON, not ANSI-colored text),
+ * and backend/Dockerfile's runtime image intentionally prunes
+ * devDependencies (`npm prune --omit=dev`). docker-compose.yml runs that
+ * same pruned image with NODE_ENV=development for local Docker use (see
+ * its own comment for why - useSecureCookies/TRUSTED_ORIGINS need it) - so
+ * `nodeEnv !== "production" && nodeEnv !== "test"` alone is no longer a
+ * safe enough signal for "pino-pretty is actually available": it's also
+ * true inside that pruned image, where requiring pino-pretty throws
+ * synchronously and previously crashed the backend and worker at startup.
+ * Resolving the module before committing to it makes this correct in both
+ * cases - pretty output wherever the package is actually installed (bare
+ * `npm run dev` on the host, or any environment with devDependencies
+ * present), and a silent, correct fallback to the same plain JSON
+ * production already uses everywhere else, wherever it isn't.
+ */
+export function canResolvePinoPretty(
+  resolve: (specifier: string) => string = createRequire(import.meta.url).resolve,
+): boolean {
+  try {
+    resolve("pino-pretty");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // Pretty-printed, colorized output is a local-development convenience only -
 // never in production (where a real log consumer wants plain JSON, not
 // ANSI-colored text) and never in test (pino-pretty is a worker-thread
 // transport; spinning it up for every test-file's import of this module
 // would slow the suite for output nothing reads, since tests assert on
 // logger.ts's own behavior via an injected stream - see createLogger below -
-// not on this singleton's stdout).
-const usePrettyOutput = nodeEnv !== "production" && nodeEnv !== "test";
+// not on this singleton's stdout). See canResolvePinoPretty's own comment
+// above for why environment alone isn't a sufficient check any more.
+const usePrettyOutput =
+  nodeEnv !== "production" && nodeEnv !== "test" && canResolvePinoPretty();
 
 export interface CreateLoggerOptions {
   /**

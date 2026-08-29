@@ -254,8 +254,11 @@ Leaving `RESEND_API_KEY`/`EMAIL_FROM` blank means the `worker` service will fail
 ```bash
 cd backend
 npm install
+npx prisma generate
 npm run seed
 ```
+
+(`npx prisma generate` builds the Prisma Client into `src/generated/prisma` — gitignored, so it doesn't exist yet on a fresh clone, and nothing in `npm install` builds it for you.)
 
 Creates a deterministic demo workspace — projects, tasks across every status, an active sprint, a couple of comments — so there's something to explore immediately instead of an empty account. Safe to run more than once: it's idempotent, and refuses to run outside local development.
 
@@ -294,6 +297,8 @@ Local development automatically verifies new accounts on sign-up and skips sendi
 
 ```bash
 cd backend
+npm install                # skip if you already ran this in step 3
+npx prisma generate        # skip if you already ran this in step 3
 cp .env.test.example .env.test
 docker compose exec postgres createdb -U postgres teamos_test   # one-time
 npm test

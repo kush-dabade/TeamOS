@@ -23,7 +23,17 @@ async function runBootCheck(options: {
   nodeEnv: string;
   withCredentials: boolean;
 }): Promise<BootCheckResult> {
-  const env = { ...process.env, NODE_ENV: options.nodeEnv };
+  // Explicit NodeJS.ProcessEnv annotation, not left to inference: spreading
+  // process.env (which has a `[key: string]: string | undefined` index
+  // signature) alongside an explicit property narrows the *inferred* object
+  // literal type down to just that one explicit property, silently dropping
+  // the index signature - so without this annotation, `env.EMAIL_FROM`
+  // below doesn't type-check even though it's valid at runtime. Verified via
+  // a minimal repro: `{ ...processEnv, X: "x" }` infers as `{ X: string }`;
+  // `{ ...processEnv }` alone does not have this problem, which is why the
+  // sibling node-env-fail-closed.test.ts (no extra property in its spread)
+  // never hit this.
+  const env: NodeJS.ProcessEnv = { ...process.env, NODE_ENV: options.nodeEnv };
 
   if (!options.withCredentials) {
     // Deleted, not set to "" - email.config.ts treats an empty string the

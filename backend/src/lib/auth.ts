@@ -7,7 +7,7 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { logger } from "./logger.js";
 import { prisma } from "./prisma.js";
 import { incrementRateLimitCounter, rateLimitRedis } from "./redis.js";
-import { isProduction, trustedOrigins } from "../config/security.config.js";
+import { isLocalDevelopment, isProduction, trustedOrigins } from "../config/security.config.js";
 import {
   enqueuePasswordResetEmail,
   enqueueVerificationEmail,
@@ -222,6 +222,27 @@ export const auth = betterAuth({
 
   emailVerification: {
     sendVerificationEmail: async ({ user, url }) => {
+      // Commit 3: databaseHooks.user.create.before below already marks every
+      // newly-created user verified in local development before this
+      // callback could ever run for them, so a queued verification email
+      // here would be pure unnecessary local work - the account has
+      // nothing left to verify, and sending it would depend on a working
+      // Resend account this whole feature exists to make unnecessary for
+      // local evaluation. Skipping the enqueue (not the callback contract)
+      // keeps this identical to before in every other environment: still
+      // fires for every verification-required sign-up and every real
+      // POST /send-verification-email resend in production, and - just as
+      // importantly - still fires under NODE_ENV=test (isLocalDevelopment
+      // is false there, see config/security.config.ts), so
+      // tests/security/email-verification.test.ts's existing coverage of
+      // the real flow is completely unaffected by this. Doesn't touch
+      // invitation or password-reset email at all - those stay enqueued in
+      // every environment, see sendResetPassword above and
+      // enqueueWorkspaceInvitationEmail (queues/email/email.queue.ts).
+      if (isLocalDevelopment) {
+        return;
+      }
+
       // Enqueued rather than sent inline: keeps sign-up latency
       // independent of Resend's availability and gets BullMQ's existing
       // retry/backoff, matching how workspace invitation email is
@@ -272,6 +293,45 @@ export const auth = betterAuth({
   // actually runs (well after both modules have finished initializing)
   // avoids relying on that cycle happening to be safe.
   databaseHooks: {
+    // Commit 3: makes a fresh clone genuinely usable without a real Resend
+    // account - in local development, a newly-created user's email is
+    // already considered verified by the time its row is inserted, so
+    // there's no link left to click. Gated on isLocalDevelopment
+    // (config/security.config.ts), not `!isProduction`: the latter is also
+    // true under NODE_ENV=test, and this suite's own
+    // tests/security/email-verification.test.ts deliberately exercises the
+    // real, non-bypassed flow (unverified-by-default, 403 on sign-in,
+    // manual verify-email token exchange) - gating on isLocalDevelopment
+    // instead of isProduction leaves that entire file, and every other
+    // test that signs up a user expecting emailVerified: false by default
+    // (e.g. tests/setup/fixtures.ts's signUpTestUser), unaffected.
+    // isLocalDevelopment can only be true when isProduction is false (see
+    // that file's own comment), so this is exactly as impossible to
+    // activate in production as any other isProduction-gated behavior
+    // already in this file (e.g. useSecureCookies below) - narrower, never
+    // weaker. Not reachable from a request in any environment: NODE_ENV is
+    // a process-level variable read once at module load, never re-read
+    // per-request and never influenced by client input.
+    //
+    // `before`, not `after`: verified against the installed better-auth
+    // (db/with-hooks.mjs's createWithHooks) - a create.before hook's
+    // returned `data` is merged into the row BEFORE the one INSERT that
+    // creates it, so the account is born already verified. A create.after
+    // hook would need a second, separate prisma.user.update() call and
+    // would leave a brief window where an unverified row exists first;
+    // `before` avoids both.
+    user: {
+      create: {
+        before: async () => {
+          if (!isLocalDevelopment) {
+            return;
+          }
+
+          return { data: { emailVerified: true } };
+        },
+      },
+    },
+
     session: {
       delete: {
         after: async (session) => {

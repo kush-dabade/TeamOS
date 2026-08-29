@@ -1,3 +1,4 @@
+import { logger } from "../../lib/logger.js";
 import { resend } from "./email.client.js";
 import { emailConfig } from "./email.config.js";
 import { passwordResetTemplate } from "./templates/reset-password.js";
@@ -14,6 +15,23 @@ async function sendEmail(
   recipientEmail: string,
   email: EmailTemplate,
 ): Promise<void> {
+  // resend is null exactly when emailConfig.enabled is false - local
+  // development without RESEND_API_KEY/EMAIL_FROM configured (see
+  // email.client.ts). The worker process itself must stay healthy in that
+  // case; a job that can't actually send just completes as a deliberate
+  // no-op instead of throwing into BullMQ's retry/backoff path for
+  // something that will never succeed without credentials. Production
+  // always has resend configured (guarded by email.config.ts's own
+  // fail-fast), so this branch never runs there.
+  if (!resend) {
+    logger.warn(
+      { recipientEmail, subject: email.subject },
+      "Skipping email send: RESEND_API_KEY/EMAIL_FROM not configured (local development only).",
+    );
+
+    return;
+  }
+
   const { error } = await resend.emails.send({
     from: emailConfig.from,
     to: recipientEmail,

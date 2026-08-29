@@ -28,8 +28,11 @@ const ALL_TABLES = [
 // The one database this harness is ever allowed to reset - matches
 // .env.test.example's documented one-time setup step. Deliberately not
 // derived from NODE_ENV (that only reflects the app's own runtime mode,
-// not which database DATABASE_URL happens to point at).
-const EXPECTED_TEST_DATABASE_NAME = "teamos_test";
+// not which database DATABASE_URL happens to point at). Exported so
+// tests/setup/env-example-parity.test.ts can assert .env.test.example's own
+// DATABASE_URL targets this same name, rather than hardcoding "teamos_test"
+// a second time.
+export const EXPECTED_TEST_DATABASE_NAME = "teamos_test";
 
 /**
  * Independent safety check, re-read every call rather than cached, so a

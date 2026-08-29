@@ -2,6 +2,22 @@ const nodeEnv = process.env.NODE_ENV ?? "development";
 
 export const isProduction = nodeEnv === "production";
 
+// Deliberately NOT the same as `!isProduction`: that also covers "test"
+// (Vitest sets NODE_ENV=test - see lib/logger.ts's comment on the same
+// value), where the suite exercises the real, non-bypassed auth/security
+// flows end-to-end (e.g. tests/security/email-verification.test.ts) and
+// must keep doing so. This is specifically the local-development signal -
+// true only when NODE_ENV is exactly "development" (this file's own
+// default above when unset, matching bare `npm run dev`; docker-compose.yml
+// sets it explicitly for the backend/worker services). isProduction and
+// isLocalDevelopment can never both be true (they compare nodeEnv against
+// two different literal values), so anything gated on this - e.g. lib/auth.ts's
+// development-only email-verification bypass - is exactly as safe from
+// activating in production as isProduction-gated behavior already is;
+// this only narrows the non-production case further, it doesn't touch the
+// production boundary itself.
+export const isLocalDevelopment = nodeEnv === "development";
+
 const DEFAULT_TRUSTED_ORIGINS = ["http://localhost:3000", "http://localhost:5173"];
 
 function parseTrustedOrigins(): string[] {

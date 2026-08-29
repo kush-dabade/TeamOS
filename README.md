@@ -247,7 +247,7 @@ docker compose up --build
 
 Builds the backend image, starts Postgres and Redis, applies pending migrations, then brings up the API on port `3000` and the background worker. (The backend image defaults to production behavior; Compose runs the local API/worker services in development mode instead, which is what makes the example values above the right ones to use here.)
 
-Leaving `RESEND_API_KEY`/`EMAIL_FROM` blank means the `worker` service will fail to start — visible as repeated restarts in `docker compose logs worker`. That's expected for now (see [Email verification](#email-verification)) and doesn't block the rest of this setup.
+Leaving `RESEND_API_KEY`/`EMAIL_FROM` blank is fine — the `worker` service starts normally and stays healthy; it just skips actually sending mail (logging that it's doing so) instead of calling a real Resend account. See [Email verification](#email-verification) for what that means for sign-up locally.
 
 ### 3. Seed local demo data
 

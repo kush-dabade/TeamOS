@@ -1,4 +1,13 @@
-const nodeEnv = process.env.NODE_ENV ?? "development";
+// Deliberately no `?? "development"` fallback here (unlike lib/logger.ts's
+// own, separate nodeEnv - a non-security pretty-printing convenience this
+// file has nothing to do with): isLocalDevelopment below gates real
+// security-relevant behavior (lib/auth.ts's development-only
+// email-verification bypass, prisma/seed.ts's seed guard), and must fail
+// closed on a genuinely unset NODE_ENV rather than silently treating "unset"
+// as "development". A misconfigured deployment that forgets to set NODE_ENV
+// must get production-equivalent (bypass/seed disabled) behavior, not the
+// most permissive one.
+const nodeEnv = process.env.NODE_ENV;
 
 export const isProduction = nodeEnv === "production";
 
@@ -7,15 +16,15 @@ export const isProduction = nodeEnv === "production";
 // value), where the suite exercises the real, non-bypassed auth/security
 // flows end-to-end (e.g. tests/security/email-verification.test.ts) and
 // must keep doing so. This is specifically the local-development signal -
-// true only when NODE_ENV is exactly "development" (this file's own
-// default above when unset, matching bare `npm run dev`; docker-compose.yml
-// sets it explicitly for the backend/worker services). isProduction and
+// true only when NODE_ENV is exactly "development" (docker-compose.yml sets
+// it explicitly for the backend/worker services; bare `npm run dev` needs it
+// set the same way - see backend/.env.example). isProduction and
 // isLocalDevelopment can never both be true (they compare nodeEnv against
-// two different literal values), so anything gated on this - e.g. lib/auth.ts's
-// development-only email-verification bypass - is exactly as safe from
-// activating in production as isProduction-gated behavior already is;
-// this only narrows the non-production case further, it doesn't touch the
-// production boundary itself.
+// two different literal values), and an unset NODE_ENV now makes both false
+// - so anything gated on this - e.g. lib/auth.ts's development-only
+// email-verification bypass - is exactly as safe from activating in
+// production, or in a misconfigured unset-NODE_ENV deployment, as
+// isProduction-gated behavior already is.
 export const isLocalDevelopment = nodeEnv === "development";
 
 const DEFAULT_TRUSTED_ORIGINS = ["http://localhost:3000", "http://localhost:5173"];

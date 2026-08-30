@@ -7,8 +7,11 @@
  * Every entity is created through the real application services this
  * repository already ships - Better Auth for the user (via auth.api,
  * already the established pattern - see requireAuth.ts/realtime.auth.ts),
- * and workspace/project/task/sprint/comment service functions for
- * everything else - rather than raw Prisma inserts. Unlike
+ * and, for everything else, src/modules/demo/demo-data-generator.ts's
+ * generateWorkspaceData() - the same generator PR 5's public demo
+ * provisioning service (src/modules/demo/demo.service.ts) calls to
+ * populate a fresh visitor's workspace, so the two never drift into
+ * maintaining separate "realistic sample data" content. Unlike
  * tests/setup/fixtures.ts's direct-Prisma fixtures (deliberately simple,
  * since test setup doesn't need realistic Activity history), this seed's
  * whole purpose is to look like genuinely-used product data, and the
@@ -16,7 +19,10 @@
  * services is what generates correct Activity rows for free, with no
  * separate hand-maintained Activity-shape logic to keep in sync.
  *
- * Idempotent by construction: every step looks up its entity by a natural
+ * This file itself only owns identity: idempotently ensuring the one fixed
+ * demo@teamos.local user/workspace exist, then handing off to the shared
+ * generator. Idempotent by construction: every step looks up its entity by
+ * a natural
  * key first (email, workspace/project slug, sprint name, task/comment
  * content within their small fixed set) and only calls the creating service
  * if it's missing - re-running `npm run seed` converges to the same state
@@ -36,13 +42,7 @@ import { isLocalDevelopment } from "../src/config/security.config.js";
 import { prisma } from "../src/lib/prisma.js";
 import { auth } from "../src/lib/auth.js";
 import { createWorkspace } from "../src/modules/workspace/workspace.service.js";
-import { createProject, updateProject } from "../src/modules/project/project.service.js";
-import { createTask, updateTask } from "../src/modules/task/task.service.js";
-import { createSprint, startSprint } from "../src/modules/sprint/sprint.service.js";
-import { assignTaskToSprint } from "../src/modules/sprint-task/sprint-task.service.js";
-import { createComment } from "../src/modules/comments/comments.service.js";
-import type { ProjectStatus } from "../src/modules/project/project.types.js";
-import type { TaskPriority, TaskStatus } from "../src/modules/task/task.types.js";
+import { generateWorkspaceData } from "../src/modules/demo/demo-data-generator.js";
 
 // Deliberately not a real person's email/domain - .local is reserved for
 // exactly this (RFC 6761), and this exact address/password pair is meant to
@@ -110,148 +110,6 @@ async function ensureDemoWorkspace(ownerId: string) {
   return prisma.workspace.findUniqueOrThrow({ where: { id: created.id } });
 }
 
-interface ProjectSeed {
-  name: string;
-  slug: string;
-  description: string;
-  // Narrower than the full ProjectStatus type (which also includes
-  // ARCHIVED) - updateProject's own input type doesn't accept ARCHIVED
-  // (archiving is a separate, dedicated endpoint/service - archiveProject),
-  // and an archived project would also block every subsequent task/sprint
-  // creation this seed does against it, so it's excluded here rather than
-  // widened to match.
-  status: Exclude<ProjectStatus, "ARCHIVED">;
-}
-
-async function ensureProject(workspaceId: string, ownerId: string, spec: ProjectSeed) {
-  const existing = await prisma.project.findUnique({
-    where: { workspaceId_slug: { workspaceId, slug: spec.slug } },
-  });
-
-  if (existing) {
-    return existing;
-  }
-
-  // createProject always starts a project at the schema default (PLANNED) -
-  // there's no status field on CreateProjectData, matching how a real user
-  // can only set status via a separate update once the project exists.
-  // updateProject below mirrors that same two-step for the seed.
-  const created = await createProject(ownerId, {
-    workspaceId,
-    ownerId,
-    name: spec.name,
-    description: spec.description,
-  });
-
-  if (spec.status !== "PLANNED") {
-    await updateProject(ownerId, created.id, { status: spec.status });
-  }
-
-  return prisma.project.findUniqueOrThrow({ where: { id: created.id } });
-}
-
-interface TaskSeed {
-  title: string;
-  description: string;
-  status: TaskStatus;
-  priority: TaskPriority;
-  assign: boolean;
-  dueDateOffsetDays?: number;
-}
-
-function offsetDate(days: number): Date {
-  const date = new Date();
-
-  date.setUTCDate(date.getUTCDate() + days);
-
-  return date;
-}
-
-async function ensureTask(
-  workspaceId: string,
-  projectId: string,
-  actorId: string,
-  spec: TaskSeed,
-) {
-  const existing = await prisma.task.findFirst({
-    where: { workspaceId, projectId, title: spec.title },
-  });
-
-  if (existing) {
-    return existing;
-  }
-
-  // status isn't settable at creation (CreateTaskData has no status field -
-  // every task starts TODO, matching real user behavior) - updateTask below
-  // is the same second step a real user takes to move it off TODO.
-  const created = await createTask(actorId, {
-    projectId,
-    title: spec.title,
-    description: spec.description,
-    priority: spec.priority,
-    ...(spec.assign && { assigneeId: actorId }),
-    ...(spec.dueDateOffsetDays !== undefined && {
-      dueDate: offsetDate(spec.dueDateOffsetDays),
-    }),
-  });
-
-  if (spec.status !== "TODO") {
-    await updateTask(actorId, created.id, { status: spec.status });
-  }
-
-  return prisma.task.findUniqueOrThrow({ where: { id: created.id } });
-}
-
-async function ensureSprint(
-  workspaceId: string,
-  projectId: string,
-  actorId: string,
-  name: string,
-  goal: string,
-) {
-  const existing = await prisma.sprint.findUnique({
-    where: { projectId_name: { projectId, name } },
-  });
-
-  if (existing) {
-    return existing;
-  }
-
-  const created = await createSprint(actorId, { projectId, name, goal });
-
-  return prisma.sprint.findUniqueOrThrow({ where: { id: created.id } });
-}
-
-async function ensureTaskInSprint(actorId: string, sprintId: string, taskId: string) {
-  const task = await prisma.task.findUniqueOrThrow({ where: { id: taskId } });
-
-  if (task.sprintId === sprintId) {
-    return;
-  }
-
-  await assignTaskToSprint(actorId, sprintId, taskId);
-}
-
-async function ensureSprintStarted(actorId: string, sprintId: string) {
-  const sprint = await prisma.sprint.findUniqueOrThrow({ where: { id: sprintId } });
-
-  if (sprint.status !== "PLANNED") {
-    return;
-  }
-
-  await startSprint(actorId, sprintId);
-}
-
-async function ensureComment(actorId: string, taskId: string, content: string) {
-  const existing = await prisma.comment.findFirst({ where: { taskId, content } });
-
-  if (existing) {
-    return existing;
-  }
-
-  return createComment(actorId, { taskId, content });
-}
-
 async function main(): Promise<void> {
   // Reuses Commit 3's exact local-development signal (config/security.config.ts)
   // rather than a second environment check - `!isProduction` is
@@ -276,143 +134,7 @@ async function main(): Promise<void> {
   const userId = await ensureDemoUser();
   const workspace = await ensureDemoWorkspace(userId);
 
-  const websiteProject = await ensureProject(workspace.id, userId, {
-    name: "Website Redesign",
-    slug: "website-redesign",
-    description: "Redesigning the marketing site ahead of the Q1 launch.",
-    status: "ACTIVE",
-  });
-
-  const mobileProject = await ensureProject(workspace.id, userId, {
-    name: "Mobile App",
-    slug: "mobile-app",
-    description: "Native iOS/Android companion app for TeamOS.",
-    status: "PLANNED",
-  });
-
-  const launchProject = await ensureProject(workspace.id, userId, {
-    name: "Product Launch",
-    slug: "product-launch",
-    description: "Go-to-market coordination for the v1 release.",
-    status: "COMPLETED",
-  });
-
-  const websiteTasks = await Promise.all(
-    (
-      [
-        {
-          title: "Design new homepage mockups",
-          description: "High-fidelity mockups for the redesigned homepage hero and nav.",
-          status: "DONE",
-          priority: "HIGH",
-          assign: true,
-          dueDateOffsetDays: -5,
-        },
-        {
-          title: "Implement responsive navigation",
-          description: "Build the new nav bar to match the approved mockups, mobile included.",
-          status: "IN_PROGRESS",
-          priority: "HIGH",
-          assign: true,
-          dueDateOffsetDays: 3,
-        },
-        {
-          title: "QA cross-browser testing",
-          description: "Verify the redesigned pages render correctly across major browsers.",
-          status: "REVIEW",
-          priority: "MEDIUM",
-          assign: true,
-          dueDateOffsetDays: 5,
-        },
-        {
-          title: "Write copy for pricing page",
-          description: "Draft final pricing page copy for review.",
-          status: "TODO",
-          priority: "MEDIUM",
-          assign: false,
-          dueDateOffsetDays: 10,
-        },
-        {
-          title: "Set up analytics tracking",
-          description: "Wire up event tracking for the new marketing pages.",
-          status: "TODO",
-          priority: "LOW",
-          assign: false,
-        },
-      ] satisfies TaskSeed[]
-    ).map((spec) => ensureTask(workspace.id, websiteProject.id, userId, spec)),
-  );
-
-  const sprint = await ensureSprint(
-    workspace.id,
-    websiteProject.id,
-    userId,
-    "Sprint 1 — Homepage Launch",
-    "Ship the redesigned homepage end to end.",
-  );
-
-  for (const task of websiteTasks.slice(0, 3)) {
-    await ensureTaskInSprint(userId, sprint.id, task.id);
-  }
-
-  await ensureSprintStarted(userId, sprint.id);
-
-  await ensureComment(
-    userId,
-    websiteTasks[1]!.id,
-    "Nav is functional on desktop - working through mobile breakpoints next.",
-  );
-
-  await ensureComment(
-    userId,
-    websiteTasks[2]!.id,
-    "Found a layout issue in Safari, filing a follow-up task once triaged.",
-  );
-
-  await Promise.all(
-    (
-      [
-        {
-          title: "Define MVP feature set",
-          description: "Scope the feature set for the first mobile app release.",
-          status: "TODO",
-          priority: "HIGH",
-          assign: true,
-          dueDateOffsetDays: 14,
-        },
-        {
-          title: "Choose cross-platform framework",
-          description: "Evaluate React Native vs. Flutter for the mobile app.",
-          status: "TODO",
-          priority: "MEDIUM",
-          assign: false,
-        },
-      ] satisfies TaskSeed[]
-    ).map((spec) => ensureTask(workspace.id, mobileProject.id, userId, spec)),
-  );
-
-  await Promise.all(
-    (
-      [
-        {
-          title: "Finalize launch checklist",
-          description: "Confirm every launch-day task is complete and owned.",
-          status: "DONE",
-          priority: "HIGH",
-          assign: true,
-          dueDateOffsetDays: -14,
-        },
-        {
-          title: "Send press release",
-          description: "Distribute the launch press release to the media list.",
-          status: "DONE",
-          priority: "MEDIUM",
-          assign: true,
-          dueDateOffsetDays: -12,
-        },
-      ] satisfies TaskSeed[]
-    ).map((spec) => ensureTask(workspace.id, launchProject.id, userId, spec)),
-  );
+  await generateWorkspaceData(workspace.id, userId);
 
   console.log("Seed complete.");
   console.log(`  Demo login: ${DEMO_EMAIL} / ${DEMO_PASSWORD}`);

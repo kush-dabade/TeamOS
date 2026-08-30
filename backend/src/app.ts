@@ -24,6 +24,7 @@ import attachmentItemRoutes from "./modules/attachment/attachment-item.routes.js
 import commentItemRoutes from "./modules/comments/comments-item.routes.js";
 import searchRoutes from "./modules/search/search.routes.js";
 import userRoutes from "./modules/user/user.routes.js";
+import demoRoutes from "./modules/demo/demo.routes.js";
 import { notFoundHandler } from "./middleware/not-found.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import {
@@ -113,6 +114,10 @@ app.use("/api/v1/workspaces", workspaceTaskRoutes);
 
 //search resources
 app.use("/api/v1/search", searchRoutes);
+
+// public demo resources - no requireAuth; demo.routes.ts mounts its own
+// dedicated rate limiter (demoSessionLimiter) ahead of everything else.
+app.use("/api/v1/demo", demoRoutes);
 
 // current-user resources
 app.use("/api/v1/users", userRoutes);

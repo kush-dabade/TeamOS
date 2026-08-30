@@ -15,6 +15,15 @@ export function MarketingNavbar() {
           <span className="text-base font-bold tracking-tight">TeamOS</span>
         </Link>
 
+        <div className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
+          <a href="#product" className="hover:text-foreground">
+            Product
+          </a>
+          <a href="#engineering" className="hover:text-foreground">
+            Engineering
+          </a>
+        </div>
+
         <div className="flex items-center gap-2">
           <Button asChild variant="ghost">
             <Link to="/login">Sign in</Link>

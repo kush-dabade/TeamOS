@@ -7,10 +7,10 @@ const DOCS_URL = "https://github.com/kush-dabade/TeamOS/tree/main/docs";
 
 export function MarketingNavbar() {
   return (
-    <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-10 border-b border-border bg-background/80 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 sm:px-6 lg:px-8">
       <nav
         aria-label="Main"
-        className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8"
+        className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4"
       >
         <Link
           to="/"

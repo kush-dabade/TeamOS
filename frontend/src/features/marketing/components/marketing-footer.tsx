@@ -2,8 +2,8 @@ import { Layers3 } from "lucide-react";
 
 export function MarketingFooter() {
   return (
-    <footer className="border-t border-border">
-      <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:px-6 lg:px-8">
+    <footer className="border-t border-border px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 py-8 text-sm text-muted-foreground sm:flex-row">
         <div className="flex items-center gap-2">
           <Layers3 className="size-4" aria-hidden="true" />
           <span className="font-medium text-foreground">TeamOS</span>

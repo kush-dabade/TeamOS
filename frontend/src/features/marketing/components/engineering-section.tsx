@@ -21,30 +21,30 @@ export function EngineeringSection() {
       aria-labelledby="engineering-heading"
       className="scroll-mt-16 px-4 py-24 sm:px-6 lg:px-8"
     >
-      <div className="mx-auto max-w-5xl rounded-3xl border border-border bg-muted p-8 sm:p-12">
-        <div className="max-w-2xl">
-          <h2
-            id="engineering-heading"
-            className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl"
-          >
-            Built like a real product, not a prototype
-          </h2>
+      <div className="mx-auto max-w-6xl border-t border-border pt-6">
+        <p className="text-sm font-medium text-muted-foreground">Engineering</p>
 
-          <p className="mt-3 text-muted-foreground">
-            TeamOS runs on a modular monolith with a real multi-tenant PostgreSQL backend,
-            not a mocked API.
-          </p>
-        </div>
+        <h2
+          id="engineering-heading"
+          className="mt-4 max-w-2xl font-heading text-2xl font-medium tracking-tight text-balance sm:text-3xl"
+        >
+          Built like a real product, not a prototype
+        </h2>
 
-        <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {engineeringPoints.map(({ icon: Icon, label }) => (
-            <li key={label} className="flex items-center gap-2.5 text-sm">
-              <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <span>{label}</span>
-            </li>
-          ))}
-        </ul>
+        <p className="mt-3 max-w-2xl text-muted-foreground">
+          TeamOS runs on a modular monolith with a real multi-tenant PostgreSQL backend,
+          not a mocked API.
+        </p>
       </div>
+
+      <ul className="mx-auto mt-12 grid max-w-6xl gap-x-8 gap-y-5 border-y border-border py-8 sm:grid-cols-2 lg:grid-cols-3">
+        {engineeringPoints.map(({ icon: Icon, label }) => (
+          <li key={label} className="flex items-center gap-2.5 text-sm">
+            <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span>{label}</span>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

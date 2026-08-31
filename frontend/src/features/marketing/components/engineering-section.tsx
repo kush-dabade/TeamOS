@@ -28,12 +28,12 @@ export function EngineeringSection() {
 
         <h2
           id="engineering-heading"
-          className="mt-4 max-w-2xl font-heading text-2xl font-medium tracking-tight text-balance sm:text-3xl"
+          className="mt-4 max-w-2xl font-heading text-xl font-medium tracking-tight text-balance sm:text-2xl"
         >
           Built like a real product, not a prototype
         </h2>
 
-        <p className="mt-3 max-w-2xl text-muted-foreground">
+        <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
           TeamOS runs on a modular monolith with a real multi-tenant PostgreSQL backend,
           not a mocked API.
         </p>

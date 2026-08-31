@@ -1,4 +1,5 @@
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { DemoIndicator } from "@/features/demo";
 
 import { HeaderActions } from "./header-actions";
 import { HeaderNavigation } from "./header-navigation";
@@ -12,7 +13,10 @@ export function AppHeader() {
         <HeaderNavigation />
       </div>
 
-      <HeaderActions />
+      <div className="flex items-center gap-3">
+        <DemoIndicator />
+        <HeaderActions />
+      </div>
     </header>
   );
 }

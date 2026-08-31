@@ -19,7 +19,7 @@ export function EngineeringSection() {
     <section
       id="engineering"
       aria-labelledby="engineering-heading"
-      className="px-4 py-24 sm:px-6 lg:px-8"
+      className="scroll-mt-16 px-4 py-24 sm:px-6 lg:px-8"
     >
       <div className="mx-auto max-w-5xl rounded-3xl border border-border bg-muted p-8 sm:p-12">
         <div className="max-w-2xl">

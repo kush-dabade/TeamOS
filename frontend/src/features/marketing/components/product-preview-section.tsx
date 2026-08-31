@@ -2,7 +2,11 @@ import { ProductShowcaseFrame } from "./showcase/product-showcase-frame";
 
 export function ProductPreviewSection() {
   return (
-    <section id="product" aria-labelledby="product-heading" className="px-4 pb-24 sm:px-6 lg:px-8">
+    <section
+      id="product"
+      aria-labelledby="product-heading"
+      className="scroll-mt-16 px-4 pb-24 sm:px-6 lg:px-8"
+    >
       <div className="mx-auto max-w-3xl text-center">
         <h2
           id="product-heading"

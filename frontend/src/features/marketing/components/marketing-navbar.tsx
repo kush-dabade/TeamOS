@@ -10,16 +10,25 @@ export function MarketingNavbar() {
         aria-label="Main"
         className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8"
       >
-        <Link to="/" className="inline-flex items-center gap-2">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
           <Layers3 className="size-5 text-foreground" aria-hidden="true" />
           <span className="text-base font-bold tracking-tight">TeamOS</span>
         </Link>
 
         <div className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
-          <a href="#product" className="hover:text-foreground">
+          <a
+            href="#product"
+            className="rounded-sm hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
             Product
           </a>
-          <a href="#engineering" className="hover:text-foreground">
+          <a
+            href="#engineering"
+            className="rounded-sm hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
             Engineering
           </a>
         </div>

@@ -8,7 +8,7 @@ export function DemoProvisioningLoader() {
       <div className="flex flex-col gap-1">
         <p className="text-lg font-semibold tracking-tight">Preparing your workspace</p>
         <p className="max-w-sm text-sm text-muted-foreground">
-          Setting up a private TeamOS demo for you…
+          Creating a private, temporary TeamOS workspace just for you…
         </p>
       </div>
     </div>

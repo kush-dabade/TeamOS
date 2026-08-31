@@ -86,9 +86,18 @@ describe("TryPage", () => {
       const refetch = vi.fn().mockResolvedValue(undefined);
       const fakeSession: DemoSession = { expiresAt: "2026-09-01T00:00:00.000Z" };
 
+      // The real UseMutateFunction's onSuccess callback takes 4 parameters
+      // (data, variables, onMutateResult, an internal MutationFunctionContext
+      // TanStack Query itself constructs) - this double only exercises the
+      // one TryPage actually reads. Typing the mock as a real
+      // UseMutateFunction would mean fabricating meaningless values for the
+      // other 3 just to satisfy the call signature, which adds noise and
+      // couples this test to TanStack Query's internal callback arity
+      // without buying any real safety - the cast is the narrower, more
+      // honest option.
       const mutate = vi.fn((_variables: void, options?: { onSuccess?: (data: DemoSession) => unknown }) => {
         options?.onSuccess?.(fakeSession);
-      });
+      }) as unknown as MutationState["mutate"];
 
       mockUseAuth.mockReturnValue(
         authState({ status: "unauthenticated", isAuthenticated: false, refetch }),

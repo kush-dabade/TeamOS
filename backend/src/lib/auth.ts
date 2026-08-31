@@ -143,6 +143,35 @@ export const auth = betterAuth({
 
   trustedOrigins,
 
+  // Exposes the two demo-provisioning columns (modules/demo/, Commit 3's
+  // migration) through the session/user object the frontend already reads
+  // via authClient.useSession() - the smallest supported way to let the
+  // demo indicator (features/demo/components/demo-indicator.tsx) know
+  // isDemo/demoExpiresAt without a second "current user" endpoint or a new
+  // global provider. `input: false` on both is the actual security
+  // property: it makes Better Auth reject either field if a client ever
+  // includes it in a request body (update-user, sign-up, ...) - verified
+  // against the installed better-auth's field.d.mts
+  // (RemoveFieldsWithInputFalse). Setting isDemo/demoExpiresAt for real
+  // remains exclusively demo.service.ts's direct Prisma write
+  // (modules/demo/demo.service.ts) - this only ever makes them readable,
+  // never writable, from the client.
+  user: {
+    additionalFields: {
+      isDemo: {
+        type: "boolean",
+        required: false,
+        defaultValue: false,
+        input: false,
+      },
+      demoExpiresAt: {
+        type: "date",
+        required: false,
+        input: false,
+      },
+    },
+  },
+
   session: {
     // How long a session is valid for before it requires a fresh sign-in,
     // and how old a session must be before a request against it pushes its

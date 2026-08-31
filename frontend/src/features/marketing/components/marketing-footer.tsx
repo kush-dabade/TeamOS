@@ -17,7 +17,8 @@ export function MarketingFooter() {
           href="https://github.com/kush-dabade/TeamOS"
           target="_blank"
           rel="noopener noreferrer"
-          className="underline-offset-4 hover:text-foreground hover:underline"
+          aria-label="View source on GitHub (opens in a new tab)"
+          className="rounded-sm underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           View source on GitHub
         </a>

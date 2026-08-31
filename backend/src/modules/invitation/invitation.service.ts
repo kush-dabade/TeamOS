@@ -227,11 +227,24 @@ export async function createInvitation(
     },
     select: {
       name: true,
+      isDemo: true,
     },
   });
 
   if (!actor) {
     throw new NotFoundError("User not found");
+  }
+
+  // Server-side only - never derived from anything the client sends (no
+  // request field, header, or query param is consulted). A demo identity
+  // (modules/demo/, Commit 3) is otherwise a completely normal OWNER of its
+  // own isolated workspace, so without this an anonymous, free-to-create
+  // demo session could send real invitation email to any address through
+  // the existing, fully-functional invitation pipeline. Checked ahead of
+  // canAssignRole below: "you're a demo account" is a more fundamental
+  // block than "you can't assign this particular role."
+  if (actor.isDemo) {
+    throw new ForbiddenError("Demo accounts cannot send workspace invitations.");
   }
 
   if (!canAssignRole(actorMembership.role, data.role)) {

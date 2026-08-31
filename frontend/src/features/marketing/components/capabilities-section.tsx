@@ -1,7 +1,7 @@
 import { Activity, Bell, BriefcaseBusiness, CalendarRange, ListTodo, Search } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SectionReveal } from "./section-reveal";
 
 interface Capability {
   icon: LucideIcon;
@@ -42,33 +42,59 @@ const capabilities: Capability[] = [
   },
 ];
 
+const CAPABILITY_COLUMNS = 2;
+
+// Grouped into rows so a rule can separate rows without also cutting
+// between the two columns of the same row (see sm:divide-y-0 below).
+const capabilityRows: Capability[][] = Array.from(
+  { length: Math.ceil(capabilities.length / CAPABILITY_COLUMNS) },
+  (_, rowIndex) =>
+    capabilities.slice(rowIndex * CAPABILITY_COLUMNS, rowIndex * CAPABILITY_COLUMNS + CAPABILITY_COLUMNS),
+);
+
 export function CapabilitiesSection() {
   return (
     <section
       id="capabilities"
       aria-labelledby="capabilities-heading"
-      className="px-4 py-24 sm:px-6 lg:px-8"
+      className="px-4 pt-20 pb-14 sm:px-6 sm:pt-24 sm:pb-16 lg:px-8 lg:pt-28"
     >
-      <div className="mx-auto max-w-2xl text-center">
+      <SectionReveal className="mx-auto max-w-6xl border-t border-border pt-6">
+        <p className="text-sm font-medium text-muted-foreground">Capabilities</p>
+
         <h2
           id="capabilities-heading"
-          className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl"
+          className="mt-4 max-w-2xl font-heading text-2xl font-medium tracking-tight text-balance sm:text-3xl"
         >
           Everything a team needs to move work forward
         </h2>
-      </div>
+      </SectionReveal>
 
-      <div className="mx-auto mt-12 grid max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {capabilities.map(({ icon: Icon, title, description }) => (
-          <Card key={title}>
-            <CardHeader>
-              <Icon className="size-5 text-foreground" aria-hidden="true" />
-              <CardTitle className="mt-3 text-base">{title}</CardTitle>
-              <CardDescription>{description}</CardDescription>
-            </CardHeader>
-          </Card>
+      <SectionReveal className="mx-auto mt-16 max-w-6xl">
+        {capabilityRows.map((row) => (
+          <div
+            key={row.map(({ title }) => title).join("-")}
+            className="grid gap-x-12 divide-y divide-border border-t border-border first:border-t-0 sm:grid-cols-2 sm:divide-y-0"
+          >
+            {row.map(({ icon: Icon, title, description }) => (
+              <div
+                key={title}
+                className="group flex items-start gap-3 py-8 transition-transform duration-150 hover:translate-x-px motion-reduce:transition-none motion-reduce:hover:translate-x-0"
+              >
+                <Icon
+                  aria-hidden="true"
+                  className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-colors duration-150 group-hover:text-foreground"
+                />
+
+                <div>
+                  <h3 className="font-heading text-base font-medium text-foreground">{title}</h3>
+                  <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">{description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         ))}
-      </div>
+      </SectionReveal>
     </section>
   );
 }

@@ -1,14 +1,16 @@
 import { Link } from "react-router-dom";
 
+import { SectionReveal } from "./section-reveal";
+
 import { Button } from "@/components/ui/button";
 
 export function FinalCtaSection() {
   return (
-    <section aria-labelledby="final-cta-heading" className="px-4 py-24 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-3xl rounded-3xl border border-border bg-card p-10 text-center sm:p-16">
+    <section aria-labelledby="final-cta-heading" className="px-4 pt-12 pb-24 sm:px-6 sm:pt-16 lg:px-8">
+      <SectionReveal className="mx-auto max-w-3xl border-t border-border pt-16 text-center">
         <h2
           id="final-cta-heading"
-          className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl"
+          className="font-heading text-2xl font-medium tracking-tight text-balance sm:text-3xl"
         >
           See it for yourself.
         </h2>
@@ -18,7 +20,11 @@ export function FinalCtaSection() {
         </p>
 
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Button asChild size="lg" className="w-full sm:w-auto">
+          <Button
+            asChild
+            size="lg"
+            className="w-full transition-transform hover:-translate-y-px motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:w-auto"
+          >
             <Link to="/try">Try TeamOS</Link>
           </Button>
 
@@ -26,7 +32,7 @@ export function FinalCtaSection() {
             <Link to="/login">Sign in</Link>
           </Button>
         </div>
-      </div>
+      </SectionReveal>
     </section>
   );
 }

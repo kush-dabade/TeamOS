@@ -1,6 +1,8 @@
 import { Database, Radio, ShieldCheck, Users, Zap } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
+import { SectionReveal } from "./section-reveal";
+
 interface EngineeringPoint {
   icon: LucideIcon;
   label: string;
@@ -21,7 +23,7 @@ export function EngineeringSection() {
       aria-labelledby="engineering-heading"
       className="scroll-mt-16 px-4 pt-10 pb-20 sm:px-6 sm:pt-12 sm:pb-24 lg:px-8"
     >
-      <div className="mx-auto max-w-6xl border-t border-border pt-6">
+      <SectionReveal className="mx-auto max-w-6xl border-t border-border pt-6">
         <p className="text-sm font-medium text-muted-foreground">Engineering</p>
 
         <h2
@@ -35,16 +37,24 @@ export function EngineeringSection() {
           TeamOS runs on a modular monolith with a real multi-tenant PostgreSQL backend,
           not a mocked API.
         </p>
-      </div>
+      </SectionReveal>
 
-      <ul className="mx-auto mt-12 grid max-w-6xl gap-x-8 gap-y-5 border-y border-border py-8 sm:grid-cols-2 lg:grid-cols-3">
-        {engineeringPoints.map(({ icon: Icon, label }) => (
-          <li key={label} className="flex items-center gap-2.5 text-sm">
-            <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <span>{label}</span>
-          </li>
-        ))}
-      </ul>
+      <SectionReveal>
+        <ul className="mx-auto mt-12 grid max-w-6xl gap-x-8 gap-y-5 border-y border-border py-8 sm:grid-cols-2 lg:grid-cols-3">
+          {engineeringPoints.map(({ icon: Icon, label }) => (
+            <li
+              key={label}
+              className="group flex items-center gap-2.5 text-sm transition-transform duration-150 hover:translate-x-px"
+            >
+              <Icon
+                className="size-4 shrink-0 text-muted-foreground transition-colors duration-150 group-hover:text-foreground"
+                aria-hidden="true"
+              />
+              <span>{label}</span>
+            </li>
+          ))}
+        </ul>
+      </SectionReveal>
     </section>
   );
 }

@@ -1,6 +1,8 @@
 import { Activity, Bell, BriefcaseBusiness, CalendarRange, ListTodo, Search } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
+import { SectionReveal } from "./section-reveal";
+
 interface Capability {
   icon: LucideIcon;
   title: string;
@@ -57,7 +59,7 @@ export function CapabilitiesSection() {
       aria-labelledby="capabilities-heading"
       className="px-4 pt-20 pb-14 sm:px-6 sm:pt-24 sm:pb-16 lg:px-8 lg:pt-28"
     >
-      <div className="mx-auto max-w-6xl border-t border-border pt-6">
+      <SectionReveal className="mx-auto max-w-6xl border-t border-border pt-6">
         <p className="text-sm font-medium text-muted-foreground">Capabilities</p>
 
         <h2
@@ -66,17 +68,23 @@ export function CapabilitiesSection() {
         >
           Everything a team needs to move work forward
         </h2>
-      </div>
+      </SectionReveal>
 
-      <div className="mx-auto mt-16 max-w-6xl">
+      <SectionReveal className="mx-auto mt-16 max-w-6xl">
         {capabilityRows.map((row) => (
           <div
             key={row.map(({ title }) => title).join("-")}
             className="grid gap-x-12 divide-y divide-border border-t border-border first:border-t-0 sm:grid-cols-2 sm:divide-y-0"
           >
             {row.map(({ icon: Icon, title, description }) => (
-              <div key={title} className="flex items-start gap-3 py-8">
-                <Icon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+              <div
+                key={title}
+                className="group flex items-start gap-3 py-8 transition-transform duration-150 hover:translate-x-px"
+              >
+                <Icon
+                  aria-hidden="true"
+                  className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-colors duration-150 group-hover:text-foreground"
+                />
 
                 <div>
                   <h3 className="font-heading text-base font-medium text-foreground">{title}</h3>
@@ -86,7 +94,7 @@ export function CapabilitiesSection() {
             ))}
           </div>
         ))}
-      </div>
+      </SectionReveal>
     </section>
   );
 }

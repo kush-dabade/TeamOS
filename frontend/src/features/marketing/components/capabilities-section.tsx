@@ -79,7 +79,7 @@ export function CapabilitiesSection() {
             {row.map(({ icon: Icon, title, description }) => (
               <div
                 key={title}
-                className="group flex items-start gap-3 py-8 transition-transform duration-150 hover:translate-x-px"
+                className="group flex items-start gap-3 py-8 transition-transform duration-150 hover:translate-x-px motion-reduce:transition-none motion-reduce:hover:translate-x-0"
               >
                 <Icon
                   aria-hidden="true"

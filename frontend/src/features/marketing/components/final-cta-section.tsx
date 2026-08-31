@@ -20,7 +20,11 @@ export function FinalCtaSection() {
         </p>
 
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Button asChild size="lg" className="w-full transition-transform hover:-translate-y-px sm:w-auto">
+          <Button
+            asChild
+            size="lg"
+            className="w-full transition-transform hover:-translate-y-px motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:w-auto"
+          >
             <Link to="/try">Try TeamOS</Link>
           </Button>
 

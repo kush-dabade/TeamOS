@@ -44,7 +44,7 @@ export function EngineeringSection() {
           {engineeringPoints.map(({ icon: Icon, label }) => (
             <li
               key={label}
-              className="group flex items-center gap-2.5 text-sm transition-transform duration-150 hover:translate-x-px"
+              className="group flex items-center gap-2.5 text-sm transition-transform duration-150 hover:translate-x-px motion-reduce:transition-none motion-reduce:hover:translate-x-0"
             >
               <Icon
                 className="size-4 shrink-0 text-muted-foreground transition-colors duration-150 group-hover:text-foreground"

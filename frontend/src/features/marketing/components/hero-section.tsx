@@ -41,7 +41,11 @@ export function HeroSection() {
           transition={{ duration: 0.5, delay: 0.16, ease: EASE }}
           className="mt-10 flex flex-col items-start gap-3 sm:flex-row"
         >
-          <Button asChild size="lg" className="w-full transition-transform hover:-translate-y-px sm:w-auto">
+          <Button
+            asChild
+            size="lg"
+            className="w-full transition-transform hover:-translate-y-px motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:w-auto"
+          >
             <Link to="/try">Try TeamOS</Link>
           </Button>
 

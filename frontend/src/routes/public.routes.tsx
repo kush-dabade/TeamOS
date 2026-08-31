@@ -1,6 +1,7 @@
 import type { RouteObject } from "react-router-dom";
 
 import { GuestRoute } from "@/features/auth";
+import { TryPage } from "@/features/demo";
 import { InvitationPage } from "@/features/invitations";
 import PublicLayout from "@/layouts/PublicLayout";
 import RouteErrorBoundary from "@/layouts/RouteErrorBoundary";
@@ -17,6 +18,17 @@ export const publicRoutes: RouteObject[] = [
   {
     path: "/",
     element: <HomePage />,
+    errorElement: <RouteErrorBoundary fullPage recoveryPath="/" recoveryLabel="Back to home" />,
+  },
+  {
+    // Deliberately not wrapped in GuestRoute/AuthenticatedRoute/
+    // WorkspaceGuard - the whole point of this route is to create the
+    // session that lets a visitor enter the authenticated app in the first
+    // place. TryPage itself checks useAuth() and redirects an
+    // already-authenticated visitor straight to /dashboard instead of
+    // provisioning a redundant demo workspace.
+    path: "/try",
+    element: <TryPage />,
     errorElement: <RouteErrorBoundary fullPage recoveryPath="/" recoveryLabel="Back to home" />,
   },
   {

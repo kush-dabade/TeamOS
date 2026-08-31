@@ -15,7 +15,7 @@ import { REALTIME_EVENTS } from "../../realtime/realtime.constants.js";
 
 import { createActivity } from "../activity/activity.service.js";
 
-import { ALLOWED_ATTACHMENT_MIME_TYPES } from "./attachment.config.js";
+import { ALLOWED_ATTACHMENT_MIME_TYPES, DEMO_ATTACHMENT_MAX_FILE_SIZE } from "./attachment.config.js";
 
 import type {
   AttachmentResponse,
@@ -124,6 +124,20 @@ function validateAttachmentMimeType(mimeType: string): void {
   }
 }
 
+// Server-side only - isDemo is looked up fresh from the database by
+// uploadAttachment below, never taken from anything the client sends.
+// middleware/multer.ts's ATTACHMENT_MAX_FILE_SIZE (10MB) already ran ahead
+// of this for every caller; this is an additional, tighter bound that only
+// applies to demo accounts (modules/demo/, Commit 3), so an anonymous,
+// free-to-create demo session can't be used as unrestricted file storage.
+function validateDemoAttachmentSize(isDemo: boolean, size: number): void {
+  if (isDemo && size > DEMO_ATTACHMENT_MAX_FILE_SIZE) {
+    throw new ValidationError(
+      `Demo workspaces are limited to attachments up to ${DEMO_ATTACHMENT_MAX_FILE_SIZE / (1024 * 1024)}MB.`,
+    );
+  }
+}
+
 // Physical storage layout:
 //
 // workspaces/{workspaceId}/tasks/{taskId}/
@@ -169,6 +183,21 @@ export async function uploadAttachment(
   await assertProjectNotArchived(task.projectId);
 
   validateAttachmentMimeType(file.mimetype);
+
+  const actor = await prisma.user.findUnique({
+    where: {
+      id: actorId,
+    },
+    select: {
+      isDemo: true,
+    },
+  });
+
+  if (!actor) {
+    throw new NotFoundError("User not found");
+  }
+
+  validateDemoAttachmentSize(actor.isDemo, file.size);
 
   const { buffer, originalname, mimetype, size } = file;
 

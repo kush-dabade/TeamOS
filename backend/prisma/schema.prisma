@@ -119,6 +119,15 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  // Public demo provisioning (PR 5, src/modules/demo/). isDemo marks an
+  // account created by POST /api/v1/demo/session rather than real sign-up;
+  // demoExpiresAt is when its owned workspace(s) and this row become
+  // eligible for the demo-cleanup worker to delete. Both are set together,
+  // once, at provisioning time - never updated afterward. null for every
+  // normal user.
+  isDemo        Boolean   @default(false)
+  demoExpiresAt DateTime?
+
   sessions Session[]
   accounts Account[]
 
@@ -135,6 +144,18 @@ model User {
   notifications       Notification[]    @relation("NotificationRecipient")
 
   @@unique([email])
+  // Serves the demo-cleanup worker's one query: WHERE isDemo = true AND
+  // demoExpiresAt <= now(). A plain composite index, not a hand-authored
+  // partial index (WHERE isDemo = true) like Sprint's active-partial-unique
+  // index elsewhere in this schema - at this application's scale (a
+  // portfolio SaaS app, not a high-signup consumer product) the `user`
+  // table is never going to be large enough for an unindexed full scan on
+  // every cleanup tick to matter, and isDemo is boolean-selective enough
+  // that a normal composite index already serves this query well. A
+  // partial index would shrink it further, but that's a real future
+  // optimization to reach for only if demo volume actually grows into a
+  // problem - not a default to reach for now.
+  @@index([isDemo, demoExpiresAt])
   @@map("user")
 }
 

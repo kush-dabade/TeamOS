@@ -252,3 +252,27 @@ export const signUpIpLimiter = rateLimit({
   handler: handleRateLimitExceeded,
   ...FAIL_OPEN_ON_STORE_ERROR,
 });
+
+// 5 per 15 minutes per IP - deliberately tighter than signUpIpLimiter's
+// 10/min despite both being anonymous account-creation paths: each call
+// here does far more than create one Account row - a real user, a real
+// workspace, and ~9 tasks/a sprint/comments across 3 projects (see
+// modules/demo/demo-data-generator.ts), all through the same service
+// layer a real interactive user would drive one click at a time. A
+// legitimate visitor only ever needs one demo session per visit; a human
+// who hits an error and retries needs at most 2-3. The 15-minute window
+// (not 60s) mirrors lib/auth.ts's SIGN_IN_ACCOUNT_WINDOW_MS - a
+// deliberately long window is what actually bounds sustained scripted
+// provisioning, not just burst volume in any single minute. Mounted first
+// in demo.routes.ts (ahead of the controller), so an over-limit request
+// never reaches the expensive provisioning work at all.
+export const demoSessionLimiter = rateLimit({
+  windowMs: 15 * 60_000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: createRedisStore("rl:demo:session:"),
+  keyGenerator: (req) => ipKeyGenerator(req.ip ?? "unknown"),
+  handler: handleRateLimitExceeded,
+  ...FAIL_OPEN_ON_STORE_ERROR,
+});

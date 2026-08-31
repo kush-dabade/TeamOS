@@ -22,6 +22,10 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+// Pathnames the hard 401 redirect below must never fire on - see that
+// interceptor's own comment for why each one is here.
+const UNAUTHORIZED_REDIRECT_EXCLUDED_PATHS = ["/login", "/try"];
+
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -37,12 +41,20 @@ apiClient.interceptors.response.use(
     // mirrors RouteErrorBoundary's existing use of window.location for
     // "something is fundamentally wrong, start over."
     //
-    // The pathname check is future-proofing, not a live bug: nothing on
-    // /login currently calls apiClient (login/register go through authClient
-    // instead), so this redirect can't fire there today. It guards against a
-    // future change quietly adding an apiClient call to the login page and
-    // reintroducing a redirect loop.
-    if (appError.type === "unauthorized" && window.location.pathname !== "/login") {
+    // The pathname check is future-proofing, not a live bug on either
+    // excluded path today: nothing on /login calls apiClient (login/register
+    // go through authClient instead), and /try's own POST /demo/session is a
+    // public, unauthenticated endpoint that can never itself 401. Both are
+    // guarded anyway against a future change quietly adding an apiClient
+    // call to either page - on /login that would reintroduce a redirect
+    // loop; on /try it would otherwise force a demo visitor who has no
+    // password to set through a login form that can never work for them,
+    // mid-provisioning, instead of letting TryPage's own error state (with
+    // its Try again / Back to TeamOS actions) handle the failure.
+    if (
+      appError.type === "unauthorized" &&
+      !UNAUTHORIZED_REDIRECT_EXCLUDED_PATHS.includes(window.location.pathname)
+    ) {
       window.location.href = "/login";
     }
 

@@ -77,6 +77,26 @@ export async function signUpTestUser(app: Express): Promise<AuthenticatedTestUse
 }
 
 /**
+ * signUpTestUser + a direct Prisma flip of isDemo to true - simulates a
+ * demo-provisioned identity (modules/demo/demo.service.ts, Commit 3) for
+ * tests proving demo-specific restrictions (invitations, attachments),
+ * without going through the real public POST /demo/session provisioning
+ * flow - these tests are proving the authorization boundary reacts to
+ * isDemo, not re-testing provisioning itself (already covered by
+ * tests/demo/).
+ */
+export async function signUpDemoTestUser(app: Express): Promise<AuthenticatedTestUser> {
+  const user = await signUpTestUser(app);
+
+  await prisma.user.update({
+    where: { id: user.userId },
+    data: { isDemo: true },
+  });
+
+  return user;
+}
+
+/**
  * Direct Prisma inserts, not the HTTP layer - workspace/membership rows
  * have no security-sensitive internals (unlike auth), so hitting the
  * database directly is simpler and faster for test setup.

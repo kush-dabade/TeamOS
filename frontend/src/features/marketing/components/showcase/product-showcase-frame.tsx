@@ -14,7 +14,7 @@ import { ShowcaseTaskList } from "./showcase-task-list";
  */
 export function ProductShowcaseFrame() {
   return (
-    <div className="mx-auto max-w-5xl overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
+    <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-3 sm:px-6">
         <div className="flex min-w-0 items-center gap-2">
           <Layers3 className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />

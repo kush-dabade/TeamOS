@@ -55,7 +55,7 @@ export function CapabilitiesSection() {
     <section
       id="capabilities"
       aria-labelledby="capabilities-heading"
-      className="px-4 py-24 sm:px-6 lg:px-8"
+      className="px-4 pt-20 pb-14 sm:px-6 sm:pt-24 sm:pb-16 lg:px-8 lg:pt-28"
     >
       <div className="mx-auto max-w-6xl border-t border-border pt-6">
         <p className="text-sm font-medium text-muted-foreground">Capabilities</p>

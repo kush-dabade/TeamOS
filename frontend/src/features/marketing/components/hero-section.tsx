@@ -19,7 +19,7 @@ export function HeroSection() {
       >
         <h1
           id="hero-heading"
-          className="font-heading text-6xl leading-[0.92] tracking-tight text-balance sm:text-7xl lg:text-8xl"
+          className="font-heading text-5xl leading-[0.92] tracking-tight text-balance sm:text-7xl lg:text-8xl"
         >
           <span className="block font-light text-muted-foreground">A clearer way to run</span>
           <span className="block font-semibold text-foreground">your team&apos;s work.</span>

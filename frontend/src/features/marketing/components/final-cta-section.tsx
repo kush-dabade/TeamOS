@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 
 export function FinalCtaSection() {
   return (
-    <section aria-labelledby="final-cta-heading" className="px-4 py-24 sm:px-6 lg:px-8">
+    <section aria-labelledby="final-cta-heading" className="px-4 pt-12 pb-24 sm:px-6 sm:pt-16 lg:px-8">
       <div className="mx-auto max-w-3xl border-t border-border pt-16 text-center">
         <h2
           id="final-cta-heading"

@@ -20,7 +20,7 @@ export function ProductPreviewSection() {
     <section
       id="product"
       aria-labelledby="product-heading"
-      className="scroll-mt-16 px-4 pb-24 sm:px-6 lg:px-8"
+      className="scroll-mt-16 px-4 pb-20 sm:px-6 sm:pb-28 lg:px-8 lg:pb-32"
     >
       {/* Visually silent — the hero flows directly into the product UI with no
           separating heading, but the section keeps an accessible name for the

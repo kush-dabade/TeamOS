@@ -4,65 +4,143 @@ import type { Variants } from "motion/react";
 import { SectionReveal } from "./section-reveal";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
-const SUPPORTING_COLUMNS = 2;
-const SUPPORTING_STAGGER = 0.05;
+const CLOSING_STAGGER = 0.05;
 
-interface SupportingCapability {
+interface FeatureStory {
   number: string;
   title: string;
   description: string;
+  imageSrc: string;
+  imageMobileSrc: string;
+  imageAlt: string;
+  imageWidth: number;
+  imageHeight: number;
+  /** Literal Tailwind classes — must stay literal so the build's static scanner finds them. */
+  imageAspectClassName: string;
+  /** Image on the left, text on the right at lg+. */
+  reverse?: boolean;
 }
 
-const supportingCapabilities: SupportingCapability[] = [
+const featureStories: FeatureStory[] = [
+  {
+    number: "01",
+    title: "Projects",
+    description: "Organize work into projects with status, ownership, and progress tracking.",
+    imageSrc: "/images/marketing/projects.png",
+    imageMobileSrc: "/images/marketing/projects-mobile.png",
+    imageAlt: "The TeamOS projects list, showing three projects with their status, progress, and task counts.",
+    imageWidth: 1976,
+    imageHeight: 580,
+    imageAspectClassName: "aspect-[896/300] sm:aspect-[1976/580]",
+  },
   {
     number: "02",
     title: "Tasks",
     description: "Track status, priority, assignees, and due dates on every task.",
+    imageSrc: "/images/marketing/tasks.png",
+    imageMobileSrc: "/images/marketing/tasks-mobile.png",
+    imageAlt: "The TeamOS task list, showing real tasks with their status, priority, assignee, and due date.",
+    imageWidth: 1976,
+    imageHeight: 1398,
+    imageAspectClassName: "aspect-[750/700] sm:aspect-[1976/1398]",
+    reverse: true,
   },
   {
     number: "03",
+    title: "Search",
+    description: "Find projects, tasks, and comments across the workspace instantly.",
+    imageSrc: "/images/marketing/search.png",
+    imageMobileSrc: "/images/marketing/search-mobile.png",
+    imageAlt: "The TeamOS command palette searching for “launch,” returning matching projects and tasks.",
+    imageWidth: 1600,
+    imageHeight: 960,
+    imageAspectClassName: "aspect-[1164/580] sm:aspect-[1600/960]",
+  },
+];
+
+interface ClosingCapability {
+  title: string;
+  description: string;
+}
+
+const closingCapabilities: ClosingCapability[] = [
+  {
     title: "Sprints",
     description: "Plan focused sprints and move tasks through them as work progresses.",
   },
   {
-    number: "04",
     title: "Activity feed",
     description: "Every change is recorded, so a project's history is always visible.",
   },
   {
-    number: "05",
     title: "Notifications",
     description: "Stay on top of assignments and updates as they happen.",
   },
-  {
-    number: "06",
-    title: "Search",
-    description: "Find projects, tasks, and comments across the workspace instantly.",
-  },
 ];
 
-// Grouped into rows so a rule can separate rows without also cutting
-// between the two columns of the same row (see sm:divide-y-0 below).
-const supportingRows: SupportingCapability[][] = Array.from(
-  { length: Math.ceil(supportingCapabilities.length / SUPPORTING_COLUMNS) },
-  (_, rowIndex) =>
-    supportingCapabilities.slice(
-      rowIndex * SUPPORTING_COLUMNS,
-      rowIndex * SUPPORTING_COLUMNS + SUPPORTING_COLUMNS,
-    ),
-);
+function FeatureRow({ story }: { story: FeatureStory }) {
+  const shouldReduceMotion = useReducedMotion();
+  const {
+    number,
+    title,
+    description,
+    imageSrc,
+    imageMobileSrc,
+    imageAlt,
+    imageWidth,
+    imageHeight,
+    imageAspectClassName,
+    reverse,
+  } = story;
+
+  return (
+    <motion.div
+      initial={shouldReduceMotion ? false : { opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.2 }}
+      transition={{ duration: 0.6, ease: EASE }}
+      className="lg:grid lg:grid-cols-12 lg:items-start lg:gap-x-12"
+    >
+      <div className={`lg:col-span-5 ${reverse ? "lg:order-2" : ""}`}>
+        <span className="font-heading text-sm font-medium tabular-nums text-muted-foreground">
+          {number}
+        </span>
+
+        <h3 className="mt-3 font-heading text-4xl font-medium tracking-tight text-balance sm:text-5xl">
+          {title}
+        </h3>
+
+        <p className="mt-4 max-w-md text-base text-muted-foreground sm:text-lg">{description}</p>
+      </div>
+
+      <div className={`mt-10 lg:col-span-7 lg:mt-0 ${reverse ? "lg:order-1" : ""}`}>
+        <picture>
+          <source media="(max-width: 639px)" srcSet={imageMobileSrc} />
+          <img
+            src={imageSrc}
+            alt={imageAlt}
+            width={imageWidth}
+            height={imageHeight}
+            decoding="async"
+            className={`w-full rounded-3xl border border-border object-cover shadow-sm ${imageAspectClassName}`}
+          />
+        </picture>
+      </div>
+    </motion.div>
+  );
+}
 
 export function CapabilitiesSection() {
   const shouldReduceMotion = useReducedMotion();
 
-  const supportingContainerVariants: Variants = {
+  const closingContainerVariants: Variants = {
     hidden: {},
     visible: {
-      transition: shouldReduceMotion ? undefined : { staggerChildren: SUPPORTING_STAGGER },
+      transition: shouldReduceMotion ? undefined : { staggerChildren: CLOSING_STAGGER },
     },
   };
 
-  const supportingItemVariants: Variants = {
+  const closingItemVariants: Variants = {
     hidden: shouldReduceMotion ? {} : { opacity: 0, y: 16 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: EASE } },
   };
@@ -84,88 +162,39 @@ export function CapabilitiesSection() {
         </h2>
       </SectionReveal>
 
-      {/* Focal: Projects is the one dominant capability — paired with real
-          evidence (a live capture of the Projects table) instead of another
-          icon+description row, so it reads as the section's centerpiece
-          rather than the first of six equal cards. */}
-      <motion.div
-        initial={shouldReduceMotion ? false : { opacity: 0, y: 24 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.2 }}
-        transition={{ duration: 0.6, ease: EASE }}
-        className="mx-auto mt-16 max-w-6xl sm:mt-20"
-      >
-        <div className="lg:grid lg:grid-cols-12 lg:items-center lg:gap-x-12">
-          <div className="lg:col-span-5">
-            <span className="font-heading text-sm font-medium tabular-nums text-muted-foreground">
-              01
-            </span>
+      {/* Three product stories — Projects, Tasks, Search — each paired with
+          a real screenshot, alternating sides for rhythm. Deliberately not
+          the Product Preview treatment a second time: these stay contained
+          within the text column's max-w-6xl rather than breaking out, and
+          items-start (not items-center) so a short row never leaves dead
+          space under a tall one. */}
+      <div className="mx-auto mt-14 max-w-6xl space-y-20 sm:mt-16 sm:space-y-24 lg:space-y-28">
+        {featureStories.map((story) => (
+          <FeatureRow key={story.title} story={story} />
+        ))}
+      </div>
 
-            <h3 className="mt-3 font-heading text-4xl font-medium tracking-tight text-balance sm:text-5xl">
-              Projects
-            </h3>
-
-            <p className="mt-4 max-w-md text-base text-muted-foreground sm:text-lg">
-              Organize work into projects with status, ownership, and progress tracking.
-            </p>
-          </div>
-
-          <div className="mt-10 lg:col-span-7 lg:mt-0">
-            <picture>
-              {/* Five columns (Project/Status/Progress/Tasks/Updated) shrink past
-                  legibility below sm, so a tighter real crop (Project + Status
-                  only, same three rows) is served instead of scaling the full
-                  desktop table down to an unreadable strip. */}
-              <source media="(max-width: 639px)" srcSet="/images/marketing/projects-mobile.png" />
-              <img
-                src="/images/marketing/projects.png"
-                alt="The TeamOS projects list, showing three projects with their status, progress, and task counts."
-                width={1976}
-                height={580}
-                loading="lazy"
-                decoding="async"
-                className="aspect-[896/300] w-full rounded-3xl border border-border object-cover shadow-sm sm:aspect-[1976/580]"
-              />
-            </picture>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Supporting: deliberately quieter — no screenshots, no icons.
-          Typography scale and the shared 01–06 numbering carry the
-          hierarchy instead of a second visual anchor competing with
-          Projects. */}
+      {/* Closing trio: quieter by design — no numerals, no screenshots, no
+          per-item rules. A single shared top rule introduces it as the
+          supporting layer after the three major stories above. */}
       <motion.div
         initial="hidden"
         whileInView="visible"
         viewport={{ once: true, amount: 0.2 }}
-        variants={supportingContainerVariants}
-        className="mx-auto mt-20 max-w-6xl sm:mt-24"
+        variants={closingContainerVariants}
+        className="mx-auto mt-20 max-w-6xl border-t border-border pt-12 sm:mt-24 sm:pt-14"
       >
-        {supportingRows.map((row) => (
-          <div
-            key={row.map(({ title }) => title).join("-")}
-            className="grid gap-x-12 divide-y divide-border border-t border-border first:border-t-0 sm:grid-cols-2 sm:divide-y-0"
-          >
-            {row.map(({ number, title, description }) => (
-              <motion.div
-                key={title}
-                variants={supportingItemVariants}
-                className="group py-10 transition-transform duration-150 hover:translate-x-px motion-reduce:transition-none motion-reduce:hover:translate-x-0"
-              >
-                <span className="font-heading text-sm font-medium tabular-nums text-muted-foreground transition-colors duration-150 group-hover:text-foreground">
-                  {number}
-                </span>
+        <div className="grid gap-x-12 gap-y-10 sm:grid-cols-3">
+          {closingCapabilities.map(({ title, description }) => (
+            <motion.div key={title} variants={closingItemVariants}>
+              <h3 className="font-heading text-xl font-medium tracking-tight text-foreground sm:text-2xl">
+                {title}
+              </h3>
 
-                <h3 className="mt-2 font-heading text-xl font-medium tracking-tight text-foreground sm:text-2xl">
-                  {title}
-                </h3>
-
-                <p className="mt-2 max-w-sm text-base text-muted-foreground">{description}</p>
-              </motion.div>
-            ))}
-          </div>
-        ))}
+              <p className="mt-2 text-base text-muted-foreground">{description}</p>
+            </motion.div>
+          ))}
+        </div>
       </motion.div>
     </section>
   );

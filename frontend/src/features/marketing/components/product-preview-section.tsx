@@ -1,18 +1,9 @@
-import { motion, useReducedMotion, useScroll, useTransform } from "motion/react";
-import { useRef } from "react";
+import { motion, useReducedMotion } from "motion/react";
+
+const EASE = [0.16, 1, 0.3, 1] as const;
 
 export function ProductPreviewSection() {
-  const containerRef = useRef<HTMLDivElement>(null);
   const shouldReduceMotion = useReducedMotion();
-
-  const { scrollYProgress } = useScroll({
-    target: containerRef,
-    offset: ["start 0.9", "start 0.4"],
-  });
-
-  const opacity = useTransform(scrollYProgress, [0, 1], [0, 1]);
-  const scale = useTransform(scrollYProgress, [0, 1], [0.94, 1]);
-  const y = useTransform(scrollYProgress, [0, 1], [40, 0]);
 
   return (
     <section
@@ -27,20 +18,37 @@ export function ProductPreviewSection() {
         The TeamOS dashboard
       </h2>
 
+      {/* Deliberately wider than the max-w-6xl text column above it — the
+          product screenshot is the one element on the page allowed to break
+          the shared container width, so it reads as the strongest visual
+          object after the hero headline rather than another content block. */}
       <motion.div
-        ref={containerRef}
-        style={shouldReduceMotion ? undefined : { opacity, scale, y }}
-        className="mx-auto max-w-6xl"
+        initial={shouldReduceMotion ? false : { opacity: 0, y: 32, scale: 0.92 }}
+        whileInView={{ opacity: 1, y: 0, scale: 1 }}
+        viewport={{ once: true, amount: 0.2 }}
+        transition={{ duration: 0.7, ease: EASE }}
+        className="mx-auto max-w-7xl"
       >
-        <img
-          src="/images/marketing/dashboard.png"
-          alt="The TeamOS dashboard, showing a workspace's active projects and the tasks that need attention."
-          width={1419}
-          height={513}
-          fetchPriority="high"
-          decoding="async"
-          className="w-full rounded-3xl border border-border shadow-sm"
-        />
+        <picture>
+          {/* Below sm, the full desktop crop shrinks past legibility, so a
+              tighter real crop (sidebar + the "Continue working" panel,
+              ending cleanly at the panel gap) is served instead of
+              CSS-cropping the wide desktop image down to an unreadable strip.
+              Captured natively at 2x device-pixel density, so a single file
+              stays crisp under CSS downscaling across every real phone DPR
+              without needing its own 1x/2x pair. */}
+          <source media="(max-width: 639px)" srcSet="/images/marketing/dashboard-mobile.png" />
+          <img
+            src="/images/marketing/dashboard.png"
+            srcSet="/images/marketing/dashboard.png 1x, /images/marketing/dashboard@2x.png 2x"
+            alt="The TeamOS dashboard, showing a workspace's navigation, active projects, and in-progress tasks."
+            width={1241}
+            height={633}
+            fetchPriority="high"
+            decoding="async"
+            className="aspect-[1488/778] w-full rounded-3xl border border-border object-cover shadow-sm sm:aspect-[1241/633]"
+          />
+        </picture>
       </motion.div>
     </section>
   );

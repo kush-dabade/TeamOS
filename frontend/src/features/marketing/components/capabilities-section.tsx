@@ -1,63 +1,77 @@
-import { Activity, Bell, BriefcaseBusiness, CalendarRange, ListTodo, Search } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
+import type { Variants } from "motion/react";
 
 import { SectionReveal } from "./section-reveal";
 
-interface Capability {
-  icon: LucideIcon;
+const EASE = [0.16, 1, 0.3, 1] as const;
+const SUPPORTING_COLUMNS = 2;
+const SUPPORTING_STAGGER = 0.05;
+
+interface SupportingCapability {
+  number: string;
   title: string;
   description: string;
 }
 
-const capabilities: Capability[] = [
+const supportingCapabilities: SupportingCapability[] = [
   {
-    icon: BriefcaseBusiness,
-    title: "Projects",
-    description: "Organize work into projects with status, ownership, and progress tracking.",
-  },
-  {
-    icon: ListTodo,
+    number: "02",
     title: "Tasks",
     description: "Track status, priority, assignees, and due dates on every task.",
   },
   {
-    icon: CalendarRange,
+    number: "03",
     title: "Sprints",
     description: "Plan focused sprints and move tasks through them as work progresses.",
   },
   {
-    icon: Activity,
+    number: "04",
     title: "Activity feed",
     description: "Every change is recorded, so a project's history is always visible.",
   },
   {
-    icon: Bell,
+    number: "05",
     title: "Notifications",
     description: "Stay on top of assignments and updates as they happen.",
   },
   {
-    icon: Search,
+    number: "06",
     title: "Search",
     description: "Find projects, tasks, and comments across the workspace instantly.",
   },
 ];
 
-const CAPABILITY_COLUMNS = 2;
-
 // Grouped into rows so a rule can separate rows without also cutting
 // between the two columns of the same row (see sm:divide-y-0 below).
-const capabilityRows: Capability[][] = Array.from(
-  { length: Math.ceil(capabilities.length / CAPABILITY_COLUMNS) },
+const supportingRows: SupportingCapability[][] = Array.from(
+  { length: Math.ceil(supportingCapabilities.length / SUPPORTING_COLUMNS) },
   (_, rowIndex) =>
-    capabilities.slice(rowIndex * CAPABILITY_COLUMNS, rowIndex * CAPABILITY_COLUMNS + CAPABILITY_COLUMNS),
+    supportingCapabilities.slice(
+      rowIndex * SUPPORTING_COLUMNS,
+      rowIndex * SUPPORTING_COLUMNS + SUPPORTING_COLUMNS,
+    ),
 );
 
 export function CapabilitiesSection() {
+  const shouldReduceMotion = useReducedMotion();
+
+  const supportingContainerVariants: Variants = {
+    hidden: {},
+    visible: {
+      transition: shouldReduceMotion ? undefined : { staggerChildren: SUPPORTING_STAGGER },
+    },
+  };
+
+  const supportingItemVariants: Variants = {
+    hidden: shouldReduceMotion ? {} : { opacity: 0, y: 16 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: EASE } },
+  };
+
   return (
     <section
       id="capabilities"
       aria-labelledby="capabilities-heading"
-      className="px-4 pt-20 pb-14 sm:px-6 sm:pt-24 sm:pb-16 lg:px-8 lg:pt-28"
+      className="px-4 pt-24 pb-20 sm:px-6 sm:pt-28 sm:pb-24 lg:px-8 lg:pt-32 lg:pb-28"
     >
       <SectionReveal className="mx-auto max-w-6xl border-t border-border pt-6">
         <p className="text-sm font-medium text-muted-foreground">Capabilities</p>
@@ -70,31 +84,89 @@ export function CapabilitiesSection() {
         </h2>
       </SectionReveal>
 
-      <SectionReveal className="mx-auto mt-16 max-w-6xl">
-        {capabilityRows.map((row) => (
+      {/* Focal: Projects is the one dominant capability — paired with real
+          evidence (a live capture of the Projects table) instead of another
+          icon+description row, so it reads as the section's centerpiece
+          rather than the first of six equal cards. */}
+      <motion.div
+        initial={shouldReduceMotion ? false : { opacity: 0, y: 24 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.2 }}
+        transition={{ duration: 0.6, ease: EASE }}
+        className="mx-auto mt-16 max-w-6xl sm:mt-20"
+      >
+        <div className="lg:grid lg:grid-cols-12 lg:items-center lg:gap-x-12">
+          <div className="lg:col-span-5">
+            <span className="font-heading text-sm font-medium tabular-nums text-muted-foreground">
+              01
+            </span>
+
+            <h3 className="mt-3 font-heading text-4xl font-medium tracking-tight text-balance sm:text-5xl">
+              Projects
+            </h3>
+
+            <p className="mt-4 max-w-md text-base text-muted-foreground sm:text-lg">
+              Organize work into projects with status, ownership, and progress tracking.
+            </p>
+          </div>
+
+          <div className="mt-10 lg:col-span-7 lg:mt-0">
+            <picture>
+              {/* Five columns (Project/Status/Progress/Tasks/Updated) shrink past
+                  legibility below sm, so a tighter real crop (Project + Status
+                  only, same three rows) is served instead of scaling the full
+                  desktop table down to an unreadable strip. */}
+              <source media="(max-width: 639px)" srcSet="/images/marketing/projects-mobile.png" />
+              <img
+                src="/images/marketing/projects.png"
+                alt="The TeamOS projects list, showing three projects with their status, progress, and task counts."
+                width={1976}
+                height={580}
+                loading="lazy"
+                decoding="async"
+                className="aspect-[896/300] w-full rounded-3xl border border-border object-cover shadow-sm sm:aspect-[1976/580]"
+              />
+            </picture>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Supporting: deliberately quieter — no screenshots, no icons.
+          Typography scale and the shared 01–06 numbering carry the
+          hierarchy instead of a second visual anchor competing with
+          Projects. */}
+      <motion.div
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, amount: 0.2 }}
+        variants={supportingContainerVariants}
+        className="mx-auto mt-20 max-w-6xl sm:mt-24"
+      >
+        {supportingRows.map((row) => (
           <div
             key={row.map(({ title }) => title).join("-")}
             className="grid gap-x-12 divide-y divide-border border-t border-border first:border-t-0 sm:grid-cols-2 sm:divide-y-0"
           >
-            {row.map(({ icon: Icon, title, description }) => (
-              <div
+            {row.map(({ number, title, description }) => (
+              <motion.div
                 key={title}
-                className="group flex items-start gap-3 py-8 transition-transform duration-150 hover:translate-x-px motion-reduce:transition-none motion-reduce:hover:translate-x-0"
+                variants={supportingItemVariants}
+                className="group py-10 transition-transform duration-150 hover:translate-x-px motion-reduce:transition-none motion-reduce:hover:translate-x-0"
               >
-                <Icon
-                  aria-hidden="true"
-                  className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-colors duration-150 group-hover:text-foreground"
-                />
+                <span className="font-heading text-sm font-medium tabular-nums text-muted-foreground transition-colors duration-150 group-hover:text-foreground">
+                  {number}
+                </span>
 
-                <div>
-                  <h3 className="font-heading text-base font-medium text-foreground">{title}</h3>
-                  <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">{description}</p>
-                </div>
-              </div>
+                <h3 className="mt-2 font-heading text-xl font-medium tracking-tight text-foreground sm:text-2xl">
+                  {title}
+                </h3>
+
+                <p className="mt-2 max-w-sm text-base text-muted-foreground">{description}</p>
+              </motion.div>
             ))}
           </div>
         ))}
-      </SectionReveal>
+      </motion.div>
     </section>
   );
 }

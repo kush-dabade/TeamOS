@@ -38,7 +38,7 @@ import { auth } from "../../lib/auth.js";
 import { WorkspaceRole } from "../../generated/prisma/enums.js";
 import { createProject, updateProject } from "../project/project.service.js";
 import type { ProjectStatus } from "../project/project.types.js";
-import { createSprint, startSprint } from "../sprint/sprint.service.js";
+import { createSprint, startSprint, completeSprint } from "../sprint/sprint.service.js";
 import { assignTaskToSprint } from "../sprint-task/sprint-task.service.js";
 import { createTask, updateTask } from "../task/task.service.js";
 import type { TaskPriority, TaskStatus } from "../task/task.types.js";
@@ -58,7 +58,19 @@ interface ProjectSeed {
   status: Exclude<ProjectStatus, "ARCHIVED">;
 }
 
-async function ensureProject(workspaceId: string, ownerId: string, spec: ProjectSeed) {
+// actorId (who performs the create/status-transition calls) and
+// projectOwnerId (the resulting Project.ownerId) are deliberately separate
+// params - createProject only requires the actor to be OWNER/ADMIN
+// (project.service.ts), not that they end up as the project's owner, so a
+// project can legitimately be filed by one person and owned by another
+// (e.g. Alex setting Sofia as the owner of a design-led initiative), the
+// same way a real workspace admin can do this today.
+async function ensureProject(
+  workspaceId: string,
+  actorId: string,
+  projectOwnerId: string,
+  spec: ProjectSeed,
+) {
   const existing = await prisma.project.findUnique({
     where: { workspaceId_slug: { workspaceId, slug: spec.slug } },
   });
@@ -71,15 +83,15 @@ async function ensureProject(workspaceId: string, ownerId: string, spec: Project
   // there's no status field on CreateProjectData, matching how a real user
   // can only set status via a separate update once the project exists.
   // updateProject below mirrors that same two-step for the seed.
-  const created = await createProject(ownerId, {
+  const created = await createProject(actorId, {
     workspaceId,
-    ownerId,
+    ownerId: projectOwnerId,
     name: spec.name,
     description: spec.description,
   });
 
   if (spec.status !== "PLANNED") {
-    await updateProject(ownerId, created.id, { status: spec.status });
+    await updateProject(actorId, created.id, { status: spec.status });
   }
 
   return prisma.project.findUniqueOrThrow({ where: { id: created.id } });
@@ -90,7 +102,10 @@ interface TaskSeed {
   description: string;
   status: TaskStatus;
   priority: TaskPriority;
-  assign: boolean;
+  // undefined means genuinely unassigned - no longer derived from whoever
+  // happens to be the acting creator, since Commit 3 attributes tasks to
+  // whichever team member the work actually belongs to.
+  assigneeId?: string;
   dueDateOffsetDays?: number;
 }
 
@@ -100,6 +115,15 @@ function offsetDate(days: number): Date {
   date.setUTCDate(date.getUTCDate() + days);
 
   return date;
+}
+
+// Who files a task, when the spec itself doesn't say: the assignee, for a
+// task someone is picking up themselves (the common real-world case - you
+// file your own ticket), falling back to filerId (typically the
+// project's lead/PM) for the deliberately-unassigned tasks, matching who'd
+// realistically open a ticket nobody's claimed yet.
+function taskCreator(spec: TaskSeed, filerId: string): string {
+  return spec.assigneeId ?? filerId;
 }
 
 async function ensureTask(
@@ -124,7 +148,7 @@ async function ensureTask(
     title: spec.title,
     description: spec.description,
     priority: spec.priority,
-    ...(spec.assign && { assigneeId: actorId }),
+    ...(spec.assigneeId !== undefined && { assigneeId: spec.assigneeId }),
     ...(spec.dueDateOffsetDays !== undefined && {
       dueDate: offsetDate(spec.dueDateOffsetDays),
     }),
@@ -137,22 +161,34 @@ async function ensureTask(
   return prisma.task.findUniqueOrThrow({ where: { id: created.id } });
 }
 
+interface SprintSeed {
+  name: string;
+  goal: string;
+  startDate?: Date;
+  endDate?: Date;
+}
+
 async function ensureSprint(
   workspaceId: string,
   projectId: string,
   actorId: string,
-  name: string,
-  goal: string,
+  spec: SprintSeed,
 ) {
   const existing = await prisma.sprint.findUnique({
-    where: { projectId_name: { projectId, name } },
+    where: { projectId_name: { projectId, name: spec.name } },
   });
 
   if (existing) {
     return existing;
   }
 
-  const created = await createSprint(actorId, { projectId, name, goal });
+  const created = await createSprint(actorId, {
+    projectId,
+    name: spec.name,
+    goal: spec.goal,
+    ...(spec.startDate !== undefined && { startDate: spec.startDate }),
+    ...(spec.endDate !== undefined && { endDate: spec.endDate }),
+  });
 
   return prisma.sprint.findUniqueOrThrow({ where: { id: created.id } });
 }
@@ -175,6 +211,16 @@ async function ensureSprintStarted(actorId: string, sprintId: string) {
   }
 
   await startSprint(actorId, sprintId);
+}
+
+async function ensureSprintCompleted(actorId: string, sprintId: string) {
+  const sprint = await prisma.sprint.findUniqueOrThrow({ where: { id: sprintId } });
+
+  if (sprint.status !== "ACTIVE") {
+    return;
+  }
+
+  await completeSprint(actorId, sprintId);
 }
 
 async function ensureComment(actorId: string, taskId: string, content: string) {
@@ -465,104 +511,115 @@ async function ensureEphemeralAcmeTeam(
  * ensurePermanentAcmeTeam/ensureEphemeralAcmeTeam for why the mechanism
  * necessarily differs while the resulting team shape does not.
  *
- * Project/task/sprint/comment content below still runs entirely as
- * `ownerId`, unchanged from before this function grew a team - attributing
- * that content to the new team members is deliberately left to a later
- * commit, not folded in here.
+ * Project/task/sprint content below is attributed across the team the
+ * block above just resolved, not to `ownerId` alone: `members.*` supplies
+ * the actual actor/assignee/project-owner ids for everything except the
+ * few project- and sprint-level operations that createProject/createSprint/
+ * startSprint/completeSprint/assignTaskToSprint themselves restrict to
+ * OWNER/ADMIN (project.service.ts, sprint.service.ts,
+ * sprint-task.service.ts) - those still run as `ownerId` or
+ * `members.engineeringLead`, the only two roles this workspace has that
+ * are ever allowed to perform them. Comments are untouched here
+ * deliberately (still `ownerId`, still exactly the two pre-existing
+ * comments) - multi-author collaboration is Commit 4's boundary, not this
+ * one's.
  */
 export async function generateWorkspaceData(workspaceId: string, ownerId: string): Promise<void> {
   const owner = await prisma.user.findUniqueOrThrow({ where: { id: ownerId } });
 
-  if (owner.isDemo) {
-    await ensureEphemeralAcmeTeam(workspaceId, owner.demoExpiresAt);
-  } else {
-    await ensurePermanentAcmeTeam(workspaceId, ownerId);
-  }
+  const members = owner.isDemo
+    ? await ensureEphemeralAcmeTeam(workspaceId, owner.demoExpiresAt)
+    : await ensurePermanentAcmeTeam(workspaceId, ownerId);
 
-  const websiteProject = await ensureProject(workspaceId, ownerId, {
+  // ---------------------------------------------------------------------
+  // Website Redesign - ACTIVE. Owned by Sofia (the redesign is
+  // fundamentally design-led); filed by Alex, the only actor available
+  // before Sofia herself is a member with standing to file it. Its sprint
+  // is the ACTIVE one: a mix of in-flight statuses, matching the project's
+  // own in-flight status.
+  // ---------------------------------------------------------------------
+  const websiteProject = await ensureProject(workspaceId, ownerId, members.designer, {
     name: "Website Redesign",
     slug: "website-redesign",
     description: "Redesigning the marketing site ahead of the Q1 launch.",
     status: "ACTIVE",
   });
 
-  const mobileProject = await ensureProject(workspaceId, ownerId, {
-    name: "Mobile App",
-    slug: "mobile-app",
-    description: "Native iOS/Android companion app for TeamOS.",
-    status: "PLANNED",
-  });
-
-  const launchProject = await ensureProject(workspaceId, ownerId, {
-    name: "Product Launch",
-    slug: "product-launch",
-    description: "Go-to-market coordination for the v1 release.",
-    status: "COMPLETED",
-  });
+  const websiteTaskSpecs: TaskSeed[] = [
+    {
+      title: "Finalize responsive navigation states",
+      description: "Build the new nav bar to match the approved mockups, mobile included.",
+      status: "IN_PROGRESS",
+      priority: "HIGH",
+      assigneeId: members.frontendEngineer,
+      dueDateOffsetDays: 3,
+    },
+    {
+      title: "Design updated homepage hero section",
+      description: "High-fidelity mockups for the redesigned homepage hero and nav.",
+      status: "DONE",
+      priority: "HIGH",
+      assigneeId: members.designer,
+      dueDateOffsetDays: -10,
+    },
+    {
+      title: "QA cross-browser & device testing",
+      description: "Verify the redesigned pages render correctly across major browsers and devices.",
+      status: "REVIEW",
+      priority: "MEDIUM",
+      assigneeId: members.frontendEngineer,
+      dueDateOffsetDays: 5,
+    },
+    {
+      // Intentionally overdue (past due, still TODO) - one of Commit 3's
+      // ~2 deliberately-overdue tasks.
+      title: "Audit accessibility for redesigned pages",
+      description:
+        "Check color contrast, keyboard navigation, and screen-reader labeling across the new page templates.",
+      status: "TODO",
+      priority: "MEDIUM",
+      assigneeId: members.designer,
+      dueDateOffsetDays: -3,
+    },
+    {
+      title: "Write copy for pricing page",
+      description: "Draft final pricing page copy for review.",
+      status: "TODO",
+      priority: "MEDIUM",
+      assigneeId: ownerId,
+      dueDateOffsetDays: 9,
+    },
+    {
+      // Deliberately unassigned - filed by the PM, not yet picked up.
+      title: "Set up analytics tracking for marketing pages",
+      description: "Wire up event tracking for the new marketing pages.",
+      status: "TODO",
+      priority: "LOW",
+    },
+  ];
 
   const websiteTasks = await Promise.all(
-    (
-      [
-        {
-          title: "Design new homepage mockups",
-          description: "High-fidelity mockups for the redesigned homepage hero and nav.",
-          status: "DONE",
-          priority: "HIGH",
-          assign: true,
-          dueDateOffsetDays: -5,
-        },
-        {
-          title: "Implement responsive navigation",
-          description: "Build the new nav bar to match the approved mockups, mobile included.",
-          status: "IN_PROGRESS",
-          priority: "HIGH",
-          assign: true,
-          dueDateOffsetDays: 3,
-        },
-        {
-          title: "QA cross-browser testing",
-          description: "Verify the redesigned pages render correctly across major browsers.",
-          status: "REVIEW",
-          priority: "MEDIUM",
-          assign: true,
-          dueDateOffsetDays: 5,
-        },
-        {
-          title: "Write copy for pricing page",
-          description: "Draft final pricing page copy for review.",
-          status: "TODO",
-          priority: "MEDIUM",
-          assign: false,
-          dueDateOffsetDays: 10,
-        },
-        {
-          title: "Set up analytics tracking",
-          description: "Wire up event tracking for the new marketing pages.",
-          status: "TODO",
-          priority: "LOW",
-          assign: false,
-        },
-      ] satisfies TaskSeed[]
-    ).map((spec) => ensureTask(workspaceId, websiteProject.id, ownerId, spec)),
+    websiteTaskSpecs.map((spec) =>
+      ensureTask(workspaceId, websiteProject.id, taskCreator(spec, members.productManager), spec),
+    ),
   );
 
-  const sprint = await ensureSprint(
-    workspaceId,
-    websiteProject.id,
-    ownerId,
-    "Sprint 1 — Homepage Launch",
-    "Ship the redesigned homepage end to end.",
-  );
+  const websiteSprint = await ensureSprint(workspaceId, websiteProject.id, ownerId, {
+    name: "Sprint 3 — Accessibility & Polish",
+    goal: "Ship navigation, hero, and accessibility work for the redesigned marketing site.",
+    startDate: offsetDate(-10),
+    endDate: offsetDate(4),
+  });
 
-  for (const task of websiteTasks.slice(0, 3)) {
-    await ensureTaskInSprint(ownerId, sprint.id, task.id);
+  for (const task of websiteTasks.slice(0, 4)) {
+    await ensureTaskInSprint(ownerId, websiteSprint.id, task.id);
   }
 
-  await ensureSprintStarted(ownerId, sprint.id);
+  await ensureSprintStarted(ownerId, websiteSprint.id);
 
   await ensureComment(
     ownerId,
-    websiteTasks[1]!.id,
+    websiteTasks[0]!.id,
     "Nav is functional on desktop - working through mobile breakpoints next.",
   );
 
@@ -572,48 +629,220 @@ export async function generateWorkspaceData(workspaceId: string, ownerId: string
     "Found a layout issue in Safari, filing a follow-up task once triaged.",
   );
 
-  await Promise.all(
-    (
-      [
-        {
-          title: "Define MVP feature set",
-          description: "Scope the feature set for the first mobile app release.",
-          status: "TODO",
-          priority: "HIGH",
-          assign: true,
-          dueDateOffsetDays: 14,
-        },
-        {
-          title: "Choose cross-platform framework",
-          description: "Evaluate React Native vs. Flutter for the mobile app.",
-          status: "TODO",
-          priority: "MEDIUM",
-          assign: false,
-        },
-      ] satisfies TaskSeed[]
-    ).map((spec) => ensureTask(workspaceId, mobileProject.id, ownerId, spec)),
+  // ---------------------------------------------------------------------
+  // Mobile App - ACTIVE. Owned and filed by Maya (the engineering lead
+  // driving the initiative). Its sprint is deliberately left PLANNED -
+  // upcoming work, not yet started - alongside ad-hoc in-flight tasks
+  // that were never in any sprint to begin with.
+  // ---------------------------------------------------------------------
+  const mobileProject = await ensureProject(workspaceId, members.engineeringLead, members.engineeringLead, {
+    name: "Mobile App",
+    slug: "mobile-app",
+    description: "Native iOS/Android companion app for Acme customers.",
+    status: "ACTIVE",
+  });
+
+  const mobileTaskSpecs: TaskSeed[] = [
+    {
+      title: "Implement OAuth login flow",
+      description: "Add Google and Apple sign-in to the mobile login screen.",
+      status: "DONE",
+      priority: "HIGH",
+      assigneeId: members.backendEngineer,
+      dueDateOffsetDays: -20,
+    },
+    {
+      title: "Build onboarding carousel screens",
+      description: "Design and implement the first-run onboarding flow for new mobile users.",
+      status: "IN_PROGRESS",
+      priority: "HIGH",
+      assigneeId: members.frontendEngineer,
+      dueDateOffsetDays: 6,
+    },
+    {
+      // Intentionally overdue AND urgent - the second of Commit 3's ~2
+      // deliberately-overdue tasks.
+      title: "Wire up push notification permissions",
+      description: "Prompt for and persist push notification opt-in on first launch.",
+      status: "TODO",
+      priority: "URGENT",
+      assigneeId: members.backendEngineer,
+      dueDateOffsetDays: -2,
+    },
+    {
+      title: "Integrate task API pagination for mobile",
+      description:
+        "Adopt the workspace task API's pagination so the mobile task list doesn't load everything at once.",
+      status: "TODO",
+      priority: "MEDIUM",
+      assigneeId: members.backendEngineer,
+      dueDateOffsetDays: 12,
+    },
+    {
+      title: "Define MVP feature set for v1 release",
+      description: "Scope the feature set for the first mobile app release.",
+      status: "DONE",
+      priority: "HIGH",
+      assigneeId: members.engineeringLead,
+      dueDateOffsetDays: -25,
+    },
+    {
+      // Deliberately unassigned - filed by the eng lead, not yet claimed.
+      title: "Evaluate offline sync strategy",
+      description: "Compare local-first sync approaches for spotty-connectivity usage.",
+      status: "TODO",
+      priority: "LOW",
+    },
+  ];
+
+  const mobileTasks = await Promise.all(
+    mobileTaskSpecs.map((spec) =>
+      ensureTask(workspaceId, mobileProject.id, taskCreator(spec, members.engineeringLead), spec),
+    ),
   );
 
+  const mobileSprint = await ensureSprint(workspaceId, mobileProject.id, members.engineeringLead, {
+    name: "Sprint 1 — Foundation",
+    goal: "Land push notifications, pagination, and offline sync groundwork for the mobile beta.",
+    startDate: offsetDate(7),
+    endDate: offsetDate(21),
+  });
+
+  for (const task of [mobileTasks[2]!, mobileTasks[3]!, mobileTasks[5]!]) {
+    await ensureTaskInSprint(members.engineeringLead, mobileSprint.id, task.id);
+  }
+
+  // ---------------------------------------------------------------------
+  // Product Launch - COMPLETED. Owned by Ethan (product manager), filed
+  // by Alex. Its sprint runs the full historical lifecycle: created,
+  // tasks assigned while still PLANNED, started, then completed - genuine
+  // completed-sprint state, not a status inserted directly.
+  // ---------------------------------------------------------------------
+  const launchProject = await ensureProject(workspaceId, ownerId, members.productManager, {
+    name: "Product Launch",
+    slug: "product-launch",
+    description: "Go-to-market coordination for the v1 release.",
+    status: "COMPLETED",
+  });
+
+  const launchTaskSpecs: TaskSeed[] = [
+    {
+      title: "Finalize launch checklist",
+      description: "Confirm every launch-day task is complete and owned.",
+      status: "DONE",
+      priority: "HIGH",
+      assigneeId: members.productManager,
+      dueDateOffsetDays: -30,
+    },
+    {
+      title: "Send press release",
+      description: "Distribute the launch press release to the media list.",
+      status: "DONE",
+      priority: "MEDIUM",
+      assigneeId: members.productManager,
+      dueDateOffsetDays: -28,
+    },
+    {
+      title: "Prepare launch-day support runbook",
+      description: "Document the on-call plan and known issues for launch-day support.",
+      status: "DONE",
+      priority: "MEDIUM",
+      assigneeId: ownerId,
+      dueDateOffsetDays: -29,
+    },
+    {
+      title: "Review post-launch analytics report",
+      description: "Summarize the first two weeks of post-launch usage data for the team.",
+      status: "DONE",
+      priority: "LOW",
+      assigneeId: members.productManager,
+      dueDateOffsetDays: -18,
+    },
+  ];
+
+  const launchTasks = await Promise.all(
+    launchTaskSpecs.map((spec) =>
+      ensureTask(workspaceId, launchProject.id, taskCreator(spec, members.productManager), spec),
+    ),
+  );
+
+  const launchSprint = await ensureSprint(workspaceId, launchProject.id, ownerId, {
+    name: "Sprint 2 — Launch Readiness",
+    goal: "Close out every launch-day workstream ahead of the v1 release.",
+    startDate: offsetDate(-35),
+    endDate: offsetDate(-20),
+  });
+
+  for (const task of launchTasks.slice(0, 3)) {
+    await ensureTaskInSprint(ownerId, launchSprint.id, task.id);
+  }
+
+  await ensureSprintStarted(ownerId, launchSprint.id);
+  await ensureSprintCompleted(ownerId, launchSprint.id);
+
+  // ---------------------------------------------------------------------
+  // Internal Platform - PLANNED. Owned and filed by Maya. Not started yet,
+  // so every task is TODO and every date is in the future (or, for the
+  // one urgent item, effectively immediate) - no sprint of its own; the
+  // project itself hasn't kicked off.
+  // ---------------------------------------------------------------------
+  const platformProject = await ensureProject(
+    workspaceId,
+    members.engineeringLead,
+    members.engineeringLead,
+    {
+      name: "Internal Platform",
+      slug: "internal-platform",
+      description: "Developer tooling, CI, and observability improvements for Acme's engineering org.",
+      status: "PLANNED",
+    },
+  );
+
+  const platformTaskSpecs: TaskSeed[] = [
+    {
+      title: "Audit workspace authorization paths",
+      description: "Review RBAC checks across workspace, project, and task endpoints for gaps.",
+      status: "TODO",
+      priority: "HIGH",
+      assigneeId: members.backendEngineer,
+      dueDateOffsetDays: 15,
+    },
+    {
+      title: "Add API pagination to activity feed",
+      description: "Extend the activity feed endpoint to support cursor-based pagination.",
+      status: "TODO",
+      priority: "MEDIUM",
+      assigneeId: members.backendEngineer,
+      dueDateOffsetDays: 20,
+    },
+    {
+      title: "Investigate slow search queries",
+      description: "Profile the workspace search endpoint under realistic data volume.",
+      status: "TODO",
+      priority: "URGENT",
+      assigneeId: members.engineeringLead,
+      dueDateOffsetDays: 1,
+    },
+    {
+      // Deliberately unassigned - filed by the eng lead, not yet claimed.
+      title: "Update production environment documentation",
+      description: "Document the current production deployment and environment variables.",
+      status: "TODO",
+      priority: "LOW",
+    },
+    {
+      title: "Improve CI pipeline caching",
+      description: "Cache dependency installs to speed up the CI pipeline.",
+      status: "TODO",
+      priority: "MEDIUM",
+      assigneeId: members.backendEngineer,
+      dueDateOffsetDays: 25,
+    },
+  ];
+
   await Promise.all(
-    (
-      [
-        {
-          title: "Finalize launch checklist",
-          description: "Confirm every launch-day task is complete and owned.",
-          status: "DONE",
-          priority: "HIGH",
-          assign: true,
-          dueDateOffsetDays: -14,
-        },
-        {
-          title: "Send press release",
-          description: "Distribute the launch press release to the media list.",
-          status: "DONE",
-          priority: "MEDIUM",
-          assign: true,
-          dueDateOffsetDays: -12,
-        },
-      ] satisfies TaskSeed[]
-    ).map((spec) => ensureTask(workspaceId, launchProject.id, ownerId, spec)),
+    platformTaskSpecs.map((spec) =>
+      ensureTask(workspaceId, platformProject.id, taskCreator(spec, members.engineeringLead), spec),
+    ),
   );
 }

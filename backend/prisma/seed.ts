@@ -47,9 +47,12 @@ import { generateWorkspaceData } from "../src/modules/demo/demo-data-generator.j
 // Deliberately not a real person's email/domain - .local is reserved for
 // exactly this (RFC 6761), and this exact address/password pair is meant to
 // be published in Commit 5's README, so it must be obviously a local-only
-// demo credential, never mistakable for a real account.
+// demo credential, never mistakable for a real account. The email itself is
+// intentionally NOT renamed alongside the Acme Inc. identity below - it's
+// the one documented, memorable login this seed must never break; only the
+// display name changes to fit the organization.
 const DEMO_EMAIL = "demo@teamos.local";
-const DEMO_NAME = "Demo User";
+const DEMO_NAME = "Alex Rivera";
 // Satisfies the frontend's registration complexity rule too (8+ chars,
 // upper, lower, number - see frontend/src/features/auth/validation/register.ts)
 // even though signing up here goes through Better Auth directly, not that
@@ -57,19 +60,35 @@ const DEMO_NAME = "Demo User";
 // through the real UI after intentionally deleting the seeded row.
 const DEMO_PASSWORD = "TeamOSDemo123!";
 
-const DEMO_WORKSPACE_NAME = "TeamOS Demo";
+const DEMO_WORKSPACE_NAME = "Acme Inc.";
 // Must match generateSlug(DEMO_WORKSPACE_NAME) (src/lib/slug.ts) - this is
 // what createWorkspace would derive on its own, asserted explicitly here so
 // the idempotency lookup below (by slug) stays correct if that name ever
 // changes.
-const DEMO_WORKSPACE_SLUG = "teamos-demo";
+const DEMO_WORKSPACE_SLUG = "acme-inc";
+
+// Pre-Commit-2 local DBs have this workspace under its old identity -
+// ensureDemoWorkspace renames it in place rather than creating a second,
+// duplicate workspace for the same owner. New/fresh-clone environments
+// never have a workspace under this slug, so this is a no-op for them.
+const LEGACY_DEMO_WORKSPACE_SLUG = "teamos-demo";
 
 async function ensureDemoUser(): Promise<string> {
   const existing = await prisma.user.findUnique({ where: { email: DEMO_EMAIL } });
 
   if (existing) {
-    if (!existing.emailVerified) {
-      await prisma.user.update({ where: { id: existing.id }, data: { emailVerified: true } });
+    // Converges an existing row toward the current DEMO_NAME/verified state
+    // on every run, not just at creation - a local DB seeded before Commit
+    // 2's "Demo User" -> "Alex Rivera" rename would otherwise keep the
+    // stale display name forever, since this function only ever ran its
+    // creation branch once.
+    const needsUpdate = !existing.emailVerified || existing.name !== DEMO_NAME;
+
+    if (needsUpdate) {
+      await prisma.user.update({
+        where: { id: existing.id },
+        data: { emailVerified: true, name: DEMO_NAME },
+      });
     }
 
     return existing.id;
@@ -103,6 +122,17 @@ async function ensureDemoWorkspace(ownerId: string) {
 
   if (existing) {
     return existing;
+  }
+
+  const legacy = await prisma.workspace.findUnique({
+    where: { slug: LEGACY_DEMO_WORKSPACE_SLUG },
+  });
+
+  if (legacy && legacy.ownerId === ownerId) {
+    return prisma.workspace.update({
+      where: { id: legacy.id },
+      data: { name: DEMO_WORKSPACE_NAME, slug: DEMO_WORKSPACE_SLUG },
+    });
   }
 
   const created = await createWorkspace({ name: DEMO_WORKSPACE_NAME, ownerId });

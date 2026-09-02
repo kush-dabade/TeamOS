@@ -16,8 +16,9 @@ const backendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 const SEED_SCRIPT = path.join(backendRoot, "prisma/seed.ts");
 
 const DEMO_EMAIL = "demo@teamos.local";
+const DEMO_NAME = "Alex Rivera";
 const DEMO_PASSWORD = "TeamOSDemo123!";
-const DEMO_WORKSPACE_SLUG = "teamos-demo";
+const DEMO_WORKSPACE_SLUG = "acme-inc";
 
 /**
  * Spawns the real backend/prisma/seed.ts, the exact command `npm run seed`
@@ -49,19 +50,21 @@ describe("deterministic seed (Commit 4)", () => {
     await resetDatabase();
   });
 
-  it("creates the demo user, workspace, membership, projects, tasks, sprint, and comments", async () => {
+  it("creates the demo user, team, workspace, projects, tasks, sprints, comments, and attachments", async () => {
     await runSeed("development");
 
     const user = await prisma.user.findUnique({ where: { email: DEMO_EMAIL } });
 
     expect(user).toBeTruthy();
     expect(user!.emailVerified).toBe(true);
+    expect(user!.name).toBe(DEMO_NAME);
 
     const workspace = await prisma.workspace.findUnique({
       where: { slug: DEMO_WORKSPACE_SLUG },
     });
 
     expect(workspace).toBeTruthy();
+    expect(workspace!.name).toBe("Acme Inc.");
     expect(workspace!.ownerId).toBe(user!.id);
 
     const membership = await prisma.workspaceMember.findUnique({
@@ -71,39 +74,65 @@ describe("deterministic seed (Commit 4)", () => {
     expect(membership).toBeTruthy();
     expect(membership!.role).toBe("OWNER");
 
+    // The full Acme Inc. team (Commit 2): the owner plus 5 real invited/
+    // accepted members - not asserting individual names/roles here, just
+    // that the team-building side of the seed converged.
+    const memberCount = await prisma.workspaceMember.count({ where: { workspaceId: workspace!.id } });
+
+    expect(memberCount).toBe(6);
+
+    // One believable next-hire invitation, deliberately left pending
+    // (Commit 2) - not accepted, not a second pending invite.
+    const invitations = await prisma.workspaceInvitation.findMany({
+      where: { workspaceId: workspace!.id },
+    });
+
+    expect(invitations).toHaveLength(6);
+    expect(invitations.filter((invitation) => invitation.status === "PENDING")).toHaveLength(1);
+
     const projects = await prisma.project.findMany({
       where: { workspaceId: workspace!.id },
       orderBy: { slug: "asc" },
     });
 
     expect(projects.map((project) => ({ slug: project.slug, status: project.status }))).toEqual([
-      { slug: "mobile-app", status: "PLANNED" },
+      { slug: "internal-platform", status: "PLANNED" },
+      { slug: "mobile-app", status: "ACTIVE" },
       { slug: "product-launch", status: "COMPLETED" },
       { slug: "website-redesign", status: "ACTIVE" },
     ]);
 
     const tasks = await prisma.task.findMany({ where: { workspaceId: workspace!.id } });
 
-    expect(tasks).toHaveLength(9);
+    expect(tasks).toHaveLength(21);
 
-    const sprint = await prisma.sprint.findFirst({ where: { workspaceId: workspace!.id } });
+    // Commit 3's full sprint lifecycle: one of each state, not asserting
+    // exact per-sprint task counts (that's the seed's content, not its
+    // contract) - just that all three lifecycle states are genuinely
+    // reachable through the real service calls that produced them.
+    const sprints = await prisma.sprint.findMany({ where: { workspaceId: workspace!.id } });
 
-    expect(sprint).toBeTruthy();
-    expect(sprint!.status).toBe("ACTIVE");
+    expect(sprints).toHaveLength(3);
+    expect(sprints.map((sprint) => sprint.status).sort()).toEqual(["ACTIVE", "COMPLETED", "PLANNED"]);
 
-    const tasksInSprint = await prisma.task.count({ where: { sprintId: sprint!.id } });
-
-    expect(tasksInSprint).toBe(3);
-
+    // Commit 4: multi-author collaboration, not the original single-owner
+    // pair.
     const comments = await prisma.comment.count({ where: { workspaceId: workspace!.id } });
 
-    expect(comments).toBe(2);
+    expect(comments).toBe(8);
 
-    // The whole point of using the real project/task/sprint/comment
-    // services (not raw Prisma inserts) rather than mirroring
+    const attachments = await prisma.attachment.count({ where: { workspaceId: workspace!.id } });
+
+    expect(attachments).toBe(3);
+
+    // The whole point of using the real project/task/sprint/comment/
+    // attachment services (not raw Prisma inserts) rather than mirroring
     // tests/setup/fixtures.ts's simpler direct-insert convention: a
     // populated Activity feed comes for free, with no hand-maintained
-    // Activity-shape logic in the seed itself.
+    // Activity-shape logic in the seed itself. Not pinning an exact count -
+    // notifications (also service side effects) are asynchronous through
+    // BullMQ and this test never starts a worker, so only Activity (a
+    // synchronous side effect of the same calls) is asserted here.
     const activities = await prisma.activity.count({ where: { workspaceId: workspace!.id } });
 
     expect(activities).toBeGreaterThan(0);
@@ -116,10 +145,12 @@ describe("deterministic seed (Commit 4)", () => {
       prisma.user.count({ where: { email: DEMO_EMAIL } }),
       prisma.workspace.count(),
       prisma.workspaceMember.count(),
+      prisma.workspaceInvitation.count(),
       prisma.project.count(),
       prisma.task.count(),
       prisma.sprint.count(),
       prisma.comment.count(),
+      prisma.attachment.count(),
       prisma.activity.count(),
     ]);
 
@@ -129,10 +160,12 @@ describe("deterministic seed (Commit 4)", () => {
       prisma.user.count({ where: { email: DEMO_EMAIL } }),
       prisma.workspace.count(),
       prisma.workspaceMember.count(),
+      prisma.workspaceInvitation.count(),
       prisma.project.count(),
       prisma.task.count(),
       prisma.sprint.count(),
       prisma.comment.count(),
+      prisma.attachment.count(),
       prisma.activity.count(),
     ]);
 

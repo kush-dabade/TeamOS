@@ -255,8 +255,9 @@ export const signUpIpLimiter = rateLimit({
 
 // 5 per 15 minutes per IP - deliberately tighter than signUpIpLimiter's
 // 10/min despite both being anonymous account-creation paths: each call
-// here does far more than create one Account row - a real user, a real
-// workspace, and ~9 tasks/a sprint/comments across 3 projects (see
+// here does far more than create one Account row - a real user, 5 real
+// teammates, a real workspace, and the full canonical Acme Inc. dataset
+// (4 projects, 21 tasks, 3 sprints, comments, and attachments - see
 // modules/demo/demo-data-generator.ts), all through the same service
 // layer a real interactive user would drive one click at a time. A
 // legitimate visitor only ever needs one demo session per visit; a human

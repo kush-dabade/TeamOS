@@ -14,6 +14,14 @@ import { startTestServer, type TestServer } from "../setup/test-server.js";
 // auth-rate-limit.test.ts's GENERAL_LIMIT/SIGN_UP_LIMIT etc.
 const DEMO_SESSION_LIMIT = 5;
 
+// The Acme Inc. team (Commit 2): the session owner plus 5 fresh throwaway
+// teammates, every one of them isDemo - see
+// demo-data-generator.ts's ensureEphemeralAcmeTeam. Was 1 before Commit 2;
+// pinned separately from DEMO_SESSION_LIMIT above since the two numbers
+// are unrelated (one is a rate-limit policy, the other is how many people
+// a single allowed session provisions).
+const USERS_PER_DEMO_SESSION = 6;
+
 const RATE_LIMITED_ENVELOPE = {
   success: false,
   error: { code: "RATE_LIMITED", message: expect.any(String) },
@@ -43,15 +51,16 @@ describe("demo session provisioning rate limiting", () => {
       // Real requests, not seeded counters - DEMO_SESSION_LIMIT (5) is
       // small enough to drive directly, and this exercises the real
       // middleware/Redis path, not an approximation of it. Each one is a
-      // genuine full provisioning call (user + workspace + seed data), the
-      // same real-cost work an actual abusive burst would trigger.
+      // genuine full provisioning call (an owner, 5 real teammates, a
+      // workspace, and the full canonical Acme Inc. dataset), the same
+      // real-cost work an actual abusive burst would trigger.
       for (let i = 0; i < DEMO_SESSION_LIMIT; i++) {
         await request(app).post("/api/v1/demo/session").expect(201);
       }
 
       const provisionedCount = await prisma.user.count({ where: { isDemo: true } });
 
-      expect(provisionedCount).toBe(DEMO_SESSION_LIMIT);
+      expect(provisionedCount).toBe(DEMO_SESSION_LIMIT * USERS_PER_DEMO_SESSION);
 
       const blockedRes = await request(app).post("/api/v1/demo/session").expect(429);
 
@@ -64,14 +73,15 @@ describe("demo session provisioning rate limiting", () => {
       // Proves the limiter runs BEFORE provisioning (demo.routes.ts mounts
       // it as the first middleware, ahead of the controller) - if
       // provisioning ran first and the limiter only blocked the response,
-      // this count would have incremented to 6 despite the 429.
+      // this count would have incremented by another 6 despite the 429.
       const countAfterBlockedRequest = await prisma.user.count({ where: { isDemo: true } });
 
-      expect(countAfterBlockedRequest).toBe(DEMO_SESSION_LIMIT);
+      expect(countAfterBlockedRequest).toBe(DEMO_SESSION_LIMIT * USERS_PER_DEMO_SESSION);
     },
-    // 5 full provisioning calls (each creating a user, workspace, 3
-    // projects, 9 tasks, a sprint, and 2 comments through the real service
-    // layer) comfortably exceed vitest.config.ts's default 15s testTimeout.
+    // 5 full provisioning calls (each creating an owner, 5 teammates, a
+    // workspace, 4 projects, 21 tasks, 3 sprints, comments, and attachments
+    // through the real service layer) comfortably exceed vitest.config.ts's
+    // default 15s testTimeout.
     30_000,
   );
 });

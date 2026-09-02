@@ -43,6 +43,7 @@ import { prisma } from "../src/lib/prisma.js";
 import { auth } from "../src/lib/auth.js";
 import { createWorkspace } from "../src/modules/workspace/workspace.service.js";
 import { generateWorkspaceData } from "../src/modules/demo/demo-data-generator.js";
+import { notificationQueue } from "../src/queues/notification/notification.queue.js";
 
 // Deliberately not a real person's email/domain - .local is reserved for
 // exactly this (RFC 6761), and this exact address/password pair is meant to
@@ -140,6 +141,63 @@ async function ensureDemoWorkspace(ownerId: string) {
   return prisma.workspace.findUniqueOrThrow({ where: { id: created.id } });
 }
 
+// Commit 4's comment/task-reassignment content enqueues real notification
+// jobs (comments.service.ts/task.service.ts's enqueueNotification calls,
+// same BullMQ queue notification.worker.ts consumes in production) - this
+// script exits immediately after generateWorkspaceData() resolves, which
+// would otherwise race a real, already-running local worker (the `worker`
+// docker-compose service, or `npm run worker`) for whether those
+// Notification rows exist yet when the script's own output is read. Not a
+// new queue architecture - just reading the existing queue's own job
+// counts (a bounded poll, not a redesign) before exiting, so a worker
+// that's already up gets a fair chance to finish before this process
+// forces every connection closed.
+//
+// Deliberately NOT gated on getWorkersCount() first: verified empirically
+// that BullMQ's worker detection (Redis CLIENT LIST, filtered by this
+// queue's client name) is not scoped to the connection's own selected
+// logical Redis DB - a worker connected to a *different* REDIS_DB (e.g.
+// the dev worker on DB 0, while this script runs against DB 1 under
+// NODE_ENV=test) still counts as "a worker", even though it can never
+// drain jobs enqueued on this DB. A short, unconditional poll avoids that
+// false positive entirely and costs nothing when a real matching worker
+// picks the job up promptly - a real completion is a single Redis round
+// trip, not seconds. 3s is enough margin above that for a real worker,
+// short enough not to meaningfully slow down `npm run seed`, and short
+// enough that spawning this script twice in a row (as
+// tests/setup/seed.test.ts's runSeed() helper does) still comfortably
+// fits inside a normal test timeout.
+async function waitForNotificationQueueDrain(timeoutMs = 3_000): Promise<void> {
+  try {
+    const start = Date.now();
+
+    while (Date.now() - start < timeoutMs) {
+      const counts = await notificationQueue.getJobCounts("waiting", "active", "delayed");
+      const pending = (counts.waiting ?? 0) + (counts.active ?? 0) + (counts.delayed ?? 0);
+
+      if (pending === 0) {
+        return;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+
+    console.warn(
+      "Notification queue did not fully drain within " +
+        `${timeoutMs}ms - some seeded notifications may not be visible yet.`,
+    );
+  } catch (error) {
+    // Best-effort: the seed's own data is already committed regardless of
+    // whether this check itself can reach Redis - never fail the whole
+    // seed run over notification-queue introspection.
+    console.warn(
+      "Could not check notification queue status - some seeded notifications " +
+        "may not be visible yet.",
+      error,
+    );
+  }
+}
+
 async function main(): Promise<void> {
   // Reuses Commit 3's exact local-development signal (config/security.config.ts)
   // rather than a second environment check - `!isProduction` is
@@ -165,6 +223,8 @@ async function main(): Promise<void> {
   const workspace = await ensureDemoWorkspace(userId);
 
   await generateWorkspaceData(workspace.id, userId);
+
+  await waitForNotificationQueueDrain();
 
   console.log("Seed complete.");
   console.log(`  Demo login: ${DEMO_EMAIL} / ${DEMO_PASSWORD}`);

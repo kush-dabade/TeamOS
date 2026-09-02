@@ -43,6 +43,7 @@ import { assignTaskToSprint } from "../sprint-task/sprint-task.service.js";
 import { createTask, updateTask } from "../task/task.service.js";
 import type { TaskPriority, TaskStatus } from "../task/task.types.js";
 import { createComment } from "../comments/comments.service.js";
+import { uploadAttachment } from "../attachment/attachment.service.js";
 import { createInvitation, acceptInvitation } from "../invitation/invitation.service.js";
 
 interface ProjectSeed {
@@ -231,6 +232,103 @@ async function ensureComment(actorId: string, taskId: string, content: string) {
   }
 
   return createComment(actorId, { taskId, content });
+}
+
+// Reassigns a currently-unassigned task, and only a currently-unassigned
+// one - idempotent by checking state rather than by any natural key on the
+// assignment itself, since "assign task X to user Y" has no natural key of
+// its own. This also protects notification idempotency: updateTask only
+// enqueues a TASK_ASSIGNED notification when the assignee actually changes
+// (task.service.ts), so calling this again once the task already has an
+// assignee is a guaranteed no-op - never a second update, never a second
+// notification.
+async function ensureTaskAssigned(actorId: string, taskId: string, assigneeId: string) {
+  const task = await prisma.task.findUniqueOrThrow({ where: { id: taskId } });
+
+  if (task.assigneeId) {
+    return;
+  }
+
+  await updateTask(actorId, taskId, { assigneeId });
+}
+
+// Looks a just-created task back up by title within an already-resolved
+// array, rather than relying on positional indices, so the comment/
+// attachment/reassignment specs below stay readable and correct even if a
+// project's task list is reordered.
+function findTaskByTitle<T extends { title: string }>(tasks: T[], title: string): T {
+  const task = tasks.find((candidate) => candidate.title === title);
+
+  if (!task) {
+    throw new Error(`Expected seeded task "${title}" to exist`);
+  }
+
+  return task;
+}
+
+// A minimal, genuinely valid 1x1 transparent PNG (68 bytes) - real,
+// decodable image bytes, not a placeholder string wearing a .png
+// extension.
+const DEMO_DESIGN_REVIEW_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  "base64",
+);
+
+// A minimal but structurally valid single-page PDF - real bytes a PDF
+// reader can open, not text wearing a .pdf extension.
+const DEMO_LAUNCH_CHECKLIST_PDF = Buffer.from(
+  "%PDF-1.4\n" +
+    "1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n" +
+    "2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n" +
+    "3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 100]>>endobj\n" +
+    "trailer<</Size 4/Root 1 0 R>>\n" +
+    "%%EOF\n",
+  "utf8",
+);
+
+const DEMO_AUTH_AUDIT_NOTES_TXT = Buffer.from(
+  "Workspace authorization audit notes\n" +
+    "------------------------------------\n" +
+    "- requireWorkspaceMembership is applied consistently across task/project/sprint routes.\n" +
+    "- GUEST role is correctly blocked from comment/attachment/task-update mutations.\n" +
+    "- Open question: confirm invitation acceptance re-checks membership uniqueness under concurrent accepts.\n",
+  "utf8",
+);
+
+interface AttachmentSeed {
+  taskId: string;
+  uploaderId: string;
+  originalName: string;
+  mimeType: string;
+  content: Buffer;
+}
+
+// uploadAttachment (attachment.service.ts) only ever reads buffer/
+// originalname/mimetype/size off the Express.Multer.File it receives - the
+// rest of that interface (fieldname, encoding, stream, destination,
+// filename, path) exists purely to satisfy multer's own on-disk/streaming
+// upload shapes and is never read for a memory-buffer upload like this
+// one. Idempotent by (taskId, originalName): a real re-upload of the same
+// filename to the same task is a rare enough edge case in real usage that
+// natural-key-by-filename is the same tradeoff comments already make
+// (natural-key-by-content).
+async function ensureAttachment(spec: AttachmentSeed) {
+  const existing = await prisma.attachment.findFirst({
+    where: { taskId: spec.taskId, originalName: spec.originalName },
+  });
+
+  if (existing) {
+    return existing;
+  }
+
+  const file = {
+    originalname: spec.originalName,
+    mimetype: spec.mimeType,
+    size: spec.content.length,
+    buffer: spec.content,
+  } as Express.Multer.File;
+
+  return uploadAttachment(spec.uploaderId, spec.taskId, file);
 }
 
 interface TeamMemberSpec {
@@ -511,18 +609,15 @@ async function ensureEphemeralAcmeTeam(
  * ensurePermanentAcmeTeam/ensureEphemeralAcmeTeam for why the mechanism
  * necessarily differs while the resulting team shape does not.
  *
- * Project/task/sprint content below is attributed across the team the
- * block above just resolved, not to `ownerId` alone: `members.*` supplies
- * the actual actor/assignee/project-owner ids for everything except the
- * few project- and sprint-level operations that createProject/createSprint/
- * startSprint/completeSprint/assignTaskToSprint themselves restrict to
- * OWNER/ADMIN (project.service.ts, sprint.service.ts,
+ * Project/task/sprint/comment/attachment content below is attributed
+ * across the team the block above just resolved, not to `ownerId` alone:
+ * `members.*` supplies the actual actor/assignee/author/uploader ids for
+ * everything except the few project- and sprint-level operations that
+ * createProject/createSprint/startSprint/completeSprint/assignTaskToSprint
+ * themselves restrict to OWNER/ADMIN (project.service.ts, sprint.service.ts,
  * sprint-task.service.ts) - those still run as `ownerId` or
  * `members.engineeringLead`, the only two roles this workspace has that
- * are ever allowed to perform them. Comments are untouched here
- * deliberately (still `ownerId`, still exactly the two pre-existing
- * comments) - multi-author collaboration is Commit 4's boundary, not this
- * one's.
+ * are ever allowed to perform them.
  */
 export async function generateWorkspaceData(workspaceId: string, ownerId: string): Promise<void> {
   const owner = await prisma.user.findUniqueOrThrow({ where: { id: ownerId } });
@@ -616,18 +711,6 @@ export async function generateWorkspaceData(workspaceId: string, ownerId: string
   }
 
   await ensureSprintStarted(ownerId, websiteSprint.id);
-
-  await ensureComment(
-    ownerId,
-    websiteTasks[0]!.id,
-    "Nav is functional on desktop - working through mobile breakpoints next.",
-  );
-
-  await ensureComment(
-    ownerId,
-    websiteTasks[2]!.id,
-    "Found a layout issue in Safari, filing a follow-up task once triaged.",
-  );
 
   // ---------------------------------------------------------------------
   // Mobile App - ACTIVE. Owned and filed by Maya (the engineering lead
@@ -840,9 +923,116 @@ export async function generateWorkspaceData(workspaceId: string, ownerId: string
     },
   ];
 
-  await Promise.all(
+  const platformTasks = await Promise.all(
     platformTaskSpecs.map((spec) =>
       ensureTask(workspaceId, platformProject.id, taskCreator(spec, members.engineeringLead), spec),
     ),
   );
+
+  // ---------------------------------------------------------------------
+  // Collaboration: reassign the three tasks every project deliberately
+  // left unassigned in the block above, then a cross-functional set of
+  // comments and a few real attachments - the same "picked up by the
+  // actual team" story the rest of this function already tells.
+  // ---------------------------------------------------------------------
+  await ensureTaskAssigned(
+    members.productManager,
+    findTaskByTitle(websiteTasks, "Set up analytics tracking for marketing pages").id,
+    members.frontendEngineer,
+  );
+
+  await ensureTaskAssigned(
+    members.engineeringLead,
+    findTaskByTitle(mobileTasks, "Evaluate offline sync strategy").id,
+    members.backendEngineer,
+  );
+
+  await ensureTaskAssigned(
+    members.engineeringLead,
+    findTaskByTitle(platformTasks, "Update production environment documentation").id,
+    members.backendEngineer,
+  );
+
+  // Deliberately not always the task's own assignee - a designer weighing
+  // in on a frontend task, the engineering lead reviewing a backend task,
+  // the backend engineer diagnosing search performance on the eng lead's
+  // own task - the same cross-functional pattern real project comments
+  // follow. Two are self-comments (Priya, Ethan updating their own work),
+  // which is just as realistic as cross-actor ones.
+  const comments: { taskId: string; authorId: string; content: string }[] = [
+    {
+      taskId: findTaskByTitle(websiteTasks, "Finalize responsive navigation states").id,
+      authorId: members.designer,
+      content:
+        "The mobile breakpoint still feels cramped around 768px. I pushed updated spacing in the latest mockup.",
+    },
+    {
+      taskId: findTaskByTitle(websiteTasks, "Finalize responsive navigation states").id,
+      authorId: members.frontendEngineer,
+      content: "Thanks - I've adjusted the breakpoint behavior and will push the final version today.",
+    },
+    {
+      taskId: findTaskByTitle(websiteTasks, "QA cross-browser & device testing").id,
+      authorId: members.designer,
+      content: "Found a layout issue in Safari around the navigation dropdown - flagging before we sign off.",
+    },
+    {
+      taskId: findTaskByTitle(platformTasks, "Investigate slow search queries").id,
+      authorId: members.backendEngineer,
+      content:
+        "I traced the slow response to the search query - it's doing more work than expected once a workspace has several projects.",
+    },
+    {
+      taskId: findTaskByTitle(platformTasks, "Audit workspace authorization paths").id,
+      authorId: members.engineeringLead,
+      content: "The API contract looks good. I'll pick up the pagination changes next.",
+    },
+    {
+      taskId: findTaskByTitle(launchTasks, "Finalize launch checklist").id,
+      authorId: members.productManager,
+      content: "Launch checklist is complete on my side. Waiting on the final analytics numbers.",
+    },
+    {
+      taskId: findTaskByTitle(launchTasks, "Review post-launch analytics report").id,
+      authorId: ownerId,
+      content: "Great numbers overall - let's highlight the activation rate in the recap doc.",
+    },
+    {
+      taskId: findTaskByTitle(mobileTasks, "Wire up push notification permissions").id,
+      authorId: members.engineeringLead,
+      content: "This one's now overdue - is there a blocker, or just a scheduling conflict? Happy to help unblock.",
+    },
+  ];
+
+  for (const comment of comments) {
+    await ensureComment(comment.authorId, comment.taskId, comment.content);
+  }
+
+  const attachments: AttachmentSeed[] = [
+    {
+      taskId: findTaskByTitle(websiteTasks, "Design updated homepage hero section").id,
+      uploaderId: members.designer,
+      originalName: "homepage-design-review.png",
+      mimeType: "image/png",
+      content: DEMO_DESIGN_REVIEW_PNG,
+    },
+    {
+      taskId: findTaskByTitle(launchTasks, "Finalize launch checklist").id,
+      uploaderId: members.productManager,
+      originalName: "launch-checklist.pdf",
+      mimeType: "application/pdf",
+      content: DEMO_LAUNCH_CHECKLIST_PDF,
+    },
+    {
+      taskId: findTaskByTitle(platformTasks, "Audit workspace authorization paths").id,
+      uploaderId: members.backendEngineer,
+      originalName: "auth-audit-notes.txt",
+      mimeType: "text/plain",
+      content: DEMO_AUTH_AUDIT_NOTES_TXT,
+    },
+  ];
+
+  for (const attachment of attachments) {
+    await ensureAttachment(attachment);
+  }
 }

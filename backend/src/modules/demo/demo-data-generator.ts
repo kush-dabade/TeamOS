@@ -22,6 +22,14 @@
  * brand-new, never-before-seen workspaceId, so every lookup there is a
  * guaranteed no-op miss - harmless, and not worth a second, non-idempotent
  * code path just to save one lookup per entity.
+ *
+ * This is the single, permanent source of demo workspace content for the
+ * whole application - not a placeholder to be replaced or forked once the
+ * dataset grows richer. The two callers are meant to keep differing only
+ * in identity/lifecycle provisioning (a fixed idempotent local account vs.
+ * a fresh throwaway one per visitor); the content this function produces
+ * should stay identical between them. Do not introduce a second,
+ * lighter-weight generator for either caller - grow this one in place.
  */
 import { prisma } from "../../lib/prisma.js";
 import { createProject, updateProject } from "../project/project.service.js";
@@ -176,11 +184,17 @@ async function ensureComment(actorId: string, taskId: string, content: string) {
 
 /**
  * Populates an already-created, empty workspace with realistic product
- * data: 3 projects, tasks spanning every status/priority, an active
- * sprint, and a couple of comments. `ownerId` must already be a member of
- * `workspaceId` (both callers create the owner's WorkspaceMember row
- * before calling this) - every entity here is created as that user, the
- * same way a real solo workspace owner's data would look.
+ * data - projects, tasks, sprints, and comments, spanning a believable
+ * range of statuses/priorities/history. `ownerId` must already be a
+ * member of `workspaceId` (both callers create the owner's
+ * WorkspaceMember row before calling this).
+ *
+ * Every entity is created through the real project/task/sprint/comment
+ * services as `ownerId`, exactly as documented above the imports. Content
+ * attributed to other workspace members (once this function is extended
+ * to seed a full team) should be created the same way, as those members'
+ * own real actor ids - not backfilled as `ownerId` acting on their
+ * behalf.
  */
 export async function generateWorkspaceData(workspaceId: string, ownerId: string): Promise<void> {
   const websiteProject = await ensureProject(workspaceId, ownerId, {

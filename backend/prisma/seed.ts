@@ -122,6 +122,23 @@ async function ensureDemoWorkspace(ownerId: string) {
   });
 
   if (existing) {
+    // Workspace.slug is a bare global-unique column (schema.prisma), with
+    // no reservation mechanism for this canonical slug - anyone (a real
+    // signup, an E2E test, or /try's own guest provisioning, which creates
+    // workspaces under this same "Acme Inc." name) could win it first on a
+    // shared/fresh local database. Reusing it here without checking
+    // ownership would silently repopulate a stranger's workspace with this
+    // seed's team/projects/tasks under the demo account's identity - refuse
+    // instead of guessing.
+    if (existing.ownerId !== ownerId) {
+      throw new Error(
+        `Refusing to seed: workspace slug "${DEMO_WORKSPACE_SLUG}" already exists but is ` +
+          `owned by a different user (expected owner ${ownerId}, found ${existing.ownerId}). ` +
+          "This is a slug collision, not the permanent demo workspace - resolve it manually " +
+          "(rename/delete the conflicting workspace) before re-running the seed.",
+      );
+    }
+
     return existing;
   }
 

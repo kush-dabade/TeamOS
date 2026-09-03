@@ -138,39 +138,49 @@ describe("deterministic seed (Commit 4)", () => {
     expect(activities).toBeGreaterThan(0);
   });
 
-  it("does not duplicate any seeded record when run a second time", async () => {
-    await runSeed("development");
+  it(
+    "does not duplicate any seeded record when run a second time",
+    async () => {
+      await runSeed("development");
 
-    const countsAfterFirstRun = await Promise.all([
-      prisma.user.count({ where: { email: DEMO_EMAIL } }),
-      prisma.workspace.count(),
-      prisma.workspaceMember.count(),
-      prisma.workspaceInvitation.count(),
-      prisma.project.count(),
-      prisma.task.count(),
-      prisma.sprint.count(),
-      prisma.comment.count(),
-      prisma.attachment.count(),
-      prisma.activity.count(),
-    ]);
+      const countsAfterFirstRun = await Promise.all([
+        prisma.user.count({ where: { email: DEMO_EMAIL } }),
+        prisma.workspace.count(),
+        prisma.workspaceMember.count(),
+        prisma.workspaceInvitation.count(),
+        prisma.project.count(),
+        prisma.task.count(),
+        prisma.sprint.count(),
+        prisma.comment.count(),
+        prisma.attachment.count(),
+        prisma.activity.count(),
+      ]);
 
-    await runSeed("development");
+      await runSeed("development");
 
-    const countsAfterSecondRun = await Promise.all([
-      prisma.user.count({ where: { email: DEMO_EMAIL } }),
-      prisma.workspace.count(),
-      prisma.workspaceMember.count(),
-      prisma.workspaceInvitation.count(),
-      prisma.project.count(),
-      prisma.task.count(),
-      prisma.sprint.count(),
-      prisma.comment.count(),
-      prisma.attachment.count(),
-      prisma.activity.count(),
-    ]);
+      const countsAfterSecondRun = await Promise.all([
+        prisma.user.count({ where: { email: DEMO_EMAIL } }),
+        prisma.workspace.count(),
+        prisma.workspaceMember.count(),
+        prisma.workspaceInvitation.count(),
+        prisma.project.count(),
+        prisma.task.count(),
+        prisma.sprint.count(),
+        prisma.comment.count(),
+        prisma.attachment.count(),
+        prisma.activity.count(),
+      ]);
 
-    expect(countsAfterSecondRun).toEqual(countsAfterFirstRun);
-  });
+      expect(countsAfterSecondRun).toEqual(countsAfterFirstRun);
+    },
+    // Two full sequential `npm run seed` subprocess runs against the
+    // current canonical dataset (6 members, 4 projects, 21 tasks, 3
+    // sprints, comments, and attachments, all through the real service
+    // layer, twice) comfortably exceed vitest.config.ts's default 15s
+    // testTimeout - same rationale as tests/demo/rate-limit.test.ts's own
+    // 30_000 override.
+    30_000,
+  );
 
   it("refuses to run under NODE_ENV=production, leaving the database untouched", async () => {
     await expect(runSeed("production")).rejects.toThrow();

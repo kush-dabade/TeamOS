@@ -5,6 +5,13 @@
 // demo-cleanup.service.ts (queries against it) can never drift apart.
 export const DEMO_SESSION_TTL_HOURS = 3;
 
+// Matches prisma/seed.ts's own DEMO_WORKSPACE_NAME (kept as a separate local
+// constant there since that script lives outside src/ and isn't part of the
+// compiled backend). createWorkspace()'s generateUniqueSlug already gives
+// each disposable /try workspace its own unique slug (acme-inc-2, -3, ...)
+// alongside the permanent seed's "acme-inc" - nothing else to coordinate.
+export const DEMO_WORKSPACE_NAME = "Acme Inc.";
+
 // RFC 6761 reserves .local for exactly this - an address that can never
 // resolve to (or collide with) a real mailbox. Matches the existing local
 // dev seed's convention (prisma/seed.ts's DEMO_EMAIL), but every call here

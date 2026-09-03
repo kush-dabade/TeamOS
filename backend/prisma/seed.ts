@@ -43,13 +43,17 @@ import { prisma } from "../src/lib/prisma.js";
 import { auth } from "../src/lib/auth.js";
 import { createWorkspace } from "../src/modules/workspace/workspace.service.js";
 import { generateWorkspaceData } from "../src/modules/demo/demo-data-generator.js";
+import { notificationQueue } from "../src/queues/notification/notification.queue.js";
 
 // Deliberately not a real person's email/domain - .local is reserved for
 // exactly this (RFC 6761), and this exact address/password pair is meant to
 // be published in Commit 5's README, so it must be obviously a local-only
-// demo credential, never mistakable for a real account.
+// demo credential, never mistakable for a real account. The email itself is
+// intentionally NOT renamed alongside the Acme Inc. identity below - it's
+// the one documented, memorable login this seed must never break; only the
+// display name changes to fit the organization.
 const DEMO_EMAIL = "demo@teamos.local";
-const DEMO_NAME = "Demo User";
+const DEMO_NAME = "Alex Rivera";
 // Satisfies the frontend's registration complexity rule too (8+ chars,
 // upper, lower, number - see frontend/src/features/auth/validation/register.ts)
 // even though signing up here goes through Better Auth directly, not that
@@ -57,19 +61,35 @@ const DEMO_NAME = "Demo User";
 // through the real UI after intentionally deleting the seeded row.
 const DEMO_PASSWORD = "TeamOSDemo123!";
 
-const DEMO_WORKSPACE_NAME = "TeamOS Demo";
+const DEMO_WORKSPACE_NAME = "Acme Inc.";
 // Must match generateSlug(DEMO_WORKSPACE_NAME) (src/lib/slug.ts) - this is
 // what createWorkspace would derive on its own, asserted explicitly here so
 // the idempotency lookup below (by slug) stays correct if that name ever
 // changes.
-const DEMO_WORKSPACE_SLUG = "teamos-demo";
+const DEMO_WORKSPACE_SLUG = "acme-inc";
+
+// Pre-Commit-2 local DBs have this workspace under its old identity -
+// ensureDemoWorkspace renames it in place rather than creating a second,
+// duplicate workspace for the same owner. New/fresh-clone environments
+// never have a workspace under this slug, so this is a no-op for them.
+const LEGACY_DEMO_WORKSPACE_SLUG = "teamos-demo";
 
 async function ensureDemoUser(): Promise<string> {
   const existing = await prisma.user.findUnique({ where: { email: DEMO_EMAIL } });
 
   if (existing) {
-    if (!existing.emailVerified) {
-      await prisma.user.update({ where: { id: existing.id }, data: { emailVerified: true } });
+    // Converges an existing row toward the current DEMO_NAME/verified state
+    // on every run, not just at creation - a local DB seeded before Commit
+    // 2's "Demo User" -> "Alex Rivera" rename would otherwise keep the
+    // stale display name forever, since this function only ever ran its
+    // creation branch once.
+    const needsUpdate = !existing.emailVerified || existing.name !== DEMO_NAME;
+
+    if (needsUpdate) {
+      await prisma.user.update({
+        where: { id: existing.id },
+        data: { emailVerified: true, name: DEMO_NAME },
+      });
     }
 
     return existing.id;
@@ -102,12 +122,97 @@ async function ensureDemoWorkspace(ownerId: string) {
   });
 
   if (existing) {
+    // Workspace.slug is a bare global-unique column (schema.prisma), with
+    // no reservation mechanism for this canonical slug - anyone (a real
+    // signup, an E2E test, or /try's own guest provisioning, which creates
+    // workspaces under this same "Acme Inc." name) could win it first on a
+    // shared/fresh local database. Reusing it here without checking
+    // ownership would silently repopulate a stranger's workspace with this
+    // seed's team/projects/tasks under the demo account's identity - refuse
+    // instead of guessing.
+    if (existing.ownerId !== ownerId) {
+      throw new Error(
+        `Refusing to seed: workspace slug "${DEMO_WORKSPACE_SLUG}" already exists but is ` +
+          `owned by a different user (expected owner ${ownerId}, found ${existing.ownerId}). ` +
+          "This is a slug collision, not the permanent demo workspace - resolve it manually " +
+          "(rename/delete the conflicting workspace) before re-running the seed.",
+      );
+    }
+
     return existing;
+  }
+
+  const legacy = await prisma.workspace.findUnique({
+    where: { slug: LEGACY_DEMO_WORKSPACE_SLUG },
+  });
+
+  if (legacy && legacy.ownerId === ownerId) {
+    return prisma.workspace.update({
+      where: { id: legacy.id },
+      data: { name: DEMO_WORKSPACE_NAME, slug: DEMO_WORKSPACE_SLUG },
+    });
   }
 
   const created = await createWorkspace({ name: DEMO_WORKSPACE_NAME, ownerId });
 
   return prisma.workspace.findUniqueOrThrow({ where: { id: created.id } });
+}
+
+// Commit 4's comment/task-reassignment content enqueues real notification
+// jobs (comments.service.ts/task.service.ts's enqueueNotification calls,
+// same BullMQ queue notification.worker.ts consumes in production) - this
+// script exits immediately after generateWorkspaceData() resolves, which
+// would otherwise race a real, already-running local worker (the `worker`
+// docker-compose service, or `npm run worker`) for whether those
+// Notification rows exist yet when the script's own output is read. Not a
+// new queue architecture - just reading the existing queue's own job
+// counts (a bounded poll, not a redesign) before exiting, so a worker
+// that's already up gets a fair chance to finish before this process
+// forces every connection closed.
+//
+// Deliberately NOT gated on getWorkersCount() first: verified empirically
+// that BullMQ's worker detection (Redis CLIENT LIST, filtered by this
+// queue's client name) is not scoped to the connection's own selected
+// logical Redis DB - a worker connected to a *different* REDIS_DB (e.g.
+// the dev worker on DB 0, while this script runs against DB 1 under
+// NODE_ENV=test) still counts as "a worker", even though it can never
+// drain jobs enqueued on this DB. A short, unconditional poll avoids that
+// false positive entirely and costs nothing when a real matching worker
+// picks the job up promptly - a real completion is a single Redis round
+// trip, not seconds. 3s is enough margin above that for a real worker,
+// short enough not to meaningfully slow down `npm run seed`, and short
+// enough that spawning this script twice in a row (as
+// tests/setup/seed.test.ts's runSeed() helper does) still comfortably
+// fits inside a normal test timeout.
+async function waitForNotificationQueueDrain(timeoutMs = 3_000): Promise<void> {
+  try {
+    const start = Date.now();
+
+    while (Date.now() - start < timeoutMs) {
+      const counts = await notificationQueue.getJobCounts("waiting", "active", "delayed");
+      const pending = (counts.waiting ?? 0) + (counts.active ?? 0) + (counts.delayed ?? 0);
+
+      if (pending === 0) {
+        return;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+
+    console.warn(
+      "Notification queue did not fully drain within " +
+        `${timeoutMs}ms - some seeded notifications may not be visible yet.`,
+    );
+  } catch (error) {
+    // Best-effort: the seed's own data is already committed regardless of
+    // whether this check itself can reach Redis - never fail the whole
+    // seed run over notification-queue introspection.
+    console.warn(
+      "Could not check notification queue status - some seeded notifications " +
+        "may not be visible yet.",
+      error,
+    );
+  }
 }
 
 async function main(): Promise<void> {
@@ -135,6 +240,8 @@ async function main(): Promise<void> {
   const workspace = await ensureDemoWorkspace(userId);
 
   await generateWorkspaceData(workspace.id, userId);
+
+  await waitForNotificationQueueDrain();
 
   console.log("Seed complete.");
   console.log(`  Demo login: ${DEMO_EMAIL} / ${DEMO_PASSWORD}`);

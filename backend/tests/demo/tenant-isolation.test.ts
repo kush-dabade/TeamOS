@@ -76,7 +76,7 @@ describe("demo session tenant isolation", () => {
 
     const projectCount = await prisma.project.count({ where: { workspaceId: demoB.workspaceId } });
 
-    expect(projectCount).toBe(3); // unchanged - still exactly the seeded set
+    expect(projectCount).toBe(4); // unchanged - still exactly the seeded set
   });
 
   it("Demo A cannot access an existing real (non-demo) user's workspace", async () => {

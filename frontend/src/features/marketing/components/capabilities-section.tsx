@@ -29,9 +29,9 @@ const featureStories: FeatureStory[] = [
     imageSrc: "/images/marketing/projects.png",
     imageMobileSrc: "/images/marketing/projects-mobile.png",
     imageAlt: "The TeamOS projects list, showing three projects with their status, progress, and task counts.",
-    imageWidth: 1976,
-    imageHeight: 580,
-    imageAspectClassName: "aspect-[896/300] sm:aspect-[1976/580]",
+    imageWidth: 1308,
+    imageHeight: 333,
+    imageAspectClassName: "aspect-[1170/1377] sm:aspect-[1308/333]",
   },
   {
     number: "02",
@@ -40,9 +40,9 @@ const featureStories: FeatureStory[] = [
     imageSrc: "/images/marketing/tasks.png",
     imageMobileSrc: "/images/marketing/tasks-mobile.png",
     imageAlt: "The TeamOS task list, showing real tasks with their status, priority, assignee, and due date.",
-    imageWidth: 1976,
-    imageHeight: 1398,
-    imageAspectClassName: "aspect-[750/700] sm:aspect-[1976/1398]",
+    imageWidth: 1308,
+    imageHeight: 806,
+    imageAspectClassName: "aspect-[1170/2532] sm:aspect-[1308/806]",
     reverse: true,
   },
   {
@@ -52,9 +52,9 @@ const featureStories: FeatureStory[] = [
     imageSrc: "/images/marketing/search.png",
     imageMobileSrc: "/images/marketing/search-mobile.png",
     imageAlt: "The TeamOS command palette searching for “launch,” returning matching projects and tasks.",
-    imageWidth: 1600,
-    imageHeight: 960,
-    imageAspectClassName: "aspect-[1164/580] sm:aspect-[1600/960]",
+    imageWidth: 640,
+    imageHeight: 460,
+    imageAspectClassName: "aspect-[1170/1236] sm:aspect-[640/460]",
   },
 ];
 

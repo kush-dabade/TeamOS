@@ -5,7 +5,7 @@ import { logger } from "../../lib/logger.js";
 import { prisma } from "../../lib/prisma.js";
 import { createWorkspace } from "../workspace/workspace.service.js";
 
-import { DEMO_SESSION_TTL_HOURS, generateDemoEmail } from "./demo.constants.js";
+import { DEMO_SESSION_TTL_HOURS, DEMO_WORKSPACE_NAME, generateDemoEmail } from "./demo.constants.js";
 import { generateWorkspaceData } from "./demo-data-generator.js";
 
 export interface DemoSessionResult {
@@ -77,7 +77,7 @@ export async function provisionDemoSession(): Promise<DemoSessionResult> {
     },
   });
 
-  const workspace = await createWorkspace({ name: "My TeamOS Demo", ownerId: userId });
+  const workspace = await createWorkspace({ name: DEMO_WORKSPACE_NAME, ownerId: userId });
 
   await generateWorkspaceData(workspace.id, userId);
 

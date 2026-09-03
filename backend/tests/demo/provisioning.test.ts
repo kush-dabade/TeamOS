@@ -68,6 +68,17 @@ describe("public demo session provisioning", () => {
 
     expect(membership.role).toBe("OWNER");
 
+    // The temporary team (Commit 2): the owner plus 5 fresh throwaway
+    // teammates, all isDemo so the existing TTL cleanup sweep can find
+    // and remove them - no permanent Acme identity ever appears here.
+    const members = await prisma.workspaceMember.findMany({
+      where: { workspaceId: workspace.id },
+      include: { user: { select: { isDemo: true } } },
+    });
+
+    expect(members).toHaveLength(6);
+    expect(members.every((member) => member.user.isDemo)).toBe(true);
+
     // Same generator prisma/seed.ts uses (demo-data-generator.ts) - same
     // counts tests/setup/seed.test.ts already pins for that caller.
     const projects = await prisma.project.findMany({
@@ -76,31 +87,46 @@ describe("public demo session provisioning", () => {
     });
 
     expect(projects.map((project) => ({ slug: project.slug, status: project.status }))).toEqual([
-      { slug: "mobile-app", status: "PLANNED" },
+      { slug: "internal-platform", status: "PLANNED" },
+      { slug: "mobile-app", status: "ACTIVE" },
       { slug: "product-launch", status: "COMPLETED" },
       { slug: "website-redesign", status: "ACTIVE" },
     ]);
 
     const taskCount = await prisma.task.count({ where: { workspaceId: workspace.id } });
 
-    expect(taskCount).toBe(9);
+    expect(taskCount).toBe(21);
 
-    const sprint = await prisma.sprint.findFirstOrThrow({
-      where: { workspaceId: workspace.id },
-    });
+    // The full sprint lifecycle (Commit 3) - one of each state, not
+    // per-sprint task counts (that's content, not contract).
+    const sprints = await prisma.sprint.findMany({ where: { workspaceId: workspace.id } });
 
-    expect(sprint.status).toBe("ACTIVE");
+    expect(sprints).toHaveLength(3);
+    expect(sprints.map((sprint) => sprint.status).sort()).toEqual(["ACTIVE", "COMPLETED", "PLANNED"]);
 
-    const tasksInSprint = await prisma.task.count({ where: { sprintId: sprint.id } });
-
-    expect(tasksInSprint).toBe(3);
-
+    // Multi-author collaboration (Commit 4), not the original single-owner
+    // pair.
     const commentCount = await prisma.comment.count({ where: { workspaceId: workspace.id } });
 
-    expect(commentCount).toBe(2);
+    expect(commentCount).toBe(8);
+
+    const attachmentCount = await prisma.attachment.count({ where: { workspaceId: workspace.id } });
+
+    expect(attachmentCount).toBe(3);
+
+    // No invitation ever exists for a /try workspace - createInvitation()
+    // unconditionally forbids isDemo actors from sending them
+    // (invitation.service.ts), and every member of this workspace is
+    // isDemo. See demo-data-generator.ts's ensureEphemeralAcmeTeam for why.
+    const invitationCount = await prisma.workspaceInvitation.count({ where: { workspaceId: workspace.id } });
+
+    expect(invitationCount).toBe(0);
 
     // Real services generate Activity rows as a side effect - not a
     // hand-maintained count to pin, just proof the feed isn't empty.
+    // Notifications are asynchronous through BullMQ and deliberately not
+    // asserted here - this test never starts a worker, so pinning a count
+    // would depend on infrastructure this suite doesn't control.
     const activityCount = await prisma.activity.count({ where: { workspaceId: workspace.id } });
 
     expect(activityCount).toBeGreaterThan(0);

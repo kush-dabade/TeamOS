@@ -260,7 +260,9 @@ npm run seed
 
 (`npx prisma generate` builds the Prisma Client into `src/generated/prisma` — gitignored, so it doesn't exist yet on a fresh clone, and nothing in `npm install` builds it for you.)
 
-Creates a deterministic demo workspace — projects, tasks across every status, an active sprint, a couple of comments — so there's something to explore immediately instead of an empty account. Safe to run more than once: it's idempotent, and refuses to run outside local development.
+Creates **Acme Inc.**, a permanent local demo workspace populated with a six-person team (one further invitation left pending), four projects spanning every status, twenty-one tasks across every status and priority, three sprints covering the full planned → active → completed lifecycle, comments from multiple team members, a few real file attachments, and the notifications/activity those actions generate through the same service layer a real user's clicks would drive — so there's a genuinely-used-looking workspace to explore immediately instead of an empty account.
+
+Safe to run more than once: every entity is looked up before it's created, so reruns converge on the same dataset rather than duplicating it. That convergence only ever adds what's missing, though — it doesn't retroactively fix up rows an older version of this seed already created, so a database that's been seeded across several different versions of this dataset can still carry a little of the old shape alongside the current one.
 
 Sign in with:
 
@@ -269,6 +271,8 @@ demo@teamos.local / TeamOSDemo123!
 ```
 
 A local-only demo account with a publicly-documented password — never reuse it, and never point this seed at anything but a local database.
+
+The running app's **`/try`** button provisions this same Acme Inc. demo content on demand, for anyone, without an account — `npm run seed` and `/try` are two different ways to reach the same canonical demo, not two separate datasets. The difference is entirely in provisioning and lifecycle: `npm run seed` gives your own machine one stable, permanent workspace under the login above; `/try` gives an anonymous visitor a disposable one of their own, automatically cleaned up a few hours later.
 
 ### 4. Start the frontend
 

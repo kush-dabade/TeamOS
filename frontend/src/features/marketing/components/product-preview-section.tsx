@@ -30,23 +30,21 @@ export function ProductPreviewSection() {
         className="mx-auto max-w-7xl"
       >
         <picture>
-          {/* Below sm, the full desktop crop shrinks past legibility, so a
-              tighter real crop (sidebar + the "Continue working" panel,
-              ending cleanly at the panel gap) is served instead of
-              CSS-cropping the wide desktop image down to an unreadable strip.
-              Captured natively at 2x device-pixel density, so a single file
-              stays crisp under CSS downscaling across every real phone DPR
-              without needing its own 1x/2x pair. */}
+          {/* Below sm, a genuine full-viewport portrait capture of the mobile
+              app (390x844 @3x) is served instead of CSS-cropping the wide
+              desktop image down to an unreadable strip - the container's
+              aspect ratio matches this image's own 1170x2532 proportions, so
+              object-cover has nothing to crop. */}
           <source media="(max-width: 639px)" srcSet="/images/marketing/dashboard-mobile.png" />
           <img
             src="/images/marketing/dashboard.png"
             srcSet="/images/marketing/dashboard.png 1x, /images/marketing/dashboard@2x.png 2x"
             alt="The TeamOS dashboard, showing a workspace's navigation, active projects, and in-progress tasks."
-            width={1241}
-            height={633}
+            width={1600}
+            height={1000}
             fetchPriority="high"
             decoding="async"
-            className="aspect-[1488/778] w-full rounded-3xl border border-border object-cover shadow-sm sm:aspect-[1241/633]"
+            className="aspect-[1170/2532] w-full rounded-3xl border border-border object-cover shadow-sm sm:aspect-[1600/1000]"
           />
         </picture>
       </motion.div>

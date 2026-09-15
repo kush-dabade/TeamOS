@@ -110,10 +110,10 @@ Standard Better Auth routes: `POST /sign-up/email`, `POST /sign-in/email`, `POST
 |---|---|
 | `POST /api/v1/tasks/:taskId/comments` | Create |
 | `GET /api/v1/tasks/:taskId/comments` | List, paginated (`page`/`limit`) |
-| `PATCH /api/v1/comments/:commentId` | Update — author only |
-| `DELETE /api/v1/comments/:commentId` | Soft-delete — author only |
+| `PATCH /api/v1/comments/:commentId` | Update — **author only** (`comment.authorId !== actorId` → `403 FORBIDDEN`, no role-based override) |
+| `DELETE /api/v1/comments/:commentId` | Soft-delete — **author OR workspace `OWNER`/`ADMIN`** (`comment.authorId === actorId \|\| membership.role === ADMIN \|\| membership.role === OWNER`) |
 
-All require membership in the comment's/task's workspace.
+All require workspace membership; `GUEST` cannot create, edit, or delete comments regardless of authorship. See `docs/features/collaboration.md` for the full comment authorization model.
 
 ### Attachments (`/api/v1/tasks/:taskId/attachments`, `/api/v1/attachments/:attachmentId`)
 | Method & Path | Purpose | Notes |
@@ -139,11 +139,13 @@ All require membership in the attachment's/task's workspace — see `docs/featur
 | `GET /api/v1/sprints/:sprintId/tasks` | List a sprint's tasks | Member |
 
 ### Activity (`/api/v1/workspaces/:workspaceId/activity`)
-| Method & Path | Purpose |
-|---|---|
+| Method & Path | Purpose | Authorization |
+|---|---|---|
 | `GET /api/v1/workspaces/:workspaceId/activity` | List, paginated (`page`/`limit`) | Member |
 
 Read-only — activity rows are written internally by other modules' services, never through a public write endpoint.
+
+**Filtering** (`listActivitiesQuerySchema`, `.strict()`): beyond `page`/`limit`, the endpoint accepts one optional filter shape — `taskId`, `projectId`, or an `(entityType, entityId)` pair — used by the frontend's per-task and per-project activity views, not just a flat workspace feed. Two rules are enforced by the schema itself: `entityType` and `entityId` must be supplied together (one without the other is rejected), and at most one of the three filter shapes (`taskId` / `projectId` / `entityType`+`entityId`) may be supplied per request — combining them is rejected, not silently merged.
 
 ### Notifications (`/api/v1/notifications`)
 | Method & Path | Purpose |
@@ -190,7 +192,7 @@ Mutations that have realtime consumers emit the corresponding realtime event **a
 mutation → Prisma write (transaction where needed) → commit → emitToWorkspace/emitToUser → connected clients' TanStack Query invalidation → refetch
 ```
 
-Verified directly in the relevant service files (`comments.service.ts`, `project.service.ts`, `task.service.ts`, `sprint.service.ts`, `sprint-task.service.ts`, `attachment.service.ts`, `activity.service.ts`, `notification.service.ts`, `workspace.service.ts`, `invitation.service.ts`) — the emit call is always the last statement, after the write is already durable. See `system-design.md` §10 for the full event list and room-isolation guarantee. Realtime emission is best-effort and is not the source of truth for persistence: an emission failure is logged, not surfaced as a failed request — it never turns an already-committed domain mutation into a failed operation.
+Verified directly in the relevant service files (`comments.service.ts`, `project.service.ts`, `task.service.ts`, `sprint.service.ts`, `sprint-task.service.ts`, `attachment.service.ts`, `activity.service.ts`, `workspace.service.ts`, `invitation.service.ts`) — the emit call is always the last statement, after the write is already durable. **`notification.service.ts` only follows this exact in-process shape for `NOTIFICATION_READ`/`NOTIFICATION_READ_ALL`** (its own synchronous mutations); the notification-creation event, `NOTIFICATION_CREATED`, is emitted differently — via a BullMQ `QueueEvents` bridge in a separate file, because the row itself is created by the worker process, which has no Socket.IO server of its own. See `system-design.md` §10 for the full event list, room-isolation guarantee, and that bridge's mechanism. Realtime emission is best-effort and is not the source of truth for persistence: an emission failure is logged, not surfaced as a failed request — it never turns an already-committed domain mutation into a failed operation.
 
 ## 8. Demo API
 

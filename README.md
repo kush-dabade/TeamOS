@@ -28,6 +28,8 @@
   <a href="#security">Security</a>
   ·
   <a href="#getting-started">Getting started</a>
+  ·
+  <a href="docs/README.md">Documentation</a>
 </p>
 
 <br />
@@ -138,7 +140,7 @@ flowchart TB
         Boundary --> Session --> Validation --> Access --> Modules
     end
 
-    PG[("PostgreSQL<br/>workspace_id on every<br/>tenant-owned table")]
+    PG[("PostgreSQL<br/>workspaceId on every<br/>tenant-owned table")]
     Redis[("Redis")]
     Worker["Background worker<br/>email · notifications"]
     Socket["Socket.IO<br/>workspace + user rooms"]
@@ -322,7 +324,7 @@ From here it's built in focused phases.
 
 **Next** — the remaining product capabilities, broader automated testing, and continued infrastructure work.
 
-**Finally** — deployment, documentation, and polish.
+**Finally** — deployment and polish.
 
 TeamOS is under active development. It isn't finished, and it doesn't pretend to be.
 

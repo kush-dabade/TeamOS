@@ -8,7 +8,7 @@ Every workspace has exactly one accountable owner (`Workspace.ownerId`), separat
 
 ## Workspace lifecycle
 
-- **Create** (`POST /api/v1/workspaces`) — any authenticated user can create a workspace; the creator is inserted as its `OWNER` in the same transaction the workspace row is created in. The workspace's `slug` is generated from its name and made unique via a check-then-insert loop backed by a database `@unique` constraint (see [`../architecture/database-design.md` §6](../architecture/database-design.md#6-constraints-and-invariants) for the known, low-severity race in that generation step).
+- **Create** (`POST /api/v1/workspaces`) — any authenticated user can create a workspace; the creator is inserted as its `OWNER` in the same transaction the workspace row is created in. The workspace's `slug` is generated from its name and made unique via a check-then-insert loop that runs under a per-slug-root advisory lock inside that same transaction, backed by a database `@unique` constraint (see [`../architecture/database-design.md` §6](../architecture/database-design.md#6-constraints-and-invariants)).
 - **List/retrieve** (`GET /api/v1/workspaces`, `GET /api/v1/workspaces/:workspaceId`) — a user only ever sees workspaces they're a member of.
 - **Rename** (`PATCH /api/v1/workspaces/:workspaceId`) — `OWNER` only.
 - **Onboarding**: `WorkspaceGuard` (`frontend/src/features/workspaces/routes/workspace-guard.tsx`) redirects any authenticated user with zero workspace memberships to `/onboarding` rather than rendering the app shell — a new user is never dropped into a workspace-shaped UI with nothing in it.

@@ -24,9 +24,9 @@ An already-authenticated real user who lands on `/try` is redirected straight to
 `provisionDemoSession` (`backend/src/modules/demo/demo.service.ts`), in order:
 
 1. Generate a random email (`demo-<uuid>@teamos.local` — RFC 6761's reserved `.local` TLD, so it can never collide with or resolve to a real mailbox) and a random 24-byte password, neither ever exposed to the client.
-2. `auth.api.signUpEmail` — creates a real Better Auth user.
+2. `auth.api.signUpEmail` — creates a real Better Auth user. The whole sequence runs inside a server-only demo provisioning context (`backend/src/lib/demo-provisioning-context.ts`), so the verification email Better Auth would otherwise trigger from inside `signUpEmail` — here and for each teammate in step 5 — is never enqueued. Nothing in a request can set that context, and it only skips sending: the account is verified by step 3, exactly as before.
 3. A direct Prisma update marks that user `emailVerified: true`, `isDemo: true`, `demoExpiresAt` set `DEMO_SESSION_TTL_HOURS` (3 hours) out.
-4. `createWorkspace` — a real workspace named `"Acme Inc."`, owned by that user (its slug is disambiguated from the permanent local-dev seed's own `"Acme Inc."` workspace and from other concurrent demo sessions by the normal unique-slug generation every workspace goes through).
+4. `createWorkspace` — a real workspace named `"Acme Inc."`, owned by that user (its slug — `acme-inc`, `acme-inc-2`, `acme-inc-3`, … — is disambiguated from the permanent local-dev seed's own `"Acme Inc."` workspace and from every other demo workspace by the normal slug allocation every workspace goes through). Allocation holds a per-slug-root PostgreSQL advisory lock for the rest of the workspace-creating transaction, so demo sessions provisioned at the same moment queue for the slug rather than colliding; the `Workspace.slug` unique index remains the backstop.
 5. `generateWorkspaceData` — populates it with seed data (see below).
 6. **Only after all of the above succeed**, `auth.api.signInEmail` issues a real session, and its `Set-Cookie` header is copied onto the HTTP response.
 

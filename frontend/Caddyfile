@@ -1,0 +1,59 @@
+# Production reverse proxy and static file server - one public HTTPS
+# origin for the whole app (see docker-compose.prod.yml and
+# docs/development/deployment.md).
+#
+# PUBLIC_ORIGIN is a full URL (e.g. https://<label>.centralindia.cloudapp.azure.com).
+# Using the https:// form as the site address makes Caddy obtain and renew
+# the certificate automatically and redirect HTTP to HTTPS.
+{
+	# HTTP/3 would need UDP 443 opened in the host firewall/NSG as well;
+	# leaving it off avoids advertising an Alt-Svc endpoint that can't be
+	# reached.
+	servers {
+		protocols h1 h2
+	}
+}
+
+{$PUBLIC_ORIGIN} {
+	encode zstd gzip
+
+	# Everything the backend serves. Routed before the SPA fallback below,
+	# so an API 404/401 is the backend's own JSON response - never
+	# swallowed and replaced by index.html.
+	@backend path /api/* /socket.io/* /health /ready
+	handle @backend {
+		# Caddy forwards WebSocket upgrades automatically and sets
+		# X-Forwarded-For/-Proto/-Host itself, discarding any client-supplied
+		# values (no trusted_proxies configured) - which is what makes the
+		# backend's TRUST_PROXY_HOPS=1 resolve the real client IP.
+		reverse_proxy backend:3000
+	}
+
+	handle {
+		# Mirrors the backend's middleware/security-headers.ts baseline for
+		# the HTML document. No CSP here: the backend's
+		# `default-src 'none'` is API-specific, and an HTML CSP for the SPA
+		# is its own decision.
+		header {
+			Strict-Transport-Security "max-age=15552000"
+			X-Content-Type-Options "nosniff"
+			X-Frame-Options "DENY"
+			Referrer-Policy "strict-origin-when-cross-origin"
+			-Server
+		}
+
+		# Vite emits content-hashed filenames under /assets, so they are
+		# safe to cache forever; index.html must always be revalidated so a
+		# new deploy is picked up. Matched on the original request path
+		# (header runs before try_files' rewrite), so SPA routes such as
+		# /dashboard - which are served index.html - get no-cache too.
+		@hashed path /assets/*
+		header @hashed Cache-Control "public, max-age=31536000, immutable"
+		@unhashed not path /assets/*
+		header @unhashed Cache-Control "no-cache"
+
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

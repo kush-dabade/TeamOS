@@ -113,10 +113,10 @@ A `Task` carries three independent foreign keys: `workspaceId` (direct), `projec
 
 **Application-enforced (not database-enforced):**
 - **At most one pending `WorkspaceInvitation` per `(workspaceId, email)`** — checked in `invitation.service.ts` before inserting; unlike the sprint invariant above, there is no matching partial unique index backing it, so this is not database-enforced. Low practical impact (a duplicate invitation email at worst).
-- **Workspace slug generation** — the `slug` column's `@unique` constraint guarantees no two workspaces ever end up with the same slug, but *picking* a free slug is a check-then-insert loop; the database constraint is the final guard against a lost race, not a prevention of the race itself.
+- **Workspace slug allocation** — picking a free slug (`acme-inc`, `acme-inc-2`, …) is a check-then-insert loop, serialized per slug *root*: `createWorkspace` takes a transaction-scoped advisory lock (`pg_advisory_xact_lock`, keyed on a fixed namespace plus the hash of the base slug with every trailing `-<digits>` group removed — `workspace.service.ts`) as the first statement of its transaction, then checks and inserts. Every candidate of a base slug shares that base's root, so any two creations whose candidate sequences can overlap — the same name, or e.g. "Acme Inc 2" (base `acme-inc-2`) and a second "Acme Inc." (next candidate `acme-inc-2`) — queue on the same lock instead of colliding. The `@unique` constraint remains the final integrity backstop, e.g. for an insert that bypasses `createWorkspace`.
 - Role/ownership authorization (who may change a role, transfer ownership, archive a project) — entirely in the service layer, not expressible as a schema constraint.
 
-Both the invitation and slug cases are ordinary application-level races, not equivalent to the sprint invariant's database-level guarantee above.
+The invitation case is an ordinary application-level race, not equivalent to the sprint invariant's database-level guarantee above.
 
 ## 7. Indexing
 
@@ -139,5 +139,5 @@ Development: `prisma migrate dev` generates and applies migrations against the l
 
 - **Foreign keys** are the primary integrity mechanism (see cascade/restrict behavior in [§6](#6-constraints-and-invariants)) — there is no orphaned-row cleanup job; the schema itself prevents most orphaning by design (`Restrict` on content-creator relations, `SetNull`/`Cascade` elsewhere as appropriate).
 - **Transactions**: used where multiple writes must succeed or fail together — most visibly the sprint-start/ownership-transfer paths, which take an explicit row lock (`SELECT ... FOR UPDATE` via `lockWorkspaceMembership`, `shared/authorization/workspace-access.ts`) as the first statement inside a `$transaction`, so two concurrent requests serialize on that lock rather than racing.
-- **Concurrency-sensitive operations** given a real, verified mechanism rather than a best-effort check: the one-active-sprint invariant (database partial unique index) and membership/ownership transfer (explicit row locking, above). The workspace-slug and pending-invitation checks are not — see [§6](#6-constraints-and-invariants).
+- **Concurrency-sensitive operations** given a real, verified mechanism rather than a best-effort check: the one-active-sprint invariant (database partial unique index), membership/ownership transfer (explicit row locking, above), and workspace slug allocation (per-slug-root advisory lock, backed by the unique index). The pending-invitation check is not — see [§6](#6-constraints-and-invariants).
 - **Soft deletes** (`Task.deletedAt`, `Comment.deletedAt`, `Notification.deletedAt`) preserve history and referential integrity for anything that references them, at the cost of every read query needing to remember to filter `deletedAt: null` — a real, if ordinary, maintenance burden rather than a database-enforced guarantee.

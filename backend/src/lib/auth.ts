@@ -4,6 +4,7 @@ import { betterAuth } from "better-auth";
 import { createAuthMiddleware, APIError } from "better-auth/api";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 
+import { isInDemoProvisioningContext } from "./demo-provisioning-context.js";
 import { logger } from "./logger.js";
 import { prisma } from "./prisma.js";
 import { incrementRateLimitCounter, rateLimitRedis } from "./redis.js";
@@ -269,6 +270,18 @@ export const auth = betterAuth({
       // every environment, see sendResetPassword above and
       // enqueueWorkspaceInvitationEmail (queues/email/email.queue.ts).
       if (isLocalDevelopment) {
+        return;
+      }
+
+      // Public demo provisioning's synthetic accounts (the /try owner and
+      // its teammates) are created through signUpEmail, which calls this
+      // before provisioning can mark them verified - and their reserved
+      // .local addresses can never receive mail. The flag is set only by
+      // server code (see lib/demo-provisioning-context.ts), and skipping the
+      // send never verifies anyone. Checked here, in this callback only -
+      // not in the shared enqueue helpers - so password-reset and invitation
+      // email are unaffected even inside the context.
+      if (isInDemoProvisioningContext()) {
         return;
       }
 

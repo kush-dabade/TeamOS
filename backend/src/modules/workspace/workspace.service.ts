@@ -1,7 +1,7 @@
 import { logger } from "../../lib/logger.js";
 import { prisma } from "../../lib/prisma.js";
 import { generateSlug } from "../../lib/slug.js";
-import type { Prisma } from "../../generated/prisma/client.js";
+import { Prisma } from "../../generated/prisma/client.js";
 import {
   ActivityEntityType,
   ActivityType,
@@ -25,14 +25,67 @@ import { evictFromWorkspace } from "../../realtime/realtime.eviction.js";
 import { REALTIME_EVENTS } from "../../realtime/realtime.constants.js";
 import { enqueueNotification } from "../../queues/notification/index.js";
 
-async function generateUniqueSlug(name: string): Promise<string> {
-  const baseSlug = generateSlug(name);
+// First key of PostgreSQL's two-key advisory lock form
+// (pg_advisory_xact_lock(int4, int4)), reserved for workspace slug
+// allocation - the second key is the slug root's hash. Namespacing keeps
+// these locks from ever colliding with an advisory lock some other feature
+// takes later; any such lock must use a different first key. Arbitrary but
+// fixed: every process must agree on it.
+const WORKSPACE_SLUG_LOCK_NAMESPACE = 72_001;
 
+/**
+ * The lock key for a base slug: the base with every trailing `-<digits>`
+ * group removed (`acme-inc-2` -> `acme-inc`, `x-2-3` -> `x`, `q4-2024` ->
+ * `q4`; `2024` stays `2024` - digits not preceded by a hyphen are kept).
+ *
+ * generateUniqueSlug tries base, base-2, base-3, ... - so different base
+ * slugs can compete for the same candidate: "Acme Inc 2" (base
+ * `acme-inc-2`) and a second "Acme Inc." (next candidate `acme-inc-2`).
+ * Every candidate of a base has the same root as the base itself (a
+ * candidate is the base plus one more `-<n>` group), so any two creations
+ * that could ever pick the same slug share a root - and therefore a lock.
+ */
+function slugLockRoot(baseSlug: string): string {
+  return baseSlug.replace(/(?:-\d+)+$/, "");
+}
+
+/**
+ * Serializes slug allocation for one slug root (see slugLockRoot) for the
+ * remainder of the caller's transaction - must run before
+ * generateUniqueSlug's availability check, inside the same transaction.
+ * Without it, two concurrent createWorkspace calls whose candidates overlap
+ * both saw the same slug as free and the second failed the Workspace.slug
+ * unique index (P2002 -> 409).
+ *
+ * Keyed per root, not one global lock: creations with unrelated names never
+ * wait on each other (barring a rare hashtext() collision, which only costs
+ * a brief wait); names differing only in trailing numbers ("Q4", "Q4 2024")
+ * do, for the length of one creation's transaction. hashtext() only has to
+ * agree between sessions on the same server, which it always does.
+ * Transaction-scoped, so it's released
+ * automatically on commit or rollback - there is no unlock path to get
+ * wrong. Parameterized like lockWorkspaceMembership's raw SQL
+ * (shared/authorization/workspace-access.ts). $executeRaw rather than
+ * $queryRaw because the function returns void - there's no row to read.
+ *
+ * The unique index stays the backstop for anything that inserts without
+ * taking this lock.
+ */
+async function lockSlugAllocation(tx: Prisma.TransactionClient, baseSlug: string): Promise<void> {
+  await tx.$executeRaw(Prisma.sql`
+    SELECT pg_advisory_xact_lock(${WORKSPACE_SLUG_LOCK_NAMESPACE}::int4, hashtext(${slugLockRoot(baseSlug)}::text))
+  `);
+}
+
+async function generateUniqueSlug(
+  tx: Prisma.TransactionClient,
+  baseSlug: string,
+): Promise<string> {
   let slug = baseSlug;
   let counter = 2;
 
   while (true) {
-    const existingWorkspace = await prisma.workspace.findUnique({
+    const existingWorkspace = await tx.workspace.findUnique({
       where: {
         slug,
       },
@@ -115,10 +168,19 @@ function canAssignRole(actorRole: WorkspaceRole, role: WorkspaceRole) {
 }
 
 export async function createWorkspace(data: CreateWorkspaceData) {
-  const slug = await generateUniqueSlug(data.name);
+  // Outside the transaction: pure, and throws ValidationError for a name
+  // with no usable characters before any database work starts.
+  const baseSlug = generateSlug(data.name);
 
   const workspace = await prisma.$transaction(
     async (tx: Prisma.TransactionClient) => {
+      // Lock first, then check availability, then insert - all in this one
+      // transaction, so a concurrent creation whose candidates overlap waits
+      // here and then sees this one's committed slug.
+      await lockSlugAllocation(tx, baseSlug);
+
+      const slug = await generateUniqueSlug(tx, baseSlug);
+
       const workspace = await tx.workspace.create({
         data: {
           name: data.name,

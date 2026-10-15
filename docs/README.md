@@ -24,6 +24,7 @@ This directory is the canonical technical documentation for TeamOS — written d
 
 - **[Local Development](./development/local-development.md)** — cloning, environment configuration, and running TeamOS locally.
 - **[Testing](./development/testing.md)** — the backend/frontend test strategy, CI, and how to add new tests.
+- **[Production Deployment](./development/deployment.md)** — the single-VM Docker Compose topology, configuration, deploys, backups and restores, and email limitations.
 
 ## Documentation principles
 

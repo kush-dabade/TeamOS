@@ -1,0 +1,277 @@
+# Production stack for a single Docker host (see
+# docs/development/deployment.md). Deliberately a standalone file rather
+# than an override of docker-compose.yml: the development file publishes
+# Postgres/Redis/backend ports to the host, and Compose overrides can only
+# append to `ports:`, not remove entries (short of the obscure `!reset`
+# tag). A separate file keeps what is reachable in production explicit.
+#
+# Usage (from the repository root, on the production host):
+#   docker compose -f docker-compose.prod.yml --env-file .env.production <cmd>
+#
+# Two env files, neither committed (see their .example files):
+# - .env.production         - Compose interpolation: Postgres/Redis
+#                             credentials and PUBLIC_ORIGIN.
+# - backend/.env.production - application secrets (Better Auth, Resend).
+
+# Pinned so volume names are stable and documented exactly
+# (teamos-prod_postgres-data, teamos-prod_uploads-data, ...) regardless of
+# which directory the repository was cloned into, and so they can never
+# collide with the development stack's volumes on the same machine.
+name: teamos-prod
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
+
+    # No `ports:` - reachable only from the internal `data` network.
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+    networks:
+      - data
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+
+    # appendonly: BullMQ keeps queued/delayed jobs (verification email,
+    # notifications, the demo-cleanup schedule) only in Redis, so an RDB
+    # snapshot alone could silently drop jobs enqueued since the last
+    # snapshot if the host restarts. noeviction is Redis's default, set
+    # explicitly because BullMQ requires it - an evicting policy would
+    # delete job keys under memory pressure instead of failing loudly.
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+      - --appendonly
+      - "yes"
+      - --maxmemory-policy
+      - noeviction
+
+    # Lets the healthcheck authenticate via REDISCLI_AUTH instead of
+    # `redis-cli -a <password>`, which would put the password on the
+    # healthcheck's command line (visible in `docker inspect` output).
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+
+    volumes:
+      - redis-data:/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+    networks:
+      - data
+
+  # One-shot migration runner, same contract as docker-compose.yml's: it
+  # reuses the backend image, runs `prisma migrate deploy` once, and exits.
+  # backend and worker wait on service_completed_successfully, so a failed
+  # migration leaves them not started and the failure visible in
+  # `docker compose ps -a` / `docker compose logs migrate`.
+  migrate:
+    image: teamos-backend:prod
+    restart: "no"
+
+    environment:
+      NODE_ENV: production
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
+
+    command: ["npx", "prisma", "migrate", "deploy"]
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    networks:
+      - data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: teamos-backend:prod
+
+    init: true
+    restart: unless-stopped
+    # Same reasoning as docker-compose.yml: long-lived Socket.IO
+    # connections and in-flight downloads need more than Compose's 10s.
+    stop_grace_period: 30s
+
+    env_file:
+      - ./backend/.env.production
+
+    # Origin-derived settings come from the single PUBLIC_ORIGIN value, so
+    # the frontend build, Caddy's site address, CORS, Better Auth, and
+    # email links can never disagree about the public URL.
+    #
+    # DATABASE_URL is explicitly empty so src/config/database.config.ts
+    # always builds (and percent-encodes) the URL from the POSTGRES_* parts
+    # below, even if someone adds a DATABASE_URL to backend/.env.production
+    # - same pattern and reason as docker-compose.yml.
+    environment: &backend-environment
+      NODE_ENV: production
+      BETTER_AUTH_URL: ${PUBLIC_ORIGIN:?PUBLIC_ORIGIN must be set}
+      FRONTEND_URL: ${PUBLIC_ORIGIN:?PUBLIC_ORIGIN must be set}
+      TRUSTED_ORIGINS: ${PUBLIC_ORIGIN:?PUBLIC_ORIGIN must be set}
+      # Exactly one reverse proxy (the caddy service) sits between clients
+      # and this process.
+      TRUST_PROXY_HOPS: "1"
+      DATABASE_URL: ""
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+    # No `ports:` - only caddy reaches this, over the `edge` network.
+    volumes:
+      - uploads-data:/usr/src/app/uploads
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://127.0.0.1:3000/health',res=>{process.exit(res.statusCode===200?0:1)}).on('error',()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+    networks:
+      - data
+      - edge
+
+  worker:
+    # Same image as backend - built once, by the backend service.
+    image: teamos-backend:prod
+
+    init: true
+    restart: unless-stopped
+    command: ["node", "dist/src/worker.js"]
+    stop_grace_period: 30s
+
+    env_file:
+      - ./backend/.env.production
+
+    environment: *backend-environment
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+    volumes:
+      - uploads-data:/usr/src/app/uploads
+
+    # Same process-presence check as docker-compose.yml's worker.
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "const fs=require('fs');const self=process.pid;const ok=fs.readdirSync('/proc').filter(p=>!isNaN(Number(p))&&Number(p)!==self).some(p=>{try{return fs.readFileSync('/proc/'+p+'/cmdline','utf8').includes('worker.js')}catch(e){return false}});process.exit(ok?0:1)",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+    # data for Postgres/Redis; edge for outbound internet (Resend API).
+    networks:
+      - data
+      - edge
+
+  # Public entry point: TLS termination (automatic certificates), the
+  # built frontend, and reverse proxying of API/Socket.IO traffic to
+  # backend. The only service with published ports.
+  caddy:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Public URL baked into the static bundle - not a secret.
+        VITE_API_URL: ${PUBLIC_ORIGIN:?PUBLIC_ORIGIN must be set}
+    image: teamos-web:prod
+
+    restart: unless-stopped
+
+    environment:
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?PUBLIC_ORIGIN must be set}
+
+    ports:
+      - "80:80"
+      - "443:443"
+
+    volumes:
+      # Certificates and ACME account state - must persist, or every
+      # restart would re-request certificates and hit CA rate limits.
+      - caddy-data:/data
+      - caddy-config:/config
+
+    depends_on:
+      backend:
+        condition: service_healthy
+
+    # Caddy's admin API listens on localhost:2019 inside the container
+    # only (never published).
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:2019/config/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+    networks:
+      - edge
+
+networks:
+  # Postgres and Redis live only here. internal: no route to or from the
+  # internet, and caddy is not attached, so the public-facing proxy has no
+  # network path to the databases.
+  data:
+    internal: true
+  edge:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  redis-data:
+  uploads-data:
+  caddy-data:
+  caddy-config:

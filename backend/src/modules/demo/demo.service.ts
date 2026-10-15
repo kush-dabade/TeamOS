@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 
 import { auth } from "../../lib/auth.js";
+import { runInDemoProvisioningContext } from "../../lib/demo-provisioning-context.js";
 import { logger } from "../../lib/logger.js";
 import { prisma } from "../../lib/prisma.js";
 import { createWorkspace } from "../workspace/workspace.service.js";
@@ -49,7 +50,16 @@ function generateDemoPassword(): string {
  * orphaned user-only row must be just as eligible for cleanup as a fully
  * provisioned one.
  */
-export async function provisionDemoSession(): Promise<DemoSessionResult> {
+export function provisionDemoSession(): Promise<DemoSessionResult> {
+  // The whole sequence runs inside the demo provisioning context, so every
+  // signUpEmail it makes - the owner's below and each teammate's in
+  // generateWorkspaceData - skips the verification email Better Auth would
+  // otherwise trigger before these accounts are marked verified (see
+  // lib/demo-provisioning-context.ts).
+  return runInDemoProvisioningContext(provisionDemoSessionInContext);
+}
+
+async function provisionDemoSessionInContext(): Promise<DemoSessionResult> {
   const email = generateDemoEmail();
   const password = generateDemoPassword();
 

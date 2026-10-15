@@ -1,0 +1,23 @@
+# Dependencies (reinstalled inside the image with npm ci)
+node_modules
+
+# Build output (rebuilt inside the image)
+dist
+
+# Environment files - VITE_API_URL comes from the build argument only
+.env
+.env.*
+
+# Git
+.git
+.gitignore
+
+# Tooling and editor state
+.claude
+.vscode
+.idea
+coverage
+*.log
+.DS_Store
+Thumbs.db
+*.tsbuildinfo

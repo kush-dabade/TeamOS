@@ -1,0 +1,363 @@
+# Production Deployment
+
+How TeamOS runs in production: one Linux VM running the whole stack through Docker Compose, with Caddy as the only public entry point. For running TeamOS locally, see [`local-development.md`](./local-development.md). This document is about operating the deployed system, not designing it.
+
+## Topology
+
+```text
+Internet ──80/443──▶ Azure VM (Ubuntu 24.04, Docker Engine + Compose plugin)
+                     docker compose -f docker-compose.prod.yml  (project: teamos-prod)
+
+                     edge network                     data network (internal: no internet)
+                     ┌───────────────┐                ┌──────────────────────────────┐
+                     │ caddy         │── /api/*  ────▶│ backend  (API + Socket.IO)   │
+                     │  TLS, SPA,    │   /socket.io/* │ worker   (BullMQ)            │
+                     │  proxy        │   /health      │ migrate  (one-shot)          │
+                     └───────────────┘   /ready       │ postgres   redis             │
+                                                      └──────────────────────────────┘
+```
+
+- **One HTTPS origin.** The SPA, REST API, Better Auth, and Socket.IO are all served from the same `PUBLIC_ORIGIN`, so session cookies are first-party and no cross-origin CORS is involved in normal use.
+- **Only `caddy` publishes ports** (80, 443). Postgres and Redis are only on the `data` network, which is `internal: true` and which `caddy` is not attached to. `backend` and `worker` are on both networks: `data` for the databases, `edge` for Caddy's upstream and for outbound internet (the worker calls the Resend API).
+- **`migrate` runs before the app.** `backend` and `worker` depend on it with `service_completed_successfully`. A failed migration leaves them stopped and the failure visible in `docker compose ps -a`.
+- **`backend` and `worker` share one image** (`teamos-backend:prod`), built from `backend/Dockerfile`. `caddy` runs `teamos-web:prod`, built from `frontend/Dockerfile`: the Vite bundle plus `frontend/Caddyfile`.
+
+### Azure resources
+
+| Resource | Name | Configuration |
+|---|---|---|
+| Resource group | `rg-teamos-prod-cin` | `centralindia` |
+| VM | `vm-teamos-prod-cin` | `Standard_B2ats_v2` (2 vCPU burstable, 1 GiB RAM), non-zonal, Ubuntu Server 24.04 LTS (Canonical) |
+| OS disk | created with the VM | 64 GiB Premium SSD (P6); the only disk, so all Docker volumes live on it |
+| Public IP | `pip-teamos-prod-cin` | Standard SKU, static IPv4, Azure DNS label |
+| NSG | `nsg-teamos-prod-cin` | inbound 22 from the administrator's IP only, plus 80 and 443 from anywhere |
+| VNet / NIC | `vnet-teamos-prod-cin` / `nic-vm-teamos-prod-cin` | default subnet |
+
+## Host preparation
+
+How to prepare a new VM for the stack above, from an empty resource group to a host ready for [Configuration](#configuration). Steps 1–2 run on the administrator's machine (Azure CLI and SSH key); steps 3–7 run over SSH on the VM.
+
+> **Verification status.** Steps 1–6 are adapted from how the current production VM was prepared (2026-10-15). They have been made reusable: placeholders, the `latest` image tag instead of the pinned version, a key passphrase, and `git`. In this exact form they have not been re-run on a fresh VM. Step 7 is new: the initial deployment copied a source archive instead of cloning.
+
+Placeholders: `<resource-group>`, `<region>`, `<vm-name>`, `<dns-label>`, `<admin-public-ip>` (your own public IPv4), `<github-owner>`. The `nsg-$VM`-style names below are an illustrative pattern; the names actually in use are listed under [Azure resources](#azure-resources).
+
+### 1. Azure: network and VM
+
+Run with the Azure CLI, signed in to the intended subscription (`az account show`). On a subscription that has never created a VM, register the providers first. This is a one-time, free subscription change.
+
+```bash
+az provider register -n Microsoft.Compute --wait
+az provider register -n Microsoft.Network --wait
+
+RG=<resource-group>; LOC=<region>; VM=<vm-name>
+
+az group create -n $RG -l $LOC
+
+# Inbound rules: SSH from the administrator's IP only; HTTP/HTTPS from anywhere. Nothing else.
+az network nsg create -g $RG -n nsg-$VM -l $LOC
+az network nsg rule create -g $RG --nsg-name nsg-$VM -n Allow-SSH-Admin --priority 1000 \
+  --direction Inbound --access Allow --protocol Tcp \
+  --source-address-prefixes <admin-public-ip>/32 --destination-port-ranges 22
+az network nsg rule create -g $RG --nsg-name nsg-$VM -n Allow-HTTP-HTTPS --priority 1010 \
+  --direction Inbound --access Allow --protocol Tcp \
+  --source-address-prefixes Internet --destination-port-ranges 80 443
+
+az network vnet create -g $RG -n vnet-$VM -l $LOC --address-prefixes 10.20.0.0/16 \
+  --subnet-name snet-app --subnet-prefixes 10.20.1.0/24 --network-security-group nsg-$VM
+
+# Static Standard IPv4 with a DNS label: <dns-label>.<region>.cloudapp.azure.com becomes PUBLIC_ORIGIN's host.
+az network public-ip create -g $RG -n pip-$VM -l $LOC --sku Standard \
+  --allocation-method Static --version IPv4 --dns-name <dns-label>
+
+az network nic create -g $RG -n nic-$VM -l $LOC --vnet-name vnet-$VM --subnet snet-app \
+  --public-ip-address pip-$VM
+
+# Ubuntu Server 24.04 LTS (Canonical; no Marketplace purchase plan). No --zone: non-zonal.
+az vm create -g $RG -n $VM -l $LOC \
+  --image Canonical:ubuntu-24_04-lts:server:latest --size Standard_B2ats_v2 \
+  --nics nic-$VM --os-disk-size-gb 64 --storage-sku Premium_LRS \
+  --admin-username azureuser --authentication-type ssh \
+  --ssh-key-values ~/.ssh/teamos_azure_ed25519.pub
+```
+
+Create the SSH key (step 2) before `az vm create`. Check the result with `az resource list -g $RG -o table`: there should be no resources beyond the six above. The DNS label must be free in the region; `az network public-ip create` fails if it isn't.
+
+### 2. SSH access
+
+On the administrator's machine:
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/teamos_azure_ed25519 -C "teamos-azure-admin"   # set a passphrase
+
+cat >> ~/.ssh/config <<'CONF'
+Host teamos-vm
+    HostName <dns-label>.<region>.cloudapp.azure.com
+    User azureuser
+    IdentityFile ~/.ssh/teamos_azure_ed25519
+    IdentitiesOnly yes
+CONF
+
+ssh teamos-vm 'sudo sshd -T | grep -E "^(passwordauthentication|kbdinteractiveauthentication)"'   # both: no
+```
+
+- **Keys only.** `--authentication-type ssh` disables password login. Never copy the private key to the VM.
+- **Least exposure.** Port 22 is open only to `<admin-public-ip>/32`. When your IP changes, update the rule rather than widening it:
+  ```bash
+  az network nsg rule update -g $RG --nsg-name nsg-$VM -n Allow-SSH-Admin --source-address-prefixes <new-ip>/32
+  ```
+
+### 3. OS updates and Docker Engine
+
+On the VM. This follows Docker's official instructions for Ubuntu (<https://docs.docker.com/engine/install/ubuntu/>); check them for changes before running.
+
+```bash
+sudo apt-get update && sudo apt-get -y upgrade
+sudo apt-get install -y ca-certificates curl git
+
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" \
+  | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo systemctl enable --now docker containerd
+
+# Lets azureuser run docker without sudo. Membership of the docker group is
+# root-equivalent; azureuser already has sudo. Takes effect at the next login.
+sudo usermod -aG docker "$USER"
+```
+
+Log out and back in, then verify: `docker version` and `docker compose version` should both print a version without `sudo`.
+
+### 4. Swap (2 GiB)
+
+The VM has about 0.9 GiB of usable RAM. Image builds and the running stack both rely on swap. Create it only if no swap is active:
+
+```bash
+if swapon --show --noheadings | grep -q .; then
+  echo "Swap already active - not creating another:"; swapon --show
+else
+  sudo fallocate -l 2G /swapfile
+  sudo chmod 600 /swapfile
+  sudo mkswap /swapfile
+  sudo swapon /swapfile
+fi
+grep -q '^/swapfile ' /etc/fstab || { [ -f /swapfile ] && echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab; }
+
+echo 'vm.swappiness=10' | sudo tee /etc/sysctl.d/99-teamos-swap.conf
+sudo sysctl --system > /dev/null
+free -m
+```
+
+### 5. Docker log rotation
+
+Container logs otherwise grow without bound on the only disk. Write `daemon.json` only if it doesn't exist yet; if it does, merge the two keys into it by hand rather than overwriting it.
+
+```bash
+if [ -e /etc/docker/daemon.json ]; then
+  echo "/etc/docker/daemon.json already exists - add \"log-driver\" and \"log-opts\" to it manually:"
+  sudo cat /etc/docker/daemon.json
+else
+  sudo tee /etc/docker/daemon.json > /dev/null <<'JSON'
+{
+  "log-driver": "local",
+  "log-opts": { "max-size": "10m", "max-file": "3" }
+}
+JSON
+  sudo systemctl restart docker
+fi
+docker info --format '{{.LoggingDriver}}'   # local
+```
+
+The setting applies to containers created afterwards. On a host with containers already running, recreate them to pick it up: `dc up -d --force-recreate`, using the `dc` alias defined under [Configuration](#configuration).
+
+### 6. Automatic security updates
+
+```bash
+sudo apt-get install -y unattended-upgrades
+sudo tee /etc/apt/apt.conf.d/20auto-upgrades > /dev/null <<'APT'
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+APT
+```
+
+Verify:
+
+```bash
+systemctl is-enabled unattended-upgrades                    # enabled
+apt-config dump APT::Periodic::Unattended-Upgrade           # ... "1";
+sudo unattended-upgrade --dry-run --debug 2>&1 | tail -n 5
+```
+
+Unattended upgrades don't reboot the VM. `/var/run/reboot-required` appears when a kernel update needs one. Reboot at a convenient time: every service restarts on its own (`restart: unless-stopped`).
+
+### 7. Application directory and repository
+
+The checkout lives at `~/TeamOS`. Never re-clone over an existing deployment: its `.env.production` files exist only there.
+
+```bash
+if [ -e ~/TeamOS ]; then
+  echo "~/TeamOS already exists - not cloning. Update it as described under Deploying."
+else
+  git clone https://github.com/<github-owner>/TeamOS.git ~/TeamOS
+fi
+```
+
+To convert a host whose `~/TeamOS` is **not** a git checkout:
+
+1. Take a backup first (see [Backups](#backups)).
+2. Move the old directory aside (`mv ~/TeamOS ~/TeamOS.previous`).
+3. Clone.
+4. Copy `.env.production` and `backend/.env.production` across, keeping them `chmod 600`.
+5. Remove the old directory only once the new deployment is healthy.
+
+Data is unaffected: Docker volumes belong to the Compose project name (`teamos-prod`), not the directory.
+
+### 8. Next
+
+Create the two env files as described in [Configuration](#configuration), then build and start the stack as described in [Deploying](#deploying).
+
+## Configuration
+
+Two env files exist **only on the VM**, each `chmod 600` and gitignored. Each is copied from its committed `.example`:
+
+| File | Example | Consumed by |
+|---|---|---|
+| `.env.production` | `.env.production.example` | Compose interpolation: `PUBLIC_ORIGIN`, `POSTGRES_USER`, `POSTGRES_DB`, `POSTGRES_PASSWORD`, `REDIS_PASSWORD` |
+| `backend/.env.production` | `backend/.env.production.example` | `backend` and `worker` (`env_file`): `BETTER_AUTH_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM` |
+
+`docker-compose.prod.yml` sets the remaining backend variables itself, so they can't drift:
+
+- `NODE_ENV=production`. This turns on the `Secure` session cookie, HSTS, and fail-fast config validation in `src/config/security.config.ts`.
+- `BETTER_AUTH_URL`, `FRONTEND_URL`, and `TRUSTED_ORIGINS` are all set to `PUBLIC_ORIGIN`.
+- `TRUST_PROXY_HOPS=1`, because exactly one proxy (Caddy) sits in front of the backend.
+- `DATABASE_URL` is empty, so `src/config/database.config.ts` builds the URL from the percent-encoded `POSTGRES_*` parts.
+- `REDIS_HOST=redis`.
+
+`PUBLIC_ORIGIN` is also the frontend's `VITE_API_URL` build argument and Caddy's site address.
+
+Every required value is enforced: Compose refuses to interpolate a missing `${VAR:?}`, and the backend and worker throw at startup on missing production config.
+
+Generate secrets on the VM. Never reuse development values:
+
+```bash
+openssl rand -hex 32     # POSTGRES_PASSWORD, REDIS_PASSWORD
+openssl rand -base64 32  # BETTER_AUTH_SECRET
+```
+
+All commands below run from the repository root on the VM and use this alias:
+
+```bash
+alias dc='docker compose -f docker-compose.prod.yml --env-file .env.production'
+```
+
+## Deploying
+
+```bash
+dc build backend        # builds teamos-backend:prod (also used by migrate and worker)
+dc build caddy          # builds teamos-web:prod
+dc up -d
+dc ps -a                # migrate: Exited (0); every other service: healthy
+dc logs migrate         # "All migrations have been successfully applied." / "No pending migrations"
+```
+
+Build the two images one at a time. On a 1 GiB VM a parallel build competes for memory.
+
+To deploy a new version:
+
+1. Take a backup first (see below).
+2. Update the checkout: `git pull --ff-only`.
+3. Run `dc build backend && dc build caddy && dc up -d`.
+
+Compose recreates the containers whose image changed. `migrate` runs again and applies only pending migrations.
+
+Never run `prisma migrate reset` or `prisma migrate dev` against production. Both can drop data.
+
+## Health and observability
+
+| Check | Command |
+|---|---|
+| Liveness | `curl -fsS "$PUBLIC_ORIGIN/health"` |
+| Readiness (Postgres + Redis) | `curl -fsS "$PUBLIC_ORIGIN/ready"` |
+| Container state, restarts | `dc ps -a`, `docker inspect -f '{{.RestartCount}}' <container>` |
+| Memory, swap | `docker stats --no-stream`, `free -m` |
+| Logs | `dc logs --tail=100 <service>` |
+
+Docker's daemon-level log rotation (`/etc/docker/daemon.json`, `local` driver with `max-size`/`max-file`) keeps container logs from filling the disk.
+
+## Data and volumes
+
+| Volume | Contents | Mounted at |
+|---|---|---|
+| `teamos-prod_postgres-data` | PostgreSQL cluster | `postgres:/var/lib/postgresql/data` |
+| `teamos-prod_uploads-data` | Attachments and avatars (local storage provider) | `backend` and `worker`: `/usr/src/app/uploads` |
+| `teamos-prod_redis-data` | Redis AOF/RDB (BullMQ jobs, rate-limit counters) | `redis:/data` |
+| `teamos-prod_caddy-data` | TLS certificates, ACME account | `caddy:/data` |
+| `teamos-prod_caddy-config` | Caddy autosaved config | `caddy:/config` |
+
+Named volumes survive `dc down`, container recreation, and VM reboots. **`dc down -v` deletes them all. Never use it in production.**
+
+## Backups
+
+Backups are taken **from the administrator's machine over SSH**, so the copy never lives only on the VM's disk. `teamos-vm` below is the administrator's SSH host alias for the VM.
+
+```bash
+mkdir -p backups
+TS=$(date +%Y%m%d-%H%M%S)
+
+# PostgreSQL, custom format (compressed, restorable with pg_restore)
+ssh teamos-vm 'cd ~/TeamOS && docker compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres sh -c '"'"'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc'"'"'' > "backups/teamos-db-$TS.dump"
+
+# Attachments and avatars (tar via the backend image, which is already on the host)
+ssh teamos-vm 'docker run --rm --entrypoint tar -v teamos-prod_uploads-data:/data:ro teamos-backend:prod -C /data -czf - .' > "backups/teamos-uploads-$TS.tar.gz"
+```
+
+Check the copies before relying on them: `pg_restore --list backups/teamos-db-$TS.dump | head` and `tar -tzf backups/teamos-uploads-$TS.tar.gz | head`.
+
+### Verifying a restore (non-destructive)
+
+This restores the dump into a scratch database next to the live one, compares row counts, then drops the scratch database. The live database is never touched.
+
+```bash
+ssh teamos-vm 'cd ~/TeamOS && docker compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres sh -c '"'"'createdb -U "$POSTGRES_USER" teamos_restore_check && pg_restore -U "$POSTGRES_USER" -d teamos_restore_check --no-owner'"'"'' < "backups/teamos-db-$TS.dump"
+
+# Compare e.g. user/workspace/task counts in "$POSTGRES_DB" vs teamos_restore_check, then:
+ssh teamos-vm 'cd ~/TeamOS && docker compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres sh -c '"'"'dropdb -U "$POSTGRES_USER" teamos_restore_check'"'"''
+```
+
+### Disaster recovery (destructive: replaces live data)
+
+Only for restoring onto a broken or empty deployment:
+
+```bash
+dc stop backend worker
+dc exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner' < teamos-db-<ts>.dump
+docker run --rm -i --entrypoint tar -v teamos-prod_uploads-data:/data teamos-backend:prod -C /data -xzf - < teamos-uploads-<ts>.tar.gz
+dc up -d
+```
+
+## Email
+
+The worker sends all transactional email (verification, password reset, invitations) through Resend, and refuses to start in production without `RESEND_API_KEY` and `EMAIL_FROM`.
+
+Until a domain is verified in Resend, the only usable sender is `onboarding@resend.dev`, and Resend then **delivers only to the Resend account owner's own address**. Mail to anyone else fails in the worker, and BullMQ retries it.
+
+The consequences:
+
+- Self-service sign-up only completes for that one address.
+- Invitations to other people don't arrive.
+- The `/try` demo is unaffected: demo provisioning marks its synthetic accounts verified itself and never enqueues verification email for them (see [`../features/demo.md`](../features/demo.md#provisioning)).
+
+Email verification stays required regardless. The fix is a verified sending domain, not relaxing verification.
+
+## Stopping, costs, and removal
+
+| Action | Command | Still billed |
+|---|---|---|
+| Stop the app, keep the VM | `dc down` (no `-v`) | VM compute, disk, public IP |
+| Stop the VM | `az vm deallocate -g rg-teamos-prod-cin -n vm-teamos-prod-cin` | OS disk, static public IP |
+| Restart | `az vm start ...`, then `dc up -d` if containers weren't set to restart | — |
+| Remove everything | Back up first, then `az group delete -n rg-teamos-prod-cin` | nothing (irreversible: deletes the disk and all data) |
+
+The VM runs on an Azure for Students subscription with the spending limit on. When the credit is exhausted or expires, Azure disables the subscription and deallocates the VM: the site goes offline, but nothing is charged beyond the credit. A Cost Management budget alert only notifies; it never stops spending.

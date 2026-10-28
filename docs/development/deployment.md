@@ -380,6 +380,16 @@ The live database is only read. The weekly cron entry above runs it.
 
 To check a copy on your own machine instead, restore it into a local scratch database with `pg_restore --no-owner -d <scratch-db> teamos-db-<ts>.dump`.
 
+### Orphaned upload files
+
+Files that no attachment or avatar row references can be left on the uploads volume. Before demo cleanup started deleting files, it left behind every expired demo workspace's attachments and every avatar, and a failed file deletion still can. To list them (read-only):
+
+```bash
+dc exec backend node dist/src/ops/find-orphan-uploads.js
+```
+
+To remove them, take and pull a backup first (the uploads archive is the undo path), review the list, then run the same command with `--delete`. It only removes orphans older than 24 hours, because an upload writes its file just before its row.
+
 ### Disaster recovery (destructive: replaces live data)
 
 Only for restoring onto a broken or empty deployment:

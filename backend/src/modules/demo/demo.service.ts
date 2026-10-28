@@ -1,8 +1,7 @@
-import { randomBytes } from "node:crypto";
-
 import { auth } from "../../lib/auth.js";
 import { runInDemoProvisioningContext } from "../../lib/demo-provisioning-context.js";
 import { logger } from "../../lib/logger.js";
+import { generateRandomCompliantPassword } from "../../lib/password-policy.js";
 import { prisma } from "../../lib/prisma.js";
 import { createWorkspace } from "../workspace/workspace.service.js";
 
@@ -26,7 +25,7 @@ export interface DemoSessionResult {
 // Better Auth's own minimum password length (8) with wide margin, so no
 // separate length check is needed.
 function generateDemoPassword(): string {
-  return randomBytes(24).toString("hex");
+  return generateRandomCompliantPassword();
 }
 
 /**

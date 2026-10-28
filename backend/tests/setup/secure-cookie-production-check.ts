@@ -22,7 +22,7 @@ async function main() {
   const server = await startTestServer();
 
   const email = `secure-cookie-check-${crypto.randomUUID()}@example.com`;
-  const password = "password1234";
+  const password = "Password1234";
 
   const signUpResponse = await request(app).post("/api/auth/sign-up/email").send({
     name: "Secure Cookie Check",

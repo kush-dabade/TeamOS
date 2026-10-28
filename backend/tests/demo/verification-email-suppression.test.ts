@@ -136,7 +136,7 @@ describe("demo provisioning verification-email suppression", () => {
   function signUp(email: string) {
     return request(app)
       .post("/api/auth/sign-up/email")
-      .send({ name: "Ordinary User", email, password: "password1234" })
+      .send({ name: "Ordinary User", email, password: "Password1234" })
       .expect(200);
   }
 
@@ -257,7 +257,7 @@ describe("demo provisioning verification-email suppression", () => {
 
   it("does not let a demo-lookalike address skip verification", async () => {
     const email = `daniel.brooks+${crypto.randomUUID().slice(0, 8)}@acme.local`;
-    const password = "password1234";
+    const password = "Password1234";
 
     await request(app)
       .post("/api/auth/sign-up/email")

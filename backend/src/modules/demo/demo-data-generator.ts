@@ -31,10 +31,11 @@
  * should stay identical between them. Do not introduce a second,
  * lighter-weight generator for either caller - grow this one in place.
  */
-import { randomBytes, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 
 import { prisma } from "../../lib/prisma.js";
 import { auth } from "../../lib/auth.js";
+import { generateRandomCompliantPassword } from "../../lib/password-policy.js";
 import { WorkspaceRole } from "../../generated/prisma/enums.js";
 import { createProject, updateProject } from "../project/project.service.js";
 import type { ProjectStatus } from "../project/project.types.js";
@@ -363,7 +364,7 @@ function acmeTeamEmail(localPart: string): string {
 // reasoning demo.service.ts's own generateDemoPassword() already uses for
 // the /try owner.
 function randomLocalPassword(): string {
-  return randomBytes(24).toString("hex");
+  return generateRandomCompliantPassword();
 }
 
 const ACME_ENGINEERING_LEAD: TeamMemberSpec = {

@@ -159,7 +159,7 @@ describe("Avatar storage-key authorization (update-user + sign-up IDOR)", () => 
     const res = await request(app).post("/api/auth/sign-up/email").send({
       name: "Test User",
       email,
-      password: "password1234",
+      password: "Password1234",
       image: "users/some-other-user-id/avatar/planted.png",
     });
 
@@ -190,7 +190,7 @@ describe("Avatar storage-key authorization (update-user + sign-up IDOR)", () => 
     const signUpRes = await request(app).post("/api/auth/sign-up/email").send({
       name: "Attacker",
       email: attackerEmail,
-      password: "password1234",
+      password: "Password1234",
       image: victimStorageKey,
     });
 

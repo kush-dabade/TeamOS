@@ -7,6 +7,7 @@ import { prisma } from "../../src/lib/prisma.js";
 import { resetDatabase } from "../setup/reset-database.js";
 import {
   createNotificationDirect,
+  addWorkspaceMember,
   createWorkspaceWithMember,
   signUpTestUser,
 } from "../setup/fixtures.js";
@@ -195,6 +196,7 @@ describe("notification service", () => {
       const userA = await signUpTestUser(app);
       const userB = await signUpTestUser(app);
       const { workspace } = await createWorkspaceWithMember(userA.userId);
+      await addWorkspaceMember(workspace.id, userB.userId);
 
       await createNotificationDirect(workspace.id, userA.userId, new Date());
       const ownNotification = await createNotificationDirect(

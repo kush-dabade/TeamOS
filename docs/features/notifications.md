@@ -4,6 +4,8 @@
 
 A **`Notification`** belongs to one `Workspace` and is addressed to one `recipientId` (a `User`). Fields: `type` (see below), `title`, `message`, an optional `metadata` JSON blob, `isRead`/`readAt`, and soft deletion via `deletedAt`.
 
+**Visibility**: a user sees, counts, and can mark read only their own non-deleted notifications from workspaces they're still a member of (`visibleNotificationsWhere`, `notification.service.ts`). Most notifications name that workspace's tasks and projects, so they disappear once the recipient leaves or is removed, and reappear if they rejoin; the rows themselves are kept. `INVITATION_RECEIVED` is exempt, because it's addressed to someone who isn't a member yet.
+
 ## Notification types
 
 The `NotificationType` enum has five values, but only four are actually produced anywhere in the service layer — verified by searching every call site, not by reading the enum alone:

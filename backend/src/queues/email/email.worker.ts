@@ -8,6 +8,7 @@ import {
   sendWorkspaceInvitation,
 } from "../../modules/email/index.js";
 import { QUEUE_NAMES } from "../queue.constants.js";
+import { describeEmailJobFailure } from "./email-failure.js";
 import { EMAIL_JOB_NAMES } from "./email.jobs.js";
 import type {
   PasswordResetEmailJob,
@@ -77,9 +78,12 @@ emailWorker.on("completed", (job) => {
 });
 
 emailWorker.on("failed", (job, error) => {
-  logger
-    .child({ jobId: job?.id ?? "unknown", jobName: job?.name ?? "unknown" })
-    .error({ err: error }, "Email job failed");
+  // Deliberately not `{ err: error }`: provider errors can carry recipient
+  // addresses in their message and stack, which describeEmailJobFailure
+  // redacts.
+  const failure = describeEmailJobFailure(job, error);
+
+  logger.child({ jobId: job?.id ?? "unknown" })[failure.level](failure.fields, failure.message);
 });
 
 emailWorker.on("error", (error) => {

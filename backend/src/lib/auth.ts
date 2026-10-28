@@ -6,6 +6,12 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 
 import { isInDemoProvisioningContext } from "./demo-provisioning-context.js";
 import { logger } from "./logger.js";
+import {
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  passwordPolicyViolation,
+  userNameViolation,
+} from "./password-policy.js";
 import { prisma } from "./prisma.js";
 import { incrementRateLimitCounter, rateLimitRedis } from "./redis.js";
 import { isLocalDevelopment, isProduction, trustedOrigins } from "../config/security.config.js";
@@ -137,6 +143,15 @@ const SESSION_UPDATE_AGE_SECONDS = 60 * 60 * 24;
 // `before` hook below doesn't allocate a new Set on every request.
 const AVATAR_IMAGE_PROTECTED_PATHS = new Set(["/update-user", "/sign-up/email"]);
 
+// Endpoint -> the body field carrying a new password.
+const PASSWORD_POLICY_PATHS: Record<string, string> = {
+  "/sign-up/email": "password",
+  "/reset-password": "newPassword",
+  "/change-password": "newPassword",
+};
+
+const USER_NAME_PATHS = new Set(["/sign-up/email", "/update-user"]);
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql",
@@ -202,6 +217,8 @@ export const auth = betterAuth({
 
   emailAndPassword: {
     enabled: true,
+    minPasswordLength: PASSWORD_MIN_LENGTH,
+    maxPasswordLength: PASSWORD_MAX_LENGTH,
     // Without this, anyone can sign up with an email address they don't
     // own and be signed in immediately - assertInvitationEligible
     // (invitation.service.ts) only compares against the *session's*
@@ -469,6 +486,25 @@ export const auth = betterAuth({
           message:
             "Avatar image cannot be set through this endpoint. Use the avatar upload/delete endpoints instead.",
         });
+      }
+
+      // The password and name rules the forms advertise (lib/password-policy.ts),
+      // enforced here so they hold for every client, not only the UI. Sign-in
+      // is deliberately not checked, so existing passwords keep working.
+      const passwordField = PASSWORD_POLICY_PATHS[ctx.path];
+      const candidatePassword = passwordField ? ctx.body?.[passwordField] : undefined;
+      if (typeof candidatePassword === "string") {
+        const violation = passwordPolicyViolation(candidatePassword);
+        if (violation) {
+          throw new APIError("BAD_REQUEST", { code: "PASSWORD_POLICY_VIOLATION", message: violation });
+        }
+      }
+
+      if (USER_NAME_PATHS.has(ctx.path) && typeof ctx.body?.name === "string") {
+        const violation = userNameViolation(ctx.body.name);
+        if (violation) {
+          throw new APIError("BAD_REQUEST", { code: "INVALID_NAME", message: violation });
+        }
       }
 
       // Runs before Better Auth even attempts to verify the password -

@@ -15,7 +15,7 @@ import { resetDatabase } from "../setup/reset-database.js";
 // limiter's 429 masking the account-scoped one under test here.
 const ACCOUNT_LIMIT = 5;
 
-const PASSWORD = "password1234";
+const PASSWORD = "Password1234";
 const WRONG_PASSWORD = "not-the-password";
 
 function uniqueEmail(label: string): string {

@@ -6,7 +6,7 @@ import { attachmentKeys } from "@/features/attachments";
 import { activityKeys } from "@/features/activity";
 import type { ActivityEntityType } from "@/features/activity";
 import { taskKeys } from "@/features/tasks";
-import { projectKeys } from "@/features/projects";
+import { invalidateProjectTaskCounts, projectKeys } from "@/features/projects";
 import { sprintKeys } from "@/features/sprints";
 import { workspaceKeys } from "@/features/workspaces";
 
@@ -131,10 +131,15 @@ function isActivityCreatedPayload(payload: unknown): payload is ActivityCreatedP
   );
 }
 
+function hasOptionalWorkspaceId(payload: object): boolean {
+  return !("workspaceId" in payload) || typeof payload.workspaceId === "string";
+}
+
 // Task payload shapes, per backend/src/modules/task/task.service.ts. All four
 // carry the full task (workspaceId + task), so projectId/id/sprintId are
 // always available without a second lookup.
 interface TaskEventPayload {
+  workspaceId?: string;
   task: { id: string; projectId: string; sprintId?: string | null };
 }
 
@@ -151,7 +156,8 @@ function isTaskEventPayload(payload: unknown): payload is TaskEventPayload {
     typeof payload.task.projectId === "string" &&
     (!("sprintId" in payload.task) ||
       payload.task.sprintId === null ||
-      typeof payload.task.sprintId === "string")
+      typeof payload.task.sprintId === "string") &&
+    hasOptionalWorkspaceId(payload)
   );
 }
 
@@ -174,6 +180,20 @@ function invalidateTask(
   }
 }
 
+// /tasks and the dashboard's My Tasks / Workspace Attention panels read one
+// cross-project list per workspace (taskKeys.workspaceList), separate from
+// the per-project lists invalidateTask covers - without this, other users'
+// task changes never reached those views until a reload. Every task event
+// carries workspaceId; the prefix fallback only guards an older payload.
+function invalidateWorkspaceTaskList(
+  workspaceId: string | undefined,
+  queryClient: QueryClient,
+): void {
+  queryClient.invalidateQueries({
+    queryKey: workspaceId ? taskKeys.workspaceList(workspaceId) : taskKeys.workspaceLists(),
+  });
+}
+
 // task.assigned_to_sprint/removed_from_sprint, per
 // backend/src/modules/sprint-task/sprint-task.service.ts, carry projectId and
 // sprintId at the payload's top level (not nested under task) plus a partial
@@ -183,6 +203,7 @@ function invalidateTask(
 // that information exists on the wire; the REST mutation response is just
 // the raw Task row and never carries it.
 interface SprintTaskEventPayload {
+  workspaceId?: string;
   projectId: string;
   sprintId: string;
   task: { id: string; previousSprintId?: string };
@@ -201,7 +222,8 @@ function isSprintTaskEventPayload(payload: unknown): payload is SprintTaskEventP
     payload.task !== null &&
     "id" in payload.task &&
     typeof payload.task.id === "string" &&
-    (!("previousSprintId" in payload.task) || typeof payload.task.previousSprintId === "string")
+    (!("previousSprintId" in payload.task) || typeof payload.task.previousSprintId === "string") &&
+    hasOptionalWorkspaceId(payload)
   );
 }
 
@@ -264,7 +286,7 @@ function isProjectEventPayload(payload: unknown): payload is ProjectEventPayload
 // never a safe prefix for "every status-filtered list in this workspace."
 // projectKeys.lists() is the narrowest key that is still guaranteed to match
 // whichever status-filtered variant a component actually has mounted (e.g.
-// use-projects-with-task-counts.ts queries with a specific status) — a
+// ProjectsPage queries with a specific status) — a
 // project being created or archived can move it in or out of any of those
 // filtered buckets, so this is a required invalidation, not just a
 // defensive/broad one.
@@ -415,6 +437,8 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
       return;
     }
     queryClient.invalidateQueries({ queryKey: taskKeys.list(payload.task.projectId) });
+    invalidateWorkspaceTaskList(payload.workspaceId, queryClient);
+    invalidateProjectTaskCounts(queryClient, payload.task.projectId);
   },
 
   [REALTIME_EVENTS.TASK_UPDATED]: (payload, queryClient) => {
@@ -422,6 +446,8 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
       return;
     }
     invalidateTask(payload.task.id, payload.task.projectId, queryClient, payload.task.sprintId);
+    invalidateWorkspaceTaskList(payload.workspaceId, queryClient);
+    invalidateProjectTaskCounts(queryClient, payload.task.projectId);
   },
 
   [REALTIME_EVENTS.TASK_COMPLETED]: (payload, queryClient) => {
@@ -429,6 +455,8 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
       return;
     }
     invalidateTask(payload.task.id, payload.task.projectId, queryClient, payload.task.sprintId);
+    invalidateWorkspaceTaskList(payload.workspaceId, queryClient);
+    invalidateProjectTaskCounts(queryClient, payload.task.projectId);
   },
 
   [REALTIME_EVENTS.TASK_DELETED]: (payload, queryClient) => {
@@ -436,6 +464,8 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
       return;
     }
     invalidateTask(payload.task.id, payload.task.projectId, queryClient, payload.task.sprintId);
+    invalidateWorkspaceTaskList(payload.workspaceId, queryClient);
+    invalidateProjectTaskCounts(queryClient, payload.task.projectId);
   },
 
   [REALTIME_EVENTS.TASK_ASSIGNED_TO_SPRINT]: (payload, queryClient) => {
@@ -443,6 +473,7 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
       return;
     }
     invalidateTask(payload.task.id, payload.projectId, queryClient);
+    invalidateWorkspaceTaskList(payload.workspaceId, queryClient);
     queryClient.invalidateQueries({ queryKey: sprintKeys.tasks(payload.sprintId) });
 
     // A task moved from another sprint leaves that sprint's own task-list
@@ -460,6 +491,7 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
       return;
     }
     invalidateTask(payload.task.id, payload.projectId, queryClient);
+    invalidateWorkspaceTaskList(payload.workspaceId, queryClient);
     queryClient.invalidateQueries({ queryKey: sprintKeys.tasks(payload.sprintId) });
   },
 

@@ -12,14 +12,18 @@ import { ALLOWED_ATTACHMENT_MIME_TYPES, ATTACHMENT_MAX_FILE_SIZE } from "../lib/
 interface AttachmentUploadProps {
   onUpload: (file: File) => Promise<void>;
   isUploading: boolean;
+  /** Bytes; lower for demo accounts. Defaults to the standard limit. */
+  maxFileSize?: number;
 }
 
 const acceptedTypesCaption = Object.values(ATTACHMENT_FILE_TYPES)
   .map((type) => type.label)
   .join(", ");
-const maxSizeCaption = `${ATTACHMENT_MAX_FILE_SIZE / (1024 * 1024)}MB`;
+function formatMaxSize(bytes: number): string {
+  return `${bytes / (1024 * 1024)}MB`;
+}
 
-function validateAttachmentFile(file: File): string | null {
+function validateAttachmentFile(file: File, maxFileSize: number): string | null {
   if (
     !ALLOWED_ATTACHMENT_MIME_TYPES.includes(
       file.type as (typeof ALLOWED_ATTACHMENT_MIME_TYPES)[number],
@@ -28,8 +32,8 @@ function validateAttachmentFile(file: File): string | null {
     return "File type not supported.";
   }
 
-  if (file.size > ATTACHMENT_MAX_FILE_SIZE) {
-    return `File must be ${maxSizeCaption} or smaller.`;
+  if (file.size > maxFileSize) {
+    return `File must be ${formatMaxSize(maxFileSize)} or smaller.`;
   }
 
   return null;
@@ -43,7 +47,11 @@ function validateAttachmentFile(file: File): string | null {
 // Client-side validation (type/size) mirrors the backend's own so rejected
 // files get instant feedback instead of a round trip - the backend still
 // re-validates independently and remains authoritative.
-export function AttachmentUpload({ onUpload, isUploading }: AttachmentUploadProps) {
+export function AttachmentUpload({
+  onUpload,
+  isUploading,
+  maxFileSize = ATTACHMENT_MAX_FILE_SIZE,
+}: AttachmentUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
 
@@ -60,7 +68,7 @@ export function AttachmentUpload({ onUpload, isUploading }: AttachmentUploadProp
     const validFiles: File[] = [];
 
     for (const file of files) {
-      const validationError = validateAttachmentFile(file);
+      const validationError = validateAttachmentFile(file, maxFileSize);
 
       if (validationError) {
         toast.error(`${file.name}: ${validationError}`);
@@ -195,7 +203,7 @@ export function AttachmentUpload({ onUpload, isUploading }: AttachmentUploadProp
       />
 
       <p className="text-xs text-muted-foreground">
-        {acceptedTypesCaption} &middot; Max {maxSizeCaption}
+        {acceptedTypesCaption} &middot; Max {formatMaxSize(maxFileSize)}
       </p>
 
       <span role="status" aria-live="polite" className="sr-only">

@@ -5,6 +5,7 @@ import type { AppError } from "@/lib/api";
 // TaskWorkspacePage.tsx. This file lives inside the tasks feature itself, and
 // the sprints barrel re-exports components that import taskKeys from
 // "@/features/tasks" at runtime, which would create a circular dependency.
+import { invalidateProjectTaskCounts } from "@/features/projects/lib/invalidate-project-task-counts";
 import { sprintKeys } from "@/features/sprints/lib/sprint-keys";
 
 import { updateTask, type UpdateTaskInput } from "../api/tasks.api";
@@ -25,6 +26,7 @@ export function useUpdateTask() {
       queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
       queryClient.invalidateQueries({ queryKey: taskKeys.list(task.projectId) });
       queryClient.invalidateQueries({ queryKey: taskKeys.workspaceLists() });
+      invalidateProjectTaskCounts(queryClient, task.projectId);
 
       // sprintId can't change via this endpoint (not part of UpdateTaskInput -
       // reassignment is its own sprint-task endpoint), so there is no

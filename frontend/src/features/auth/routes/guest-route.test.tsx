@@ -1,4 +1,6 @@
-import { screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PROTECTED_CONTENT_TEXT, renderGuard } from "@/test/render-guard";
@@ -59,5 +61,73 @@ describe("GuestRoute", () => {
     renderGuard(<GuestRoute />);
 
     expect(screen.getByText(PROTECTED_CONTENT_TEXT)).toBeInTheDocument();
+  });
+});
+
+// Regression: found by the e2e suite - after a successful sign-up the
+// session refetch made the guard show the loader, which unmounted the
+// register form and discarded its "check your email" state.
+describe("GuestRoute across a session refetch", () => {
+  function StatefulGuestPage() {
+    const [value, setValue] = useState("");
+    return <input aria-label="Guest input" value={value} onChange={(event) => setValue(event.target.value)} />;
+  }
+
+  function renderStatefulGuard() {
+    cleanup();
+    return render(
+      <MemoryRouter initialEntries={["/register"]}>
+        <Routes>
+          <Route element={<GuestRoute />}>
+            <Route path="/register" element={<StatefulGuestPage />} />
+          </Route>
+          <Route path="/dashboard" element={<p>Dashboard</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+  }
+
+  beforeEach(() => {
+    mockUseAuth.mockReset();
+  });
+
+  it("keeps the guest page mounted, with its state, when the session refetches", () => {
+    mockUseAuth.mockReturnValue(authState({ status: "unauthenticated" }));
+    const { rerender } = renderStatefulGuard();
+
+    fireEvent.change(screen.getByLabelText("Guest input"), { target: { value: "typed" } });
+
+    mockUseAuth.mockReturnValue(authState({ status: "pending", isPending: true }));
+    rerender(
+      <MemoryRouter initialEntries={["/register"]}>
+        <Routes>
+          <Route element={<GuestRoute />}>
+            <Route path="/register" element={<StatefulGuestPage />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole("status")).toBeNull();
+    expect((screen.getByLabelText("Guest input") as HTMLInputElement).value).toBe("typed");
+  });
+
+  it("still redirects once a session appears after the refetch", () => {
+    mockUseAuth.mockReturnValue(authState({ status: "unauthenticated" }));
+    const { rerender } = renderStatefulGuard();
+
+    mockUseAuth.mockReturnValue(authState({ status: "authenticated", isAuthenticated: true }));
+    rerender(
+      <MemoryRouter initialEntries={["/register"]}>
+        <Routes>
+          <Route element={<GuestRoute />}>
+            <Route path="/register" element={<StatefulGuestPage />} />
+          </Route>
+          <Route path="/dashboard" element={<p>Dashboard</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("Dashboard")).toBeInTheDocument();
   });
 });

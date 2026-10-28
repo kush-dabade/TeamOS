@@ -99,37 +99,41 @@ export function ProjectForm({
             }}
           />
 
-          <Controller
-            name="status"
-            control={form.control}
-            render={({ field, fieldState }) => {
-              const errorId = `${field.name}-error`;
+          {/* Edit only: a project is always created as Planned (the create API
+              takes no status), matching TaskForm's create mode. */}
+          {mode === "edit" ? (
+            <Controller
+              name="status"
+              control={form.control}
+              render={({ field, fieldState }) => {
+                const errorId = `${field.name}-error`;
 
-              return (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={field.name}>Status</FieldLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger
-                      id={field.name}
-                      aria-invalid={fieldState.invalid}
-                      aria-describedby={fieldState.error ? errorId : undefined}
-                      className="w-full"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem value="PLANNED">Planned</SelectItem>
-                        <SelectItem value="ACTIVE">Active</SelectItem>
-                        <SelectItem value="COMPLETED">Completed</SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  <FieldError id={errorId} errors={[fieldState.error]} />
-                </Field>
-              );
-            }}
-          />
+                return (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor={field.name}>Status</FieldLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger
+                        id={field.name}
+                        aria-invalid={fieldState.invalid}
+                        aria-describedby={fieldState.error ? errorId : undefined}
+                        className="w-full"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="PLANNED">Planned</SelectItem>
+                          <SelectItem value="ACTIVE">Active</SelectItem>
+                          <SelectItem value="COMPLETED">Completed</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    <FieldError id={errorId} errors={[fieldState.error]} />
+                  </Field>
+                );
+              }}
+            />
+          ) : null}
 
           <FieldError errors={[form.formState.errors.root]} />
         </div>

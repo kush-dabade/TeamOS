@@ -101,7 +101,7 @@ describe("password reset", () => {
   it("rejects an invalid/unknown token", async () => {
     const res = await request(app)
       .post("/api/auth/reset-password")
-      .send({ token: "totally-bogus-nonexistent-token", newPassword: "newpassword5678" });
+      .send({ token: "totally-bogus-nonexistent-token", newPassword: "Newpassword5678" });
 
     expect(res.status).toBe(400);
     expect(res.body.code).toBe("INVALID_TOKEN");
@@ -130,7 +130,7 @@ describe("password reset", () => {
 
     const res = await request(app)
       .post("/api/auth/reset-password")
-      .send({ token, newPassword: "newpassword5678" });
+      .send({ token, newPassword: "Newpassword5678" });
 
     expect(res.status).toBe(400);
     expect(res.body.code).toBe("INVALID_TOKEN");
@@ -144,12 +144,12 @@ describe("password reset", () => {
 
     await request(app)
       .post("/api/auth/reset-password")
-      .send({ token, newPassword: "newpassword5678" })
+      .send({ token, newPassword: "Newpassword5678" })
       .expect(200);
 
     const reuseRes = await request(app)
       .post("/api/auth/reset-password")
-      .send({ token, newPassword: "yetanotherpassword9" });
+      .send({ token, newPassword: "Yetanotherpassword9" });
 
     expect(reuseRes.status).toBe(400);
     expect(reuseRes.body.code).toBe("INVALID_TOKEN");
@@ -157,7 +157,7 @@ describe("password reset", () => {
 
   it("changes the password end-to-end: the old password stops working and the new one works", async () => {
     const user = await signUpTestUser(app);
-    const newPassword = "brandnewpassword5678";
+    const newPassword = "Brandnewpassword5678";
 
     await requestReset(user.email).expect(200);
     const token = await extractResetToken(user.email);
@@ -194,7 +194,7 @@ describe("password reset", () => {
 
     await request(app)
       .post("/api/auth/reset-password")
-      .send({ token, newPassword: "brandnewpassword5678" })
+      .send({ token, newPassword: "Brandnewpassword5678" })
       .expect(200);
 
     await request(app).get("/api/v1/workspaces").set("Cookie", user.cookie).expect(401);

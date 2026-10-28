@@ -34,7 +34,7 @@ async function main() {
   const signUpResponse = await request(app).post("/api/auth/sign-up/email").send({
     name: "Dev Bypass Check",
     email,
-    password: "password1234",
+    password: "Password1234",
   });
 
   const userId = signUpResponse.body.user.id as string;

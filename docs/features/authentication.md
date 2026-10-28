@@ -31,6 +31,15 @@ There is no username-based login, no magic link, and no multi-factor authenticat
 - **Production/default behavior**: `requireEmailVerification: true` — an unverified account cannot sign in.
 - **Local-development bypass**: a `databaseHooks.user.create.before` hook (`lib/auth.ts`) sets `emailVerified: true` at the moment a user row is inserted, but **only** when `isLocalDevelopment` is true — which requires `NODE_ENV` to be exactly `"development"` (not `"test"`, not unset). This exists so a freshly cloned repo can be signed up and used without a working Resend account. It cannot activate in production (`isLocalDevelopment` and `isProduction` can never both be true) and does not affect the test suite, which exercises the real, non-bypassed flow (`backend/tests/security/email-verification.test.ts`).
 
+## Password and name rules
+
+The rules the forms show are enforced on the server (`lib/password-policy.ts`, applied in `lib/auth.ts`'s `hooks.before`), so they hold for every client:
+
+- **Passwords**: 8–128 characters, with at least one uppercase letter, one lowercase letter, and one number. They're checked on sign-up, reset-password, and change-password (`PASSWORD_POLICY_VIOLATION`). Sign-in isn't checked, so an existing password always keeps working.
+- **Names**: 1–50 characters once trimmed, checked on sign-up and update-user (`INVALID_NAME`).
+
+Demo accounts get random passwords from `generateRandomCompliantPassword`, so provisioning satisfies the same rules.
+
 ## Authorization boundary
 
 Authentication only establishes **identity** — a valid session tells the backend *who* is making a request, nothing about *what* they're allowed to do. Every workspace-scoped action separately checks membership and role via `requireWorkspaceMembership`/`requireRole` (`shared/authorization/workspace-access.ts`) inside the relevant service function. See [`workspaces.md`](./workspaces.md) for that authorization model, and [`../architecture/system-design.md`](../architecture/system-design.md#6-authorization-and-rbac) for the architectural framing.

@@ -1,7 +1,11 @@
 import { logger } from "../../lib/logger.js";
 import { prisma } from "../../lib/prisma.js";
 import type { Prisma } from "../../generated/prisma/client.js";
-import { storageService, FileNotFoundError } from "../../storage/index.js";
+import {
+  storageService,
+  FileNotFoundError,
+  matchesDeclaredFileType,
+} from "../../storage/index.js";
 
 import {
   ActivityEntityType,
@@ -183,6 +187,10 @@ export async function uploadAttachment(
   await assertProjectNotArchived(task.projectId);
 
   validateAttachmentMimeType(file.mimetype);
+
+  if (!matchesDeclaredFileType(file.buffer, file.mimetype)) {
+    throw new ValidationError("The file's contents don't match its file type.");
+  }
 
   const actor = await prisma.user.findUnique({
     where: {

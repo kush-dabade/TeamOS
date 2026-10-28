@@ -27,7 +27,7 @@ describe("email verification enforcement", () => {
 
     const response = await request(app)
       .post("/api/auth/sign-up/email")
-      .send({ name: "Test User", email, password: "password1234" })
+      .send({ name: "Test User", email, password: "Password1234" })
       .expect(200);
 
     expect(response.body.token).toBeNull();
@@ -40,7 +40,7 @@ describe("email verification enforcement", () => {
 
   it("rejects sign-in for a correct password when the email is unverified", async () => {
     const email = `unverified-signin-${crypto.randomUUID()}@example.com`;
-    const password = "password1234";
+    const password = "Password1234";
 
     await request(app)
       .post("/api/auth/sign-up/email")
@@ -55,7 +55,7 @@ describe("email verification enforcement", () => {
 
   it("allows sign-in once the email is verified, and the resulting session works", async () => {
     const email = `verified-${crypto.randomUUID()}@example.com`;
-    const password = "password1234";
+    const password = "Password1234";
 
     const signUpResponse = await request(app)
       .post("/api/auth/sign-up/email")
@@ -87,7 +87,7 @@ describe("email verification enforcement", () => {
 
     await request(app)
       .post("/api/auth/sign-up/email")
-      .send({ name: "Test User", email, password: "password1234" })
+      .send({ name: "Test User", email, password: "Password1234" })
       .expect(200);
 
     const jobs = await emailQueue.getJobs(["waiting", "delayed", "active", "completed"]);
@@ -104,7 +104,7 @@ describe("email verification enforcement", () => {
 
     await request(app)
       .post("/api/auth/sign-up/email")
-      .send({ name: "Test User", email, password: "password1234" })
+      .send({ name: "Test User", email, password: "Password1234" })
       .expect(200);
 
     const jobs = await emailQueue.getJobs(["waiting", "delayed", "active", "completed"]);
@@ -163,7 +163,7 @@ describe("email verification enforcement", () => {
 
       const response = await request(app)
         .post("/api/auth/sign-up/email")
-        .send({ name: "Test User", email, password: "password1234" })
+        .send({ name: "Test User", email, password: "Password1234" })
         .expect(200);
 
       // Comfortably above the 2s ENQUEUE_VERIFICATION_EMAIL_TIMEOUT_MS
@@ -194,7 +194,7 @@ describe("email verification enforcement", () => {
 
     await request(app)
       .post("/api/auth/sign-up/email")
-      .send({ name: "Test User", email, password: "password1234" })
+      .send({ name: "Test User", email, password: "Password1234" })
       .expect(200);
 
     const jobs = await emailQueue.getJobs(["waiting", "delayed", "active", "completed"]);
@@ -236,7 +236,7 @@ describe("email verification enforcement", () => {
 
     await request(app)
       .post("/api/auth/sign-up/email")
-      .send({ name: "Test User", email, password: "password1234" })
+      .send({ name: "Test User", email, password: "Password1234" })
       .expect(200);
 
     await new Promise((resolve) => setTimeout(resolve, 1100));

@@ -34,7 +34,7 @@ export interface AuthenticatedTestUser {
  */
 export async function signUpTestUser(app: Express): Promise<AuthenticatedTestUser> {
   const email = `test-${crypto.randomUUID()}@example.com`;
-  const password = "password1234";
+  const password = "Password1234";
 
   const signUpResponse = await request(app)
     .post("/api/auth/sign-up/email")
@@ -410,4 +410,15 @@ export async function fileExists(absolutePath: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+/**
+ * Bytes that pass the upload signature check for image/png
+ * (src/storage/utils/file-signature.ts) while still carrying a distinct,
+ * test-specific payload, so byte-for-byte download assertions keep working.
+ */
+export function pngBytes(label: string): Buffer {
+  return Buffer.concat([PNG_SIGNATURE, Buffer.from(label)]);
 }

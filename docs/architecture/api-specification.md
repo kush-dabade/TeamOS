@@ -86,8 +86,8 @@ Standard Better Auth routes: `POST /sign-up/email`, `POST /sign-in/email`, `POST
 | Method & Path | Purpose | Authorization |
 |---|---|---|
 | `POST /api/v1/workspaces/:workspaceId/projects` | Create | `OWNER`/`ADMIN` |
-| `GET /api/v1/workspaces/:workspaceId/projects` | List (optional `?status=` filter) | Member. **No pagination** — returns the workspace's full project list. |
-| `GET /api/v1/projects/:projectId` | Get one | Member of the project's workspace |
+| `GET /api/v1/workspaces/:workspaceId/projects` | List (optional `?status=` filter). Each project includes `taskCounts: { total, completed }` (non-deleted tasks; `completed` = `DONE`), computed in one grouped query | Member. **No pagination** — returns the workspace's full project list. |
+| `GET /api/v1/projects/:projectId` | Get one, including `taskCounts` | Member of the project's workspace |
 | `PATCH /api/v1/projects/:projectId` | Update | `OWNER`/`ADMIN` |
 | `POST /api/v1/projects/:projectId/archive` | Archive | `OWNER`/`ADMIN` |
 | `POST /api/v1/projects/:projectId/restore` | Restore from archived | `OWNER`/`ADMIN` |

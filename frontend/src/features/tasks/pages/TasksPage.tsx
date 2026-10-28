@@ -14,14 +14,30 @@ import { useSprints } from "@/features/sprints/hooks/use-sprints";
 import { useActiveWorkspace, useWorkspaceMembers } from "@/features/workspaces";
 
 import { useCreateTask } from "../hooks/use-create-task";
+import { useDeleteTask } from "../hooks/use-delete-task";
 import { useTasks } from "../hooks/use-tasks";
 import { useUpdateTask } from "../hooks/use-update-task";
 import { TaskPreviewPanel } from "../components/preview";
 import { TaskFormPanel } from "../components/form";
 import { TasksTable } from "../components/table";
 import { TasksToolbar } from "../components/toolbar";
-import type { TaskAssignee, TaskPriorityFilter, TaskProject, TaskStatusFilter } from "../types";
+import { canManageTasks } from "../lib/task-permissions";
+import type {
+  TaskAssignee,
+  TaskPriority,
+  TaskPriorityFilter,
+  TaskProject,
+  TaskStatus,
+  TaskStatusFilter,
+} from "../types";
 import type { TaskFormData } from "../validation/task";
+
+const TASK_STATUSES: readonly TaskStatus[] = ["TODO", "IN_PROGRESS", "REVIEW", "DONE"];
+const TASK_PRIORITIES: readonly TaskPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
+
+function parseFilterParam<T extends string>(value: string | null, allowed: readonly T[]): T | "ALL" {
+  return allowed.includes(value as T) ? (value as T) : "ALL";
+}
 
 export function TasksPage() {
   const navigate = useNavigate();
@@ -29,15 +45,41 @@ export function TasksPage() {
   const { user } = useAuth();
   // The sidebar My Tasks section's "View all" link is the sole producer of
   // ?assignee=me, and TasksToolbar's own assignee Select is the source of
-  // truth for this filter after that (mirrors how none of the other filters
-  // below sync back to the URL either).
-  const [searchParams] = useSearchParams();
+  // truth for that filter after that.
+  const [searchParams, setSearchParams] = useSearchParams();
   const assigneeParam = searchParams.get("assignee");
 
+  // Status, priority and project filters live in the URL, so they survive a
+  // refresh and can be shared as a link. The free-text search stays local -
+  // it changes on every keystroke. Unknown values fall back to "ALL".
+  const statusFilter: TaskStatusFilter = parseFilterParam(searchParams.get("status"), TASK_STATUSES);
+  const priorityFilter: TaskPriorityFilter = parseFilterParam(
+    searchParams.get("priority"),
+    TASK_PRIORITIES,
+  );
+  const projectFilter = searchParams.get("project") || "ALL";
+
+  const setFilterParams = (updates: Record<string, string>) => {
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        for (const [key, value] of Object.entries(updates)) {
+          if (value === "ALL") {
+            next.delete(key);
+          } else {
+            next.set(key, value);
+          }
+        }
+        return next;
+      },
+      { replace: true },
+    );
+  };
+  const setStatusFilter = (value: TaskStatusFilter) => setFilterParams({ status: value });
+  const setPriorityFilter = (value: TaskPriorityFilter) => setFilterParams({ priority: value });
+  const setProjectFilter = (value: string) => setFilterParams({ project: value });
+
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>("ALL");
-  const [priorityFilter, setPriorityFilter] = useState<TaskPriorityFilter>("ALL");
-  const [projectFilter, setProjectFilter] = useState("ALL");
   const [assigneeFilter, setAssigneeFilter] = useState(() =>
     assigneeParam === "me" && user ? user.id : "ALL",
   );
@@ -108,6 +150,8 @@ export function TasksPage() {
 
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
+  const deleteTask = useDeleteTask();
+  const canManage = canManageTasks(workspace?.role);
 
   const tasks = useMemo(() => {
     const normalizedSearchQuery = searchQuery.trim().toLowerCase();
@@ -158,9 +202,7 @@ export function TasksPage() {
 
   const handleClearFilters = () => {
     setSearchQuery("");
-    setStatusFilter("ALL");
-    setPriorityFilter("ALL");
-    setProjectFilter("ALL");
+    setFilterParams({ status: "ALL", priority: "ALL", project: "ALL" });
     setAssigneeFilter("ALL");
   };
 
@@ -205,6 +247,27 @@ export function TasksPage() {
     setFormPanelTrigger(selectedTaskTrigger);
     setIsPreviewOpen(false);
     setIsFormPanelOpen(true);
+  };
+  // Same delete flow and permission as the project page's task preview.
+  const handleDeleteTask = async () => {
+    if (!selectedTask) {
+      return;
+    }
+
+    try {
+      await deleteTask.mutateAsync({
+        taskId: selectedTask.task.id,
+        projectId: selectedTask.task.projectId,
+        sprintId: selectedTask.task.sprintId ?? null,
+      });
+      toast.success("Task deleted");
+      // The row that opened the preview unmounts with the task, so don't
+      // try to return focus to it.
+      setSelectedTaskTrigger(null);
+      handlePreviewClose();
+    } catch {
+      // Failure feedback is already surfaced via the mutation's onError toast.
+    }
   };
   const handleFormPanelClose = () => setIsFormPanelOpen(false);
   const handleFormPanelCloseAutoFocus = () => {
@@ -294,7 +357,9 @@ export function TasksPage() {
         onClose={handlePreviewClose}
         onCloseAutoFocus={handlePreviewCloseAutoFocus}
         onOpenTask={handleOpenTask}
-        onEdit={handleEditTask}
+        onEdit={canManage ? handleEditTask : undefined}
+        onDelete={canManage ? handleDeleteTask : undefined}
+        isDeleting={deleteTask.isPending}
       />
 
       <TaskFormPanel

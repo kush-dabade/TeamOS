@@ -1,4 +1,5 @@
 import { Prisma, type Notification } from "../../generated/prisma/client.js";
+import { NotificationType } from "../../generated/prisma/enums.js";
 import { prisma } from "../../lib/prisma.js";
 
 import { notificationCursorSchema } from "./notification.schema.js";
@@ -13,6 +14,7 @@ import type {
 import { emitToUser } from "../../realtime/realtime.emitter.js";
 import { REALTIME_EVENTS } from "../../realtime/realtime.constants.js";
 
+import { requireWorkspaceMembership } from "../../shared/authorization/workspace-access.js";
 import { ForbiddenError } from "../../shared/errors/forbidden-error.js";
 import { NotFoundError } from "../../shared/errors/not-found-error.js";
 import { ValidationError } from "../../shared/errors/validation-error.js";
@@ -101,27 +103,46 @@ export async function createNotification(
   return toNotificationResponse(notification);
 }
 
+/**
+ * The actor's own, non-deleted notifications that they may still see. Most
+ * carry workspace content (task and project names in the title and
+ * message), so once the recipient leaves or is removed from that workspace
+ * they stop being shown, counted or bulk-marked; the rows aren't deleted and
+ * reappear if the user rejoins. Invitation notifications are the exception:
+ * they are addressed to someone who isn't a member yet.
+ */
+function visibleNotificationsWhere(actorId: string): Prisma.NotificationWhereInput {
+  return {
+    recipientId: actorId,
+    deletedAt: null,
+    OR: [
+      { type: NotificationType.INVITATION_RECEIVED },
+      { workspace: { members: { some: { userId: actorId } } } },
+    ],
+  };
+}
+
 export async function listNotifications(
   actorId: string,
   options: ListNotificationsOptions,
 ): Promise<ListNotificationsResult> {
-  const where: Prisma.NotificationWhereInput = {
-    recipientId: actorId,
-    deletedAt: null,
-  };
+  // The cursor only ever narrows further within the visibility filter -
+  // it's ANDed with it, so a tampered or forged cursor can never widen the
+  // query past the authenticated actor's own visible notifications.
+  const conditions: Prisma.NotificationWhereInput[] = [visibleNotificationsWhere(actorId)];
 
-  // The cursor only ever narrows further within the recipient/deletedAt
-  // filter already set above - it's ANDed in alongside them (Prisma merges
-  // top-level where fields with AND), so a tampered or forged cursor can
-  // never widen the query past the authenticated actor's own notifications.
   if (options.cursor) {
     const cursor = decodeNotificationCursor(options.cursor);
 
-    where.OR = [
-      { createdAt: { lt: cursor.createdAt } },
-      { createdAt: cursor.createdAt, id: { lt: cursor.id } },
-    ];
+    conditions.push({
+      OR: [
+        { createdAt: { lt: cursor.createdAt } },
+        { createdAt: cursor.createdAt, id: { lt: cursor.id } },
+      ],
+    });
   }
+
+  const where: Prisma.NotificationWhereInput = { AND: conditions };
 
   // Fetches one extra row (limit + 1) to determine hasMore without a
   // separate COUNT(*) - if the extra row comes back, it's dropped below
@@ -164,6 +185,13 @@ export async function markNotificationAsRead(
     throw new ForbiddenError("You do not have access to this notification");
   }
 
+  // Same rule as visibleNotificationsWhere: no access once the recipient is
+  // no longer a member of the notification's workspace, except for an
+  // invitation, which is addressed to a non-member by design.
+  if (notification.type !== NotificationType.INVITATION_RECEIVED) {
+    await requireWorkspaceMembership(notification.workspaceId, actorId);
+  }
+
   const updatedNotification = notification.isRead
     ? notification
     : await prisma.notification.update({
@@ -194,11 +222,8 @@ export async function markAllNotificationsAsRead(
 ): Promise<number> {
   const result = await prisma.notification.updateMany({
     where: {
-      recipientId: actorId,
-
+      ...visibleNotificationsWhere(actorId),
       isRead: false,
-
-      deletedAt: null,
     },
 
     data: {
@@ -219,9 +244,8 @@ export async function getUnreadNotificationCount(
 ): Promise<number> {
   return prisma.notification.count({
     where: {
-      recipientId: actorId,
+      ...visibleNotificationsWhere(actorId),
       isRead: false,
-      deletedAt: null,
     },
   });
 }

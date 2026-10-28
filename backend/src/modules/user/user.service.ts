@@ -7,6 +7,7 @@ import {
   FileNotFoundError,
   getMimeTypeExtension,
   getExtensionMimeType,
+  matchesDeclaredFileType,
 } from "../../storage/index.js";
 
 import { ConflictError } from "../../shared/errors/conflict-error.js";
@@ -38,6 +39,10 @@ export async function uploadAvatar(
   file: Express.Multer.File,
 ): Promise<void> {
   validateAvatarMimeType(file.mimetype);
+
+  if (!matchesDeclaredFileType(file.buffer, file.mimetype)) {
+    throw new ValidationError("The image's contents don't match its file type.");
+  }
 
   // The extension is derived from the validated MIME type, never from the
   // client-supplied original filename, so the storage key can't be

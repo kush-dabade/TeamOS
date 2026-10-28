@@ -12,6 +12,7 @@ import {
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 import { UserAvatar } from "@/components/ux";
 import { logout, useAuth } from "@/features/auth";
+import { useDemoStatus } from "@/features/demo/hooks/use-demo-status";
 import { getAvatarUrl, getErrorMessage } from "@/utils";
 
 import { ThemeToggle } from "./theme-toggle";
@@ -21,7 +22,10 @@ export function SidebarUser() {
   const navigate = useNavigate();
 
   const name = user?.name ?? "Unknown User";
-  const email = user?.email ?? "";
+  const { isDemo } = useDemoStatus();
+  // A demo account's address is a generated placeholder (demo-<uuid>@teamos.local)
+  // that means nothing to the visitor.
+  const email = isDemo ? "Demo account" : (user?.email ?? "");
   const avatarUrl = user ? getAvatarUrl(user) : null;
 
   async function handleSignOut() {

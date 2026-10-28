@@ -29,7 +29,12 @@ import type { TaskFormData } from "../validation/task";
 export function TaskWorkspacePage() {
   const { taskId } = useParams();
   const navigate = useNavigate();
-  const taskQuery = useTask(taskId);
+  // Set once deletion is confirmed: the task is about to stop existing, so
+  // its detail query must not refetch - not from this page's own mutation,
+  // nor from the realtime task.deleted event, which can arrive before the
+  // DELETE response does. Either would only produce a 404.
+  const [isDeletingTask, setIsDeletingTask] = useState(false);
+  const taskQuery = useTask(taskId, { enabled: !isDeletingTask });
   const taskDetail = taskQuery.data;
 
   const workspaceId = taskDetail?.taskItem.task.workspaceId;
@@ -141,6 +146,8 @@ export function TaskWorkspacePage() {
       return;
     }
 
+    setIsDeletingTask(true);
+
     try {
       await deleteTask.mutateAsync({
         taskId,
@@ -151,6 +158,7 @@ export function TaskWorkspacePage() {
       navigate("/tasks");
     } catch {
       // Failure feedback is already surfaced via the mutation's onError toast.
+      setIsDeletingTask(false);
     }
   };
 

@@ -266,7 +266,7 @@ Build the two images one at a time. On a 1 GiB VM a parallel build competes for 
 
 To deploy a new version:
 
-1. Take a backup first (see below).
+1. Take a backup first: run `scripts/ops/backup.sh` on the VM, then `scripts/ops/pull-backups.sh` on your machine (see [Backups](#backups)).
 2. Update the checkout: `git pull --ff-only`.
 3. Run `dc build backend && dc build caddy && dc up -d`.
 
@@ -283,8 +283,49 @@ Never run `prisma migrate reset` or `prisma migrate dev` against production. Bot
 | Container state, restarts | `dc ps -a`, `docker inspect -f '{{.RestartCount}}' <container>` |
 | Memory, swap | `docker stats --no-stream`, `free -m` |
 | Logs | `dc logs --tail=100 <service>` |
+| Requests (access log) | `dc logs backend \| grep '"msg":"Request'` |
+| One request, end to end | `dc logs backend \| grep '"requestId":"<id>"'`, where the id comes from the response's `X-Request-Id` header |
+| Scheduled checks | `tail -n 50 ~/teamos-ops/ops.log` |
 
 Docker's daemon-level log rotation (`/etc/docker/daemon.json`, `local` driver with `max-size`/`max-file`) keeps container logs from filling the disk.
+
+### Access log
+
+The backend writes one structured line per request (`src/middleware/request-logger.ts`): request id, method, path, status, latency, the error code from the error envelope, and the user id when signed in. Levels are `info` for success, `warn` for 4xx, and `error` for 5xx. Healthy `/health` and `/ready` probes aren't logged.
+
+The access log never contains headers, cookies, query strings, request bodies, or client IPs. Path segments that look like ids or tokens (e.g. password-reset tokens) are replaced with `:id`.
+
+### Scheduled checks
+
+`scripts/ops/ops-check.sh` appends one line per check to `~/teamos-ops/ops.log` and exits non-zero when something needs attention:
+
+| Level | Condition |
+|---|---|
+| `ALERT` | `/ready` fails; a service isn't running or is unhealthy; email jobs permanently failed since the previous run; the newest backup is older than 26 hours |
+| `WARN` | Less than 150 MB of memory available; root filesystem more than 85% used |
+
+The email check compares the queue's failed set with the previous run, so failures retained from earlier don't alert again.
+
+There's no external alerting service. Read the log after deploys and whenever something seems wrong:
+
+```bash
+grep -E ' (ALERT|WARN) ' ~/teamos-ops/ops.log | tail
+```
+
+### Cron on the VM
+
+```bash
+crontab -e
+```
+
+```cron
+# m   h  dom mon dow  command
+*/15  *  *   *   *    cd ~/TeamOS && scripts/ops/ops-check.sh    >/dev/null 2>&1
+15    2  *   *   *    cd ~/TeamOS && scripts/ops/backup.sh       >/dev/null 2>&1
+30    3  *   *   0    cd ~/TeamOS && scripts/ops/restore-check.sh >/dev/null 2>&1
+```
+
+Output is discarded because every script writes its own result to `~/teamos-ops/ops.log`. The VM has no mail transport for cron output.
 
 ## Data and volumes
 
@@ -300,31 +341,54 @@ Named volumes survive `dc down`, container recreation, and VM reboots. **`dc dow
 
 ## Backups
 
-Backups are taken **from the administrator's machine over SSH**, so the copy never lives only on the VM's disk. `teamos-vm` below is the administrator's SSH host alias for the VM.
+Backups have two stages:
+
+1. **Nightly on the VM:** `scripts/ops/backup.sh`, from the cron entry above, writes to `~/teamos-backups/`:
+   - `teamos-db-<ts>.dump`: `pg_dump -Fc`
+   - `teamos-uploads-<ts>.tar.gz`: the uploads volume
+   - `teamos-<ts>.sha256`
+
+   Each file is verified readable (`pg_restore --list`, `tar -t`) before the run counts as successful. Files are `0600` in a `0700` directory, and sets older than 7 days are pruned. A failed run logs `ALERT backup` and leaves no partial file behind.
+2. **Off the box, on the administrator's machine:** these copies share the VM's disk, so they don't survive losing the VM. `scripts/ops/pull-backups.sh` runs on your own machine. It pulls new sets over SSH with `rsync --ignore-existing`, so a damaged remote file can never overwrite a good local copy. It verifies every checksum, keeps 30 days locally, and logs to `~/teamos-backups/pull.log`.
+
+Take an ad-hoc backup (e.g. before a deploy) with:
 
 ```bash
-mkdir -p backups
-TS=$(date +%Y%m%d-%H%M%S)
-
-# PostgreSQL, custom format (compressed, restorable with pg_restore)
-ssh teamos-vm 'cd ~/TeamOS && docker compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres sh -c '"'"'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc'"'"'' > "backups/teamos-db-$TS.dump"
-
-# Attachments and avatars (tar via the backend image, which is already on the host)
-ssh teamos-vm 'docker run --rm --entrypoint tar -v teamos-prod_uploads-data:/data:ro teamos-backend:prod -C /data -czf - .' > "backups/teamos-uploads-$TS.tar.gz"
+scripts/ops/backup.sh                                    # on the VM
+scripts/ops/pull-backups.sh                              # then on your machine
 ```
 
-Check the copies before relying on them: `pg_restore --list backups/teamos-db-$TS.dump | head` and `tar -tzf backups/teamos-uploads-$TS.tar.gz | head`.
+### Scheduling the pull on your machine
+
+The pull needs an SSH key that loads without a prompt, plus the `teamos-vm` host alias.
+
+The NSG only admits your current public IP. When that IP changes, pulls fail with `ALERT` in `pull.log` until the rule is updated. Check `pull.log` the same way you check the VM's ops log.
+
+- **Linux/macOS:** a user crontab entry, e.g. `0 9 * * * ~/projects/TeamOS/scripts/ops/pull-backups.sh >/dev/null 2>&1`.
+- **Windows with WSL:** WSL doesn't run cron unless it's enabled, so use Task Scheduler with a daily trigger and the action `wsl.exe -e bash -lc "~/projects/TeamOS/scripts/ops/pull-backups.sh"`.
 
 ### Verifying a restore (non-destructive)
 
-This restores the dump into a scratch database next to the live one, compares row counts, then drops the scratch database. The live database is never touched.
+`scripts/ops/restore-check.sh [dump]` does the following:
+
+1. Restores the newest dump (or the one given) into a scratch database `teamos_restore_check` next to the live one, after checking its checksum.
+2. Requires the migration count to match the live database and the user table to be non-empty.
+3. Logs restored and live row counts side by side.
+4. Drops the scratch database, even on failure.
+
+The live database is only read. The weekly cron entry above runs it.
+
+To check a copy on your own machine instead, restore it into a local scratch database with `pg_restore --no-owner -d <scratch-db> teamos-db-<ts>.dump`.
+
+### Orphaned upload files
+
+Files that no attachment or avatar row references can be left on the uploads volume. Before demo cleanup started deleting files, it left behind every expired demo workspace's attachments and every avatar, and a failed file deletion still can. To list them (read-only):
 
 ```bash
-ssh teamos-vm 'cd ~/TeamOS && docker compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres sh -c '"'"'createdb -U "$POSTGRES_USER" teamos_restore_check && pg_restore -U "$POSTGRES_USER" -d teamos_restore_check --no-owner'"'"'' < "backups/teamos-db-$TS.dump"
-
-# Compare e.g. user/workspace/task counts in "$POSTGRES_DB" vs teamos_restore_check, then:
-ssh teamos-vm 'cd ~/TeamOS && docker compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres sh -c '"'"'dropdb -U "$POSTGRES_USER" teamos_restore_check'"'"''
+dc exec backend node dist/src/ops/find-orphan-uploads.js
 ```
+
+To remove them, take and pull a backup first (the uploads archive is the undo path), review the list, then run the same command with `--delete`. It only removes orphans older than 24 hours, because an upload writes its file just before its row.
 
 ### Disaster recovery (destructive: replaces live data)
 
@@ -350,6 +414,62 @@ The consequences:
 - The `/try` demo is unaffected: demo provisioning marks its synthetic accounts verified itself and never enqueues verification email for them (see [`../features/demo.md`](../features/demo.md#provisioning)).
 
 Email verification stays required regardless. The fix is a verified sending domain, not relaxing verification.
+
+### Failure visibility
+
+Sign-up, resend-verification, password-reset, and invitation requests only enqueue a BullMQ job, so the UI deliberately says an email was *requested* or *queued*, never *sent*. Delivery happens later in the worker:
+
+- Each failed attempt is logged at `warn` with `"msg":"Email job attempt failed; it will be retried"`.
+- After the fifth attempt the job is logged at `error` with `"alert":"EMAIL_DELIVERY_FAILED"` and kept in the queue's failed set (7 days, at most 1,000 jobs).
+- Logged error messages have email addresses redacted, because provider errors can contain them.
+
+```bash
+dc logs worker | grep -c EMAIL_DELIVERY_FAILED
+```
+
+### Verifying a sending domain
+
+`*.cloudapp.azure.com` can't be verified in Resend, because its DNS isn't yours. You need a domain whose DNS you control. A subdomain used only for mail (e.g. `mail.example.com`) keeps it separate from anything else on the domain. The site itself can stay on `PUBLIC_ORIGIN`, because the sender domain and the site origin are independent.
+
+1. In the Resend dashboard, add the domain, choosing the region closest to the VM.
+2. At your DNS provider, create exactly the records Resend shows. Copy the values from the dashboard, not from here. At the time of writing they are:
+
+   | Purpose | Type | Name (relative to the domain) | Value |
+   |---|---|---|---|
+   | DKIM | TXT | `resend._domainkey` | the public key shown in the dashboard |
+   | SPF (return path) | MX | `send` | `feedback-smtp.<region>.amazonses.com`, priority 10 |
+   | SPF (return path) | TXT | `send` | `v=spf1 include:amazonses.com ~all` |
+   | DMARC (recommended) | TXT | `_dmarc` | `v=DMARC1; p=none;` to start, tightened once mail flows |
+
+3. Wait until Resend shows the domain as **Verified**.
+4. Take a backup (see [Backups](#backups)). The change touches no data, but every production change starts with one.
+5. On the VM, record the current sender for rollback, then set the new one:
+
+   ```bash
+   grep '^EMAIL_FROM=' backend/.env.production    # note this value for rollback
+   # Edit backend/.env.production so that, for example:
+   #   EMAIL_FROM="TeamOS <no-reply@mail.example.com>"
+   dc up -d --no-deps --force-recreate worker
+   dc logs --tail=20 worker                        # "Email worker is ready."
+   ```
+
+   Only the worker sends email. `RESEND_API_KEY` doesn't change.
+
+### Post-change delivery smoke test
+
+Use a mailbox you control that is **not** the Resend account owner's address; that's the case the sandbox sender could never deliver. A mocked Resend test can't prove delivery; only this can.
+
+1. Register at `$PUBLIC_ORIGIN/register` with the test mailbox.
+2. The verification email arrives within about two minutes. In the message source, check `SPF: PASS`, `DKIM: PASS`, and the `From` domain.
+3. The link opens `$PUBLIC_ORIGIN/verify-email` without an error, and signing in then succeeds.
+4. Request a password reset for the same address, follow the link, set a new password, and sign in with it.
+5. `dc logs --since 15m worker | grep -c EMAIL_DELIVERY_FAILED` prints `0`.
+
+Accounts that registered while the sandbox sender was in place stay unverified until they request a new link. "Resend verification email" on the login screen does that. Don't mark accounts verified in the database.
+
+### Rolling back
+
+Restore the previous `EMAIL_FROM` value in `backend/.env.production` and run `dc up -d --no-deps --force-recreate worker`. No data changes in either direction. Jobs that fail in the meantime stay in the failed set and are visible as described above.
 
 ## Stopping, costs, and removal
 

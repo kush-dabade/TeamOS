@@ -41,7 +41,7 @@ export function WorkspaceInvitationRow({ workspaceId, invitation }: WorkspaceInv
   async function handleResend() {
     try {
       await resendInvitation.mutateAsync(invitation.id);
-      toast.success("Invitation resent.");
+      toast.success("Invitation email queued again.");
     } catch {
       // Failure feedback is already surfaced via the mutation's onError toast.
     }

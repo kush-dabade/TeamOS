@@ -52,7 +52,7 @@ export function ForgotPasswordForm() {
           <EmptyState
             icon={Mail}
             title="Check your email"
-            description="If an account exists for that email address, you'll receive a password reset link shortly."
+            description="If an account exists for that email address, we'll email it a password reset link. It can take a few minutes to arrive, so check your spam folder too."
             action={
               <Link
                 to="/login"

@@ -38,7 +38,7 @@ describe("session cookie configuration (P2-COOKIE)", () => {
 
   it("sets an HttpOnly, SameSite=Lax session cookie with the configured Max-Age on sign-in", async () => {
     const email = `session-cookie-${crypto.randomUUID()}@example.com`;
-    const password = "password1234";
+    const password = "Password1234";
 
     const signUpResponse = await request(app)
       .post("/api/auth/sign-up/email")
@@ -93,7 +93,9 @@ describe("session cookie configuration (P2-COOKIE)", () => {
       // process.env.NODE_ENV inline.
       const { stdout } = await execFileAsync("npx", ["tsx", SECURE_COOKIE_CHECK_SCRIPT], {
         cwd: backendRoot,
-        env: { ...process.env, NODE_ENV: "production" },
+        // LOG_LEVEL silent: the script's only stdout must be the cookie name,
+        // and production log level would add the request's access-log line.
+        env: { ...process.env, NODE_ENV: "production", LOG_LEVEL: "silent" },
       });
 
       expect(stdout.trim()).toBe("__Secure-better-auth.session_token");

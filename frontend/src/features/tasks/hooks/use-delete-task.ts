@@ -6,6 +6,7 @@ import type { AppError } from "@/lib/api";
 // TaskWorkspacePage.tsx. This file lives inside the tasks feature itself, and
 // the sprints barrel re-exports components that import taskKeys from
 // "@/features/tasks" at runtime, which would create a circular dependency.
+import { invalidateProjectTaskCounts } from "@/features/projects/lib/invalidate-project-task-counts";
 import { sprintKeys } from "@/features/sprints/lib/sprint-keys";
 
 import { deleteTask } from "../api/tasks.api";
@@ -27,9 +28,14 @@ export function useDeleteTask() {
   return useMutation<void, AppError, DeleteTaskVariables>({
     mutationFn: ({ taskId }) => deleteTask(taskId),
     onSuccess: (_data, { taskId, projectId, sprintId }) => {
-      queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
+      // Marked stale but not refetched: the task is gone, so refetching its
+      // still-mounted detail query (TaskWorkspacePage navigates away only
+      // after this resolves) could only produce a 404. A later mount still
+      // refetches because the query is stale.
+      queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId), refetchType: "none" });
       queryClient.invalidateQueries({ queryKey: taskKeys.list(projectId) });
       queryClient.invalidateQueries({ queryKey: taskKeys.workspaceLists() });
+      invalidateProjectTaskCounts(queryClient, projectId);
 
       if (sprintId) {
         queryClient.invalidateQueries({ queryKey: sprintKeys.tasks(sprintId) });

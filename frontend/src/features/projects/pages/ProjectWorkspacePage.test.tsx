@@ -34,9 +34,9 @@ vi.mock("../hooks/use-projects", () => ({
   useProjects: (...args: unknown[]) => mockUseProjects(...args),
 }));
 
-const mockUseProjectWithTaskCounts = vi.fn();
-vi.mock("../hooks/use-project-with-task-counts", () => ({
-  useProjectWithTaskCounts: (...args: unknown[]) => mockUseProjectWithTaskCounts(...args),
+const mockUseProject = vi.fn();
+vi.mock("../hooks/use-project", () => ({
+  useProject: (...args: unknown[]) => mockUseProject(...args),
 }));
 
 vi.mock("../hooks/use-update-project", () => ({
@@ -101,7 +101,7 @@ beforeEach(() => {
   cleanup();
   mockUseActiveWorkspace.mockReset();
   mockUseProjects.mockReset();
-  mockUseProjectWithTaskCounts.mockReset();
+  mockUseProject.mockReset();
   mockUseActiveWorkspace.mockReturnValue({ workspaceId: WORKSPACE_ID });
 });
 
@@ -120,7 +120,7 @@ describe("ProjectWorkspacePage - slug resolution", () => {
       return buildQueryResult({ data: [normalProject] });
     });
 
-    mockUseProjectWithTaskCounts.mockImplementation((projectId: string | undefined) => {
+    mockUseProject.mockImplementation((projectId: string | undefined) => {
       if (projectId === "project-1") {
         return buildQueryResult({ data: buildDetail(normalProject) });
       }
@@ -156,7 +156,7 @@ describe("ProjectWorkspacePage - slug resolution", () => {
       return buildQueryResult({ data: [] });
     });
 
-    mockUseProjectWithTaskCounts.mockImplementation((projectId: string | undefined) => {
+    mockUseProject.mockImplementation((projectId: string | undefined) => {
       if (projectId === "project-2") {
         return buildQueryResult({ data: buildDetail(archivedProject) });
       }
@@ -177,7 +177,7 @@ describe("ProjectWorkspacePage - slug resolution", () => {
       return buildQueryResult({ data: [] });
     });
 
-    mockUseProjectWithTaskCounts.mockReturnValue(buildQueryResult({ data: undefined }));
+    mockUseProject.mockReturnValue(buildQueryResult({ data: undefined }));
 
     renderPage("does-not-exist");
 

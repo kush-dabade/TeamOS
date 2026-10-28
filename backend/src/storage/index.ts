@@ -13,3 +13,4 @@ export * from "./errors/invalid-storage-driver.error.js";
 
 export * from "./utils/storage-key.js";
 export * from "./utils/mime-type.js";
+export * from "./utils/file-signature.js";

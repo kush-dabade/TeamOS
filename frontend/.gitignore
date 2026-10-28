@@ -26,3 +26,9 @@ dist-ssr
 .env
 .env.local
 .env.*.local
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/dist-e2e/

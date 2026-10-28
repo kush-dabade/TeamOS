@@ -19,7 +19,7 @@ const RATE_LIMITED_ENVELOPE = {
   error: { code: "RATE_LIMITED", message: expect.any(String) },
 };
 
-const PASSWORD = "password1234";
+const PASSWORD = "Password1234";
 
 function uniqueEmail(): string {
   return `auth-rl-${crypto.randomUUID()}@example.com`;

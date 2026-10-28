@@ -105,4 +105,28 @@ describe("ProjectForm - status control", () => {
     expect(screen.getByRole("option", { name: "Completed" })).toBeInTheDocument();
     expect(screen.queryByRole("option", { name: "Archived" })).not.toBeInTheDocument();
   });
+
+  // Regression (audit F-05): the create form offered a Status choice that the
+  // create request never sent, so every project silently started as Planned.
+  it("does not offer a status choice when creating a project", async () => {
+    const { onSubmit } = renderForm({
+      mode: "create",
+      defaultValues: { name: "", description: "", status: "PLANNED" },
+    });
+
+    expect(screen.queryByLabelText("Status")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Project Name"), { target: { value: "Launch" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create project" }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("keeps the status control when editing", () => {
+    renderForm();
+
+    expect(screen.getByLabelText("Status")).toBeInTheDocument();
+  });
 });

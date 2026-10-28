@@ -27,7 +27,11 @@ export function useDeleteTask() {
   return useMutation<void, AppError, DeleteTaskVariables>({
     mutationFn: ({ taskId }) => deleteTask(taskId),
     onSuccess: (_data, { taskId, projectId, sprintId }) => {
-      queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
+      // Marked stale but not refetched: the task is gone, so refetching its
+      // still-mounted detail query (TaskWorkspacePage navigates away only
+      // after this resolves) could only produce a 404. A later mount still
+      // refetches because the query is stale.
+      queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId), refetchType: "none" });
       queryClient.invalidateQueries({ queryKey: taskKeys.list(projectId) });
       queryClient.invalidateQueries({ queryKey: taskKeys.workspaceLists() });
 

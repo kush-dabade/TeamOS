@@ -40,11 +40,44 @@ Setup file (`src/test/setup.ts`) only imports `@testing-library/jest-dom/vitest`
 
 Coverage is narrower than the backend's, and this document does not claim otherwise: 25 test files, a mix of component tests (`TaskForm`, `ProjectForm`, `SprintForm`, `CommentForm`, `ProjectPreviewPanel`, `ProjectHeader`, `ProjectWorkspacePage`, route guards, the demo indicator/`TryPage`) and hook tests (task/project/comment mutations, workspace member removal, recent-activity, demo session creation, realtime event handlers). This is targeted coverage of specific components/hooks with real regression history (e.g. the archived-project guard, sprint cache invalidation), not comprehensive UI coverage.
 
+## End-to-end tests
+
+**Playwright** (`frontend/playwright.config.ts`, specs in `frontend/e2e/`) drives a real Chromium against a **local stack only**. On every run, `e2e/start-backend.mjs` does the following:
+
+1. Recreates a dedicated `teamos_e2e` database and applies migrations.
+2. Flushes Redis logical DB 2 (the backend integration tests use DB 1).
+3. Points uploads at a temp directory.
+4. Starts the API on `:3100` with `NODE_ENV=test`.
+
+Playwright also starts Vite on `:5174`. The script refuses a non-localhost database, and nothing in the suite talks to production.
+
+The prerequisites are the same local Postgres and password-protected Redis the backend tests use (`backend/.env.test`), plus a browser:
+
+```bash
+cd frontend
+npx playwright install chromium   # once
+npm run test:e2e                   # playwright test
+```
+
+**Email in E2E.** No email worker runs, so verification and password-reset emails stay queued in Redis. The specs read the exact link from the queued job (`readEmailLink` in `e2e/support.ts`). Verification is still required and exercised end to end; it just isn't delivered through Resend. That's also why this suite can't prove real delivery. The manual smoke test in [`deployment.md`](./deployment.md#post-change-delivery-smoke-test) does that.
+
+| Spec | Covers |
+|---|---|
+| `public.spec.ts` | Landing page, route guards, 404 |
+| `auth.spec.ts` | Register → unverified login refused → verify → login → onboarding → session survives reload → sign out; server-side password policy; forgot/reset password |
+| `workflow.spec.ts` | Project create/edit, task create/update/delete, URL filters and list delete, comment, attachment upload/download/delete and signature rejection, sprint lifecycle, search |
+| `isolation.spec.ts` | Another tenant can't open or read a workspace's project (UI and API) |
+| `realtime.spec.ts` | A task created in one tab appears in another tab's `/tasks` without a reload |
+
+Specs run serially in one worker, because they share sign-up/sign-in rate limits and the database. A failure keeps a trace and screenshot in `frontend/test-results/` (gitignored).
+
+The suite isn't part of CI yet. It needs Postgres and Redis service containers plus a browser install in the frontend workflow, and that configuration should only be added once it has been proven on a real Actions run.
+
 ## Type checking
 
 ```bash
 cd backend && npx tsc --noEmit -p tsconfig.test.json   # covers src/ and tests/
-cd frontend && npx tsc -b                               # also run standalone as part of `npm run build`
+cd frontend && npx tsc -b                               # app, Vite config and e2e/; also part of `npm run build`
 ```
 
 ## CI

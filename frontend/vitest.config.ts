@@ -9,6 +9,9 @@ export default mergeConfig(
   viteConfig,
   defineConfig({
     test: {
+      // Unit/component tests only; e2e/*.spec.ts are Playwright's (see
+      // playwright.config.ts) and need a running stack.
+      include: ["src/**/*.test.{ts,tsx}"],
       environment: "jsdom",
       globals: false,
       setupFiles: ["./src/test/setup.ts"],

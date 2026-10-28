@@ -64,7 +64,7 @@ export function RegisterForm() {
           <EmptyState
             icon={Mail}
             title="Check your email"
-            description={`We sent a verification link to ${registeredEmail}. Verify your email to finish setting up your account.`}
+            description={`We've requested a verification email for ${registeredEmail}. It can take a few minutes to arrive, so check your spam folder too. Verify your email to finish setting up your account.`}
             action={
               <div className="flex flex-col items-center gap-2">
                 <Button

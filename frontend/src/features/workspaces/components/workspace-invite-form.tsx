@@ -47,7 +47,7 @@ export function WorkspaceInviteForm({ workspaceId, actorRole, onSuccess }: Works
     try {
       await createInvitation.mutateAsync(data);
 
-      toast.success("Invitation sent successfully!");
+      toast.success(`Invitation created. An email to ${data.email} has been queued.`);
       form.reset({ email: "", role: defaultRole });
       onSuccess?.();
     } catch {

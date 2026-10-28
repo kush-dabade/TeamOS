@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui";
 import { taskKeys } from "@/features/tasks";
@@ -129,6 +130,7 @@ export function SprintsView({ projectId }: SprintsViewProps) {
         startDate: data.startDate || undefined,
         endDate: data.endDate || undefined,
       });
+      toast.success("Sprint created");
     }
 
     if (formMode === "edit" && editingSprintId) {
@@ -142,6 +144,7 @@ export function SprintsView({ projectId }: SprintsViewProps) {
           endDate: data.endDate || undefined,
         },
       });
+      toast.success("Sprint updated");
     }
 
     handleFormPanelClose();
@@ -157,6 +160,7 @@ export function SprintsView({ projectId }: SprintsViewProps) {
 
     try {
       await startSprint.mutateAsync({ sprintId: selectedSprintId, projectId });
+      toast.success("Sprint started");
     } catch {
       // Failure feedback is already surfaced via the mutation's onError toast.
     }
@@ -169,6 +173,7 @@ export function SprintsView({ projectId }: SprintsViewProps) {
 
     try {
       await completeSprint.mutateAsync({ sprintId: selectedSprintId, projectId });
+      toast.success("Sprint completed");
     } catch {
       // Failure feedback is already surfaced via the mutation's onError toast.
     }
@@ -195,6 +200,7 @@ export function SprintsView({ projectId }: SprintsViewProps) {
 
     try {
       await assignTaskToSprint.mutateAsync({ sprintId: selectedSprintId, taskId, projectId });
+      toast.success("Task added to sprint");
     } catch {
       // Failure feedback is already surfaced via the mutation's onError toast.
     }
@@ -209,6 +215,7 @@ export function SprintsView({ projectId }: SprintsViewProps) {
 
     try {
       await removeTaskFromSprint.mutateAsync({ sprintId: selectedSprintId, taskId, projectId });
+      toast.success("Task removed from sprint");
     } catch {
       // Failure feedback is already surfaced via the mutation's onError toast.
     } finally {

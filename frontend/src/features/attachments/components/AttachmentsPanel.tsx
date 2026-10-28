@@ -1,12 +1,14 @@
 import { useState } from "react";
 
 import { Card, CardContent, CardHeader } from "@/components/ui";
+import { useDemoStatus } from "@/features/demo";
 
 import { AttachmentList } from "./AttachmentList";
 import { AttachmentUpload } from "./AttachmentUpload";
 import { useDeleteAttachment } from "../hooks/use-delete-attachment";
 import { useTaskAttachments } from "../hooks/use-task-attachments";
 import { useUploadAttachment } from "../hooks/use-upload-attachment";
+import { ATTACHMENT_MAX_FILE_SIZE, DEMO_ATTACHMENT_MAX_FILE_SIZE } from "../lib/attachment-config";
 
 interface AttachmentsPanelProps {
   taskId: string;
@@ -19,6 +21,7 @@ export function AttachmentsPanel({ taskId }: AttachmentsPanelProps) {
   const attachmentsQuery = useTaskAttachments(taskId);
   const uploadAttachment = useUploadAttachment();
   const deleteAttachment = useDeleteAttachment();
+  const { isDemo } = useDemoStatus();
 
   // A Set, not a single id - deletes on different attachments can legitimately
   // overlap (nothing blocks starting a second row's delete while an earlier
@@ -65,7 +68,11 @@ export function AttachmentsPanel({ taskId }: AttachmentsPanelProps) {
       </CardContent>
 
       <CardContent className="mt-auto">
-        <AttachmentUpload onUpload={handleUpload} isUploading={uploadAttachment.isPending} />
+        <AttachmentUpload
+          onUpload={handleUpload}
+          isUploading={uploadAttachment.isPending}
+          maxFileSize={isDemo ? DEMO_ATTACHMENT_MAX_FILE_SIZE : ATTACHMENT_MAX_FILE_SIZE}
+        />
       </CardContent>
     </Card>
   );

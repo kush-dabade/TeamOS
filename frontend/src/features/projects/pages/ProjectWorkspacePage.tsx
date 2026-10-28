@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { SearchX, TriangleAlert } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button, Skeleton } from "@/components/ui";
 import { PageLayout } from "@/components/layout";
@@ -163,6 +164,7 @@ export function ProjectWorkspacePage() {
         status: data.status,
       },
     });
+    toast.success("Project updated");
 
     setIsFormPanelOpen(false);
   };

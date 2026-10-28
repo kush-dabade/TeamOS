@@ -69,6 +69,7 @@ export function WorkspaceMemberRow({
 
     try {
       await updateRole.mutateAsync({ memberId: member.id, role });
+      toast.success(`${member.name} is now ${ROLE_LABELS[role]}.`);
     } catch {
       // Failure feedback is already surfaced via the mutation's onError toast.
     }
@@ -77,6 +78,7 @@ export function WorkspaceMemberRow({
   async function handleConfirmRemove() {
     try {
       await removeMember.mutateAsync(member.id);
+      toast.success(`${member.name} was removed from the workspace.`);
       setIsRemoveDialogOpen(false);
     } catch {
       // Failure feedback is already surfaced via the mutation's onError toast.

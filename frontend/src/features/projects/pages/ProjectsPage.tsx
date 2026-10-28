@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 import { PageLayout } from "@/components/layout";
 import { useAuth } from "@/features/auth";
@@ -131,6 +132,7 @@ export function ProjectsPage() {
         name: data.name,
         description: data.description || undefined,
       });
+      toast.success("Project created");
     }
 
     if (formMode === "edit" && editingProjectId) {
@@ -142,6 +144,7 @@ export function ProjectsPage() {
           status: data.status,
         },
       });
+      toast.success("Project updated");
     }
 
     handleFormPanelClose();
@@ -154,6 +157,7 @@ export function ProjectsPage() {
 
     try {
       await archiveProject.mutateAsync(selectedProjectId);
+      toast.success("Project archived");
       handlePreviewClose();
     } catch {
       // Failure feedback is already surfaced via the mutation's onError toast.
@@ -167,6 +171,7 @@ export function ProjectsPage() {
 
     try {
       await restoreProject.mutateAsync(selectedProjectId);
+      toast.success("Project restored");
       // Panel stays open (unlike archive above) - the project remains fully
       // accessible after restore, so there's no reason to close it, and
       // staying open lets the user see it flip back to ACTIVE immediately.

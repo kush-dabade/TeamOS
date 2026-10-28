@@ -5,6 +5,9 @@
 // remains the source of truth and re-validates independently.
 export const ATTACHMENT_MAX_FILE_SIZE = 10 * 1024 * 1024;
 
+// Demo accounts are capped lower (DEMO_ATTACHMENT_MAX_FILE_SIZE in the backend).
+export const DEMO_ATTACHMENT_MAX_FILE_SIZE = 2 * 1024 * 1024;
+
 export const ALLOWED_ATTACHMENT_MIME_TYPES = [
   "application/pdf",
 

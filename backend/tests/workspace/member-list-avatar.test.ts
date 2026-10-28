@@ -5,7 +5,12 @@ import app from "../../src/app.js";
 import { prisma } from "../../src/lib/prisma.js";
 
 import { resetDatabase } from "../setup/reset-database.js";
-import { addWorkspaceMember, createWorkspaceWithMember, signUpTestUser } from "../setup/fixtures.js";
+import {
+  addWorkspaceMember,
+  createWorkspaceWithMember,
+  pngBytes,
+  signUpTestUser,
+} from "../setup/fixtures.js";
 
 describe("GET /api/v1/workspaces/:workspaceId/members - avatar image", () => {
   afterEach(async () => {
@@ -24,7 +29,7 @@ describe("GET /api/v1/workspaces/:workspaceId/members - avatar image", () => {
     await request(app)
       .post("/api/v1/users/me/avatar")
       .set("Cookie", memberWithAvatar.cookie)
-      .attach("file", Buffer.from("member avatar probe"), {
+      .attach("file", pngBytes("member avatar probe"), {
         filename: "avatar.png",
         contentType: "image/png",
       })

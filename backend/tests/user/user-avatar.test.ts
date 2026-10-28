@@ -5,7 +5,7 @@ import app from "../../src/app.js";
 import { prisma } from "../../src/lib/prisma.js";
 
 import { resetDatabase } from "../setup/reset-database.js";
-import { signUpTestUser } from "../setup/fixtures.js";
+import { pngBytes, signUpTestUser } from "../setup/fixtures.js";
 
 async function uploadRealAvatar(
   user: { cookie: string },
@@ -15,7 +15,7 @@ async function uploadRealAvatar(
   await request(app)
     .post("/api/v1/users/me/avatar")
     .set("Cookie", user.cookie)
-    .attach("file", Buffer.from(content), {
+    .attach("file", pngBytes(content), {
       filename: fileName,
       contentType: "image/png",
     })
@@ -40,9 +40,9 @@ describe("GET /api/v1/users/:id/avatar", () => {
       .expect(200);
 
     expect(res.headers["content-type"]).toBe("image/png");
-    expect(res.headers["content-length"]).toBe(String(Buffer.byteLength(content)));
+    expect(res.headers["content-length"]).toBe(String(pngBytes(content).length));
     expect(res.headers["cache-control"]).toBe("private, max-age=0, must-revalidate");
-    expect(res.body).toEqual(Buffer.from(content));
+    expect(res.body).toEqual(pngBytes(content));
   });
 
   it("does not require the requester to share a workspace with the target user", async () => {
@@ -115,7 +115,7 @@ describe("GET /api/v1/users/:id/avatar", () => {
       .expect(200);
 
     expect(res.headers["content-type"]).toBe("image/png");
-    expect(res.body).toEqual(Buffer.from(content));
+    expect(res.body).toEqual(pngBytes(content));
   });
 });
 
@@ -212,7 +212,7 @@ describe("Avatar storage-key authorization (update-user + sign-up IDOR)", () => 
       .set("Cookie", victim.cookie)
       .expect(200);
 
-    expect(res.body).toEqual(Buffer.from(content));
+    expect(res.body).toEqual(pngBytes(content));
   });
 
   it("does not allow reading another user's avatar file via a planted image value", async () => {
@@ -272,7 +272,7 @@ describe("Avatar storage-key authorization (update-user + sign-up IDOR)", () => 
       .set("Cookie", victim.cookie)
       .expect(200);
 
-    expect(res.body).toEqual(Buffer.from(content));
+    expect(res.body).toEqual(pngBytes(content));
   });
 
   it("still allows legitimate profile updates such as changing name", async () => {

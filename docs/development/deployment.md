@@ -351,6 +351,62 @@ The consequences:
 
 Email verification stays required regardless. The fix is a verified sending domain, not relaxing verification.
 
+### Failure visibility
+
+Sign-up, resend-verification, password-reset, and invitation requests only enqueue a BullMQ job, so the UI deliberately says an email was *requested* or *queued*, never *sent*. Delivery happens later in the worker:
+
+- Each failed attempt is logged at `warn` with `"msg":"Email job attempt failed; it will be retried"`.
+- After the fifth attempt the job is logged at `error` with `"alert":"EMAIL_DELIVERY_FAILED"` and kept in the queue's failed set (7 days, at most 1,000 jobs).
+- Logged error messages have email addresses redacted, because provider errors can contain them.
+
+```bash
+dc logs worker | grep -c EMAIL_DELIVERY_FAILED
+```
+
+### Verifying a sending domain
+
+`*.cloudapp.azure.com` can't be verified in Resend, because its DNS isn't yours. You need a domain whose DNS you control. A subdomain used only for mail (e.g. `mail.example.com`) keeps it separate from anything else on the domain. The site itself can stay on `PUBLIC_ORIGIN`, because the sender domain and the site origin are independent.
+
+1. In the Resend dashboard, add the domain, choosing the region closest to the VM.
+2. At your DNS provider, create exactly the records Resend shows. Copy the values from the dashboard, not from here. At the time of writing they are:
+
+   | Purpose | Type | Name (relative to the domain) | Value |
+   |---|---|---|---|
+   | DKIM | TXT | `resend._domainkey` | the public key shown in the dashboard |
+   | SPF (return path) | MX | `send` | `feedback-smtp.<region>.amazonses.com`, priority 10 |
+   | SPF (return path) | TXT | `send` | `v=spf1 include:amazonses.com ~all` |
+   | DMARC (recommended) | TXT | `_dmarc` | `v=DMARC1; p=none;` to start, tightened once mail flows |
+
+3. Wait until Resend shows the domain as **Verified**.
+4. Take a backup (see [Backups](#backups)). The change touches no data, but every production change starts with one.
+5. On the VM, record the current sender for rollback, then set the new one:
+
+   ```bash
+   grep '^EMAIL_FROM=' backend/.env.production    # note this value for rollback
+   # Edit backend/.env.production so that, for example:
+   #   EMAIL_FROM="TeamOS <no-reply@mail.example.com>"
+   dc up -d --no-deps --force-recreate worker
+   dc logs --tail=20 worker                        # "Email worker is ready."
+   ```
+
+   Only the worker sends email. `RESEND_API_KEY` doesn't change.
+
+### Post-change delivery smoke test
+
+Use a mailbox you control that is **not** the Resend account owner's address; that's the case the sandbox sender could never deliver. A mocked Resend test can't prove delivery; only this can.
+
+1. Register at `$PUBLIC_ORIGIN/register` with the test mailbox.
+2. The verification email arrives within about two minutes. In the message source, check `SPF: PASS`, `DKIM: PASS`, and the `From` domain.
+3. The link opens `$PUBLIC_ORIGIN/verify-email` without an error, and signing in then succeeds.
+4. Request a password reset for the same address, follow the link, set a new password, and sign in with it.
+5. `dc logs --since 15m worker | grep -c EMAIL_DELIVERY_FAILED` prints `0`.
+
+Accounts that registered while the sandbox sender was in place stay unverified until they request a new link. "Resend verification email" on the login screen does that. Don't mark accounts verified in the database.
+
+### Rolling back
+
+Restore the previous `EMAIL_FROM` value in `backend/.env.production` and run `dc up -d --no-deps --force-recreate worker`. No data changes in either direction. Jobs that fail in the meantime stay in the failed set and are visible as described above.
+
 ## Stopping, costs, and removal
 
 | Action | Command | Still billed |

@@ -47,7 +47,9 @@ export function TaskFormPanel({
         }
       : {
           title: "",
-          projectId: "",
+          // Preselected when there's only one project to choose - which is
+          // always the case when creating from inside a project.
+          projectId: projects.length === 1 ? (projects[0]?.id ?? "") : "",
           description: "",
           priority: "MEDIUM",
           // Not shown or sent in create mode (TaskForm hides the control,

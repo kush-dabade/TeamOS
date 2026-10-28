@@ -51,9 +51,12 @@ No other artificial restriction exists — a demo user can create/edit/delete pr
 ## Expiration and cleanup
 
 - Every demo user (the provisioned owner, and the ephemeral teammates seed data creates for them — see below) carries the same `demoExpiresAt`.
-- A recurring BullMQ job (`demo-cleanup` queue, scheduled every 15 minutes via BullMQ's job scheduler) runs `cleanupExpiredDemoSessions` (`demo-cleanup.service.ts`) in the `worker` process: it finds every `User` where `isDemo = true AND demoExpiresAt <= now()` (capped at 200 per sweep, remainder picked up next run), deletes each one's owned workspace(s) first, then the user row itself.
-- **Order matters and is deliberate**: several models (`Project.owner`, `Task.createdBy`, `Comment.author`, `Attachment.uploadedBy`) are `onDelete: Restrict` from `User` — a demo user can't be deleted while content they created still references them. Every one of those is cascade-deleted *from* `Workspace`, so deleting the owned workspace(s) first clears every reference; only then can the user row itself be deleted.
-- Both delete steps use `deleteMany` (not `delete`), making the sweep idempotent — a session already cleaned up by an earlier or concurrent run simply matches zero rows instead of erroring; one user's cleanup failing is caught and logged without aborting the rest of the batch.
+- A recurring BullMQ job (`demo-cleanup` queue, scheduled every 15 minutes via BullMQ's job scheduler) runs `cleanupExpiredDemoSessions` (`demo-cleanup.service.ts`) in the `worker` process. It works on every `User` where `isDemo = true AND demoExpiresAt <= now()` (capped at 200 per sweep; the remainder is picked up by the next run), in two phases:
+  1. It deletes **every workspace owned by an expired demo user**.
+  2. It deletes the expired users.
+- **Order matters and is deliberate**: several models (`Project.owner`, `Task.createdBy`, `Comment.author`, `Attachment.uploadedBy`) are `onDelete: Restrict` from `User`, so a user can't be deleted while content they created still references them. All of that content is cascade-deleted *from* `Workspace`. Removing every expired owner's workspace first also removes what the session's demo teammates created inside it, even though they own no workspace. Cleaning up user by user instead failed whenever a teammate came before their owner, and only succeeded on a later sweep.
+- **Stored files**: storage keys are read before each delete, and the files (attachments, avatars) are removed only after the rows are gone. A file that's already missing counts as removed. A file that can't be deleted is logged and reported (`failedFileDeletionCount`) without stopping the sweep. `src/ops/find-orphan-uploads.ts` lists any such leftovers.
+- Every delete uses `deleteMany` (not `delete`), so the sweep is idempotent: a session already cleaned up by an earlier or concurrent run matches zero rows instead of erroring. A failure for one workspace or user is caught and logged without aborting the rest of the batch.
 
 ## Security
 

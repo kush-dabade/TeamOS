@@ -95,6 +95,8 @@ describe("demo cleanup", () => {
         expiredUserCount: 1,
         deletedWorkspaceCount: 1,
         deletedUserCount: 1,
+        deletedFileCount: 0,
+        failedFileDeletionCount: 0,
       });
 
       await expect(
@@ -156,12 +158,16 @@ describe("demo cleanup", () => {
       expiredUserCount: 1,
       deletedWorkspaceCount: 1,
       deletedUserCount: 1,
+      deletedFileCount: 0,
+      failedFileDeletionCount: 0,
     });
 
     await expect(cleanupExpiredDemoSessions()).resolves.toEqual({
       expiredUserCount: 0,
       deletedWorkspaceCount: 0,
       deletedUserCount: 0,
+      deletedFileCount: 0,
+      failedFileDeletionCount: 0,
     });
 
     const user = await prisma.user.findUnique({ where: { id: expiredDemo.user.id } });

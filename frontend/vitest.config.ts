@@ -13,6 +13,11 @@ export default mergeConfig(
       // playwright.config.ts) and need a running stack.
       include: ["src/**/*.test.{ts,tsx}"],
       environment: "jsdom",
+      // Radix-heavy component tests (Select, DropdownMenu, Sheet) can take
+      // several seconds to render under jsdom on slower machines (seen on
+      // WSL); the 5s default made them time out intermittently without any
+      // assertion failing. Assertions are unchanged.
+      testTimeout: 15_000,
       globals: false,
       setupFiles: ["./src/test/setup.ts"],
     },

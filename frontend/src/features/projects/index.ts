@@ -2,6 +2,7 @@ export * from "./pages/ProjectWorkspacePage";
 export * from "./pages/ProjectsPage";
 export * from "./types";
 export { projectKeys } from "./lib/project-keys";
+export { invalidateProjectTaskCounts } from "./lib/invalidate-project-task-counts";
 export { useProjects } from "./hooks/use-projects";
 export { useProject } from "./hooks/use-project";
 export { useCreateProject } from "./hooks/use-create-project";

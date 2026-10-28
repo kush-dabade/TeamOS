@@ -8,7 +8,7 @@ import { PageLayout } from "@/components/layout";
 import { ErrorState, PageError } from "@/components/ux";
 import { useActiveWorkspace } from "@/features/workspaces";
 
-import { useProjectWithTaskCounts } from "../hooks/use-project-with-task-counts";
+import { useProject } from "../hooks/use-project";
 import { useProjects } from "../hooks/use-projects";
 import { useUpdateProject } from "../hooks/use-update-project";
 import { ProjectFormPanel } from "../components/form";
@@ -42,7 +42,7 @@ export function ProjectWorkspacePage() {
 
   const resolvedProjectId = primaryProjectId ?? archivedProjectId;
 
-  const projectDetailQuery = useProjectWithTaskCounts(resolvedProjectId);
+  const projectDetailQuery = useProject(resolvedProjectId);
   const updateProject = useUpdateProject();
 
   // A sprint search result (see SearchCommand's handleSelectSprint) navigates

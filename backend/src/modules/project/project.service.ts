@@ -48,6 +48,46 @@ function toProjectResponse(project: Project) {
   };
 }
 
+export interface ProjectTaskCounts {
+  total: number;
+  completed: number;
+}
+
+/**
+ * Non-deleted task totals and DONE counts for the given projects, in one
+ * grouped query - the projects page used to fetch every project's task
+ * list (capped at 100) just to count it. Callers pass only project ids
+ * they have already authorized.
+ */
+async function countTasksByProject(projectIds: string[]): Promise<Map<string, ProjectTaskCounts>> {
+  const counts = new Map<string, ProjectTaskCounts>(
+    projectIds.map((projectId) => [projectId, { total: 0, completed: 0 }]),
+  );
+
+  if (projectIds.length === 0) {
+    return counts;
+  }
+
+  const groups = await prisma.task.groupBy({
+    by: ["projectId", "status"],
+    where: { projectId: { in: projectIds }, deletedAt: null },
+    _count: { _all: true },
+  });
+
+  for (const group of groups) {
+    const projectCounts = counts.get(group.projectId);
+    if (!projectCounts) {
+      continue;
+    }
+    projectCounts.total += group._count._all;
+    if (group.status === "DONE") {
+      projectCounts.completed += group._count._all;
+    }
+  }
+
+  return counts;
+}
+
 async function findProjectById(projectId: string) {
   return prisma.project.findUnique({
     where: {
@@ -74,6 +114,8 @@ export async function getProject(actorId: string, projectId: string) {
 
   await requireWorkspaceMembership(project.workspaceId, actorId);
 
+  const taskCounts = (await countTasksByProject([project.id])).get(project.id);
+
   return {
     id: project.id,
     workspaceId: project.workspaceId,
@@ -95,6 +137,8 @@ export async function getProject(actorId: string, projectId: string) {
       name: project.owner.name,
       email: project.owner.email,
     },
+
+    taskCounts,
   };
 }
 
@@ -591,5 +635,10 @@ export async function listProjects(
     },
   });
 
-  return projects.map(toProjectResponse);
+  const taskCounts = await countTasksByProject(projects.map((project) => project.id));
+
+  return projects.map((project) => ({
+    ...toProjectResponse(project),
+    taskCounts: taskCounts.get(project.id),
+  }));
 }

@@ -9,7 +9,7 @@ import { useActiveWorkspace } from "@/features/workspaces";
 import { useArchiveProject } from "../hooks/use-archive-project";
 import { useCreateProject } from "../hooks/use-create-project";
 import { useProject } from "../hooks/use-project";
-import { useProjectsWithTaskCounts } from "../hooks/use-projects-with-task-counts";
+import { useProjects } from "../hooks/use-projects";
 import { useRestoreProject } from "../hooks/use-restore-project";
 import { useUpdateProject } from "../hooks/use-update-project";
 import { ProjectFormPanel } from "../components/form";
@@ -37,7 +37,7 @@ export function ProjectsPage() {
   const [isFormPanelOpen, setIsFormPanelOpen] = useState(false);
   const [formPanelTrigger, setFormPanelTrigger] = useState<HTMLButtonElement | null>(null);
 
-  const projectsQuery = useProjectsWithTaskCounts(
+  const projectsQuery = useProjects(
     workspace?.id,
     statusFilter === "ALL" ? undefined : statusFilter,
   );

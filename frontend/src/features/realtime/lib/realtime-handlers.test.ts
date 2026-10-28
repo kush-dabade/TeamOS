@@ -2,6 +2,7 @@ import { QueryObserver, type QueryClient } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { activityKeys } from "@/features/activity";
+import { projectKeys } from "@/features/projects";
 import { taskKeys } from "@/features/tasks";
 import { sprintKeys } from "@/features/sprints";
 import { createTestQueryClient } from "@/test/create-test-query-client";
@@ -364,5 +365,27 @@ describe("realtimeHandlers - workspace-wide task list invalidation", () => {
     expect(queryFn).toHaveBeenCalledTimes(2);
 
     unsubscribe();
+  });
+});
+
+// Regression (audit F-25): project progress now comes from the project
+// queries, so task events must refresh them as well.
+describe("realtimeHandlers - project task counts", () => {
+  it.each([
+    REALTIME_EVENTS.TASK_CREATED,
+    REALTIME_EVENTS.TASK_UPDATED,
+    REALTIME_EVENTS.TASK_COMPLETED,
+    REALTIME_EVENTS.TASK_DELETED,
+  ])("%s invalidates the project lists and the task's project detail", (event) => {
+    const queryClient = createTestQueryClient();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    getHandler(event)(
+      { workspaceId: "workspace-1", task: { id: "task-1", projectId: "project-1", sprintId: null } },
+      queryClient,
+    );
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectKeys.lists() });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectKeys.detail("project-1") });
   });
 });

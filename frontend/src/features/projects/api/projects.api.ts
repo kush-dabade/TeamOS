@@ -18,6 +18,8 @@ interface BackendProject {
   endDate: string | null;
   createdAt: string;
   updatedAt: string;
+  // Present on list and detail responses; create/update responses omit it.
+  taskCounts?: { total: number; completed: number };
 }
 
 interface BackendProjectDetail extends BackendProject {
@@ -40,12 +42,9 @@ export interface UpdateProjectInput {
   status?: ProjectStatus;
 }
 
-// The backend project resource does not include task counts - there is no
-// aggregate endpoint for them. This layer always reports 0/0/0%; real counts
-// are computed client-side from Tasks data by `useProjectsWithTaskCounts` /
-// `useProjectWithTaskCounts`, which overwrite these fields after this mapping
-// runs. Kept here (rather than omitted) so `ProjectListItem` has one shape
-// regardless of which hook produced it.
+// Task counts come from the project resource itself (computed server-side in
+// one grouped query); responses without them - create and update - report
+// 0/0/0% until the next list or detail fetch.
 function toProjectListItem(project: BackendProject): ProjectListItem {
   return {
     project: {
@@ -57,9 +56,19 @@ function toProjectListItem(project: BackendProject): ProjectListItem {
       createdAt: project.createdAt,
       updatedAt: project.updatedAt,
     },
-    completedTaskCount: 0,
-    totalTaskCount: 0,
-    progressPercentage: 0,
+    ...toTaskCounts(project.taskCounts),
+  };
+}
+
+function toTaskCounts(taskCounts: BackendProject["taskCounts"]) {
+  const totalTaskCount = taskCounts?.total ?? 0;
+  const completedTaskCount = taskCounts?.completed ?? 0;
+
+  return {
+    totalTaskCount,
+    completedTaskCount,
+    progressPercentage:
+      totalTaskCount === 0 ? 0 : Math.round((completedTaskCount / totalTaskCount) * 100),
   };
 }
 

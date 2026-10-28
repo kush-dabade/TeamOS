@@ -3,6 +3,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { createElement, type PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { projectKeys } from "@/features/projects/lib/project-keys";
 import { sprintKeys } from "@/features/sprints/lib/sprint-keys";
 import { createTestQueryClient } from "@/test/create-test-query-client";
 
@@ -60,12 +61,15 @@ describe("useUpdateTask", () => {
     await result.current.mutateAsync({ taskId: "task-1", input: { title: "Updated" } });
 
     await waitFor(() => {
-      expect(invalidateSpy).toHaveBeenCalledTimes(3);
+      expect(invalidateSpy).toHaveBeenCalledTimes(5);
     });
 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: taskKeys.detail("task-1") });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: taskKeys.list("project-1") });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: taskKeys.workspaceLists() });
+    // Project progress counts come from the project queries (audit F-25).
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectKeys.lists() });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: projectKeys.detail("project-1") });
   });
 
   it("invalidates the task's sprint task-list cache when the updated task has a sprintId", async () => {
@@ -81,7 +85,7 @@ describe("useUpdateTask", () => {
     await result.current.mutateAsync({ taskId: "task-1", input: { status: "DONE" } });
 
     await waitFor(() => {
-      expect(invalidateSpy).toHaveBeenCalledTimes(4);
+      expect(invalidateSpy).toHaveBeenCalledTimes(6);
     });
 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: sprintKeys.tasks("sprint-1") });
@@ -100,7 +104,7 @@ describe("useUpdateTask", () => {
     await result.current.mutateAsync({ taskId: "task-1", input: { title: "Updated" } });
 
     await waitFor(() => {
-      expect(invalidateSpy).toHaveBeenCalledTimes(3);
+      expect(invalidateSpy).toHaveBeenCalledTimes(5);
     });
 
     const sprintCalls = invalidateSpy.mock.calls.filter((call: unknown[]) => {

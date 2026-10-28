@@ -6,7 +6,7 @@ import { attachmentKeys } from "@/features/attachments";
 import { activityKeys } from "@/features/activity";
 import type { ActivityEntityType } from "@/features/activity";
 import { taskKeys } from "@/features/tasks";
-import { projectKeys } from "@/features/projects";
+import { invalidateProjectTaskCounts, projectKeys } from "@/features/projects";
 import { sprintKeys } from "@/features/sprints";
 import { workspaceKeys } from "@/features/workspaces";
 
@@ -286,7 +286,7 @@ function isProjectEventPayload(payload: unknown): payload is ProjectEventPayload
 // never a safe prefix for "every status-filtered list in this workspace."
 // projectKeys.lists() is the narrowest key that is still guaranteed to match
 // whichever status-filtered variant a component actually has mounted (e.g.
-// use-projects-with-task-counts.ts queries with a specific status) — a
+// ProjectsPage queries with a specific status) — a
 // project being created or archived can move it in or out of any of those
 // filtered buckets, so this is a required invalidation, not just a
 // defensive/broad one.
@@ -438,6 +438,7 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
     }
     queryClient.invalidateQueries({ queryKey: taskKeys.list(payload.task.projectId) });
     invalidateWorkspaceTaskList(payload.workspaceId, queryClient);
+    invalidateProjectTaskCounts(queryClient, payload.task.projectId);
   },
 
   [REALTIME_EVENTS.TASK_UPDATED]: (payload, queryClient) => {
@@ -446,6 +447,7 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
     }
     invalidateTask(payload.task.id, payload.task.projectId, queryClient, payload.task.sprintId);
     invalidateWorkspaceTaskList(payload.workspaceId, queryClient);
+    invalidateProjectTaskCounts(queryClient, payload.task.projectId);
   },
 
   [REALTIME_EVENTS.TASK_COMPLETED]: (payload, queryClient) => {
@@ -454,6 +456,7 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
     }
     invalidateTask(payload.task.id, payload.task.projectId, queryClient, payload.task.sprintId);
     invalidateWorkspaceTaskList(payload.workspaceId, queryClient);
+    invalidateProjectTaskCounts(queryClient, payload.task.projectId);
   },
 
   [REALTIME_EVENTS.TASK_DELETED]: (payload, queryClient) => {
@@ -462,6 +465,7 @@ export const realtimeHandlers: Partial<Record<RealtimeEvent, RealtimeHandler>> =
     }
     invalidateTask(payload.task.id, payload.task.projectId, queryClient, payload.task.sprintId);
     invalidateWorkspaceTaskList(payload.workspaceId, queryClient);
+    invalidateProjectTaskCounts(queryClient, payload.task.projectId);
   },
 
   [REALTIME_EVENTS.TASK_ASSIGNED_TO_SPRINT]: (payload, queryClient) => {

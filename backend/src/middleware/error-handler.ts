@@ -32,6 +32,9 @@ function sendError(
     error: { code, message },
   };
 
+  // Read by request-logger.ts so the access log classifies the failure
+  // without logging the (possibly user-derived) message itself.
+  res.locals.errorCode = code;
   res.status(status).json(body);
 }
 

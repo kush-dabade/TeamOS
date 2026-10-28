@@ -36,6 +36,7 @@ import {
 } from "./middleware/rate-limit.js";
 import { securityHeaders } from "./middleware/security-headers.js";
 import { createRequestIdMiddleware } from "./middleware/request-id.js";
+import { createRequestLoggerMiddleware } from "./middleware/request-logger.js";
 import { createReadinessHandler } from "./lib/readiness.js";
 
 const app = express();
@@ -50,6 +51,11 @@ app.disable("x-powered-by");
 // guarantees X-Request-Id (and a correlated req.log) is available for every
 // response this app sends, including the earliest possible failures.
 app.use(createRequestIdMiddleware());
+
+// Directly after the request id, so every response - including 401s from
+// Better Auth, 404s, and errors that skip the remaining middleware - gets
+// one access-log line carrying that id.
+app.use(createRequestLoggerMiddleware());
 
 // Mounted next, ahead of CORS/auth/body-parsing/rate limiting/routes -
 // res.setHeader calls persist on the response regardless of what happens

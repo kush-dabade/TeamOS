@@ -11,7 +11,12 @@ vi.mock("@/features/projects", () => ({
   useProjects: (workspaceId: string | undefined, status?: string) =>
     status === "ARCHIVED" ? archivedProjects(workspaceId) : activeProjects(workspaceId),
 }));
-vi.mock("@/features/tasks", () => ({ useTask: () => ({ data: undefined }) }));
+const mockUseTask = vi.fn<
+  (taskId: string | undefined, options?: { enabled?: boolean }) => { data: undefined }
+>(() => ({ data: undefined }));
+vi.mock("@/features/tasks", () => ({
+  useTask: (taskId: string | undefined, options?: { enabled?: boolean }) => mockUseTask(taskId, options),
+}));
 vi.mock("@/features/workspaces", () => ({
   useActiveWorkspace: () => ({ workspace: { id: "workspace-1" } }),
 }));
@@ -26,6 +31,7 @@ function renderAt(path: string) {
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/projects/:slug" element={<Breadcrumbs />} />
+        <Route path="/tasks/:taskId" element={<Breadcrumbs />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -72,5 +78,17 @@ describe("Breadcrumbs on a project page", () => {
 
     expect(screen.getByText("Website Redesign")).toBeTruthy();
     expect(archivedProjects).toHaveBeenCalledWith(undefined);
+  });
+});
+
+// Regression (audit F-24): the breadcrumb ran its own fetch of the task, so
+// deleting a task from its page refetched it (and got a 404) through here.
+describe("Breadcrumbs on a task page", () => {
+  it("reads the task from the page's query without fetching it", () => {
+    activeProjects.mockReturnValue({ data: undefined, isSuccess: false });
+
+    renderAt("/tasks/task-1");
+
+    expect(mockUseTask).toHaveBeenCalledWith("task-1", { enabled: false });
   });
 });

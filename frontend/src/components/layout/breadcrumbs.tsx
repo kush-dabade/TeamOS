@@ -12,7 +12,10 @@ export function Breadcrumbs() {
   const { slug, taskId } = useParams();
   const isProjectWorkspace = slug && pathname.startsWith(`/projects/${slug}`);
   const isTaskWorkspace = taskId && pathname.startsWith(`/tasks/${taskId}`);
-  const taskQuery = useTask(isTaskWorkspace ? taskId : undefined);
+  // Reads the task the page has already loaded instead of fetching it too:
+  // TaskWorkspacePage owns that query and pauses it while deleting the task,
+  // so a second, independent fetcher here would refetch a deleted task.
+  const taskQuery = useTask(isTaskWorkspace ? taskId : undefined, { enabled: false });
   const taskTitle = isTaskWorkspace ? (taskQuery.data?.taskItem.task.title ?? "Task") : null;
   const projectName = useProjectName(isProjectWorkspace ? slug : undefined);
 

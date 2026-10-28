@@ -14,11 +14,16 @@ export interface TaskDetail {
   createdBy: TaskAssignee | null;
 }
 
-export function useTask(taskId: string | undefined) {
+interface UseTaskOptions {
+  /** False keeps the cached task but stops fetching it (e.g. while it's being deleted). */
+  enabled?: boolean;
+}
+
+export function useTask(taskId: string | undefined, { enabled = true }: UseTaskOptions = {}) {
   const taskQuery = useQuery<Task, AppError>({
     queryKey: taskKeys.detail(taskId ?? ""),
     queryFn: () => fetchTask(taskId as string),
-    enabled: Boolean(taskId),
+    enabled: Boolean(taskId) && enabled,
   });
 
   const task = taskQuery.data;

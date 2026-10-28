@@ -17,7 +17,9 @@ async function runBypassCheck(
 ): Promise<{ emailVerified: boolean; verificationEmailEnqueued: boolean }> {
   const { stdout } = await execFileAsync("npx", ["tsx", DEV_BYPASS_CHECK_SCRIPT], {
     cwd: backendRoot,
-    env: { ...process.env, NODE_ENV: nodeEnv },
+    // LOG_LEVEL silent: stdout must be only the JSON result; development and
+    // production log levels would add the request's access-log line.
+    env: { ...process.env, NODE_ENV: nodeEnv, LOG_LEVEL: "silent" },
   });
 
   return JSON.parse(stdout) as { emailVerified: boolean; verificationEmailEnqueued: boolean };

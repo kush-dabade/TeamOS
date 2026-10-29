@@ -626,7 +626,12 @@ The fix is a verified sending domain (below). Until then, mandatory verification
 
 ### Turning verification off temporarily
 
-Read the trade-offs first: [`../features/authentication.md`](../features/authentication.md#when-verification-is-turned-off). In short, an email address stops proving who owns an account, and sign-up reveals which addresses are registered. Invitation and password-reset email still won't arrive; this only removes the sign-up dependency on email.
+Mandatory verification stays on by default (`REQUIRE_EMAIL_VERIFICATION` unset). Turn it off only on purpose, for as long as you need to. The setting lives only in `backend/.env.production` on the VM, which is never committed. Read the trade-offs first: [`../features/authentication.md`](../features/authentication.md#when-verification-is-turned-off). In short:
+
+- An email address stops proving who owns an account.
+- Sign-up reveals which addresses are registered.
+- Unverified accounts can send invitation email.
+- Invitation and password-reset email still won't arrive while the sandbox sender is in use; this only removes the sign-up dependency on email.
 
 1. Take a backup (see [Backups](#backups)). Nothing touches data, but every production change starts with one.
 2. On the VM, add this line to `backend/.env.production`:
@@ -644,7 +649,60 @@ Read the trade-offs first: [`../features/authentication.md`](../features/authent
 
 4. Check it: register at `$PUBLIC_ORIGIN/register` with a new address. You land in the app signed in, without a "Check your email" screen.
 
-To restore verification — normally right after a sending domain is verified — delete the line (or set it to `true`), recreate `backend worker` the same way, and run the delivery smoke test below. Any value other than `true` or `false` stops both services at startup, so a typo fails loudly instead of silently changing behavior.
+Any value other than `true` or `false` stops both services at startup, so a typo fails loudly instead of silently changing behavior.
+
+### Restoring verification
+
+Restore it before you enable unrestricted email delivery (a verified sending domain, below), unless leaving it off is a deliberate policy. Once mail is actually delivered, unverified accounts sending invitations stops being harmless.
+
+Changing the setting alone affects only **new** sign-ups and sign-ins. Sessions already issued to unverified users stay valid and keep renewing while they're used (see [Authentication](../features/authentication.md#when-verification-is-turned-off)). If those users should lose their current access, also do steps 3–5.
+
+1. Take a backup (see [Backups](#backups)).
+2. In `backend/.env.production`, delete the `REQUIRE_EMAIL_VERIFICATION` line, or set it to `true`. If you aren't revoking sessions, skip to step 6.
+3. Stop the backend, so nobody can sign in under the old setting halfway through and every Socket.IO connection is closed:
+
+   ```bash
+   dc stop backend
+   ```
+
+4. Make sure you're on the production VM, in the repository directory, and that `dc` points at `docker-compose.prod.yml` and `.env.production`. Then open `psql` in the Postgres container and check the schema before changing anything:
+
+   ```bash
+   dc exec postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+   ```
+
+   ```sql
+   \d "session"
+   \d "user"
+   ```
+
+   Confirm that `session` has a `userId` column and `user` has `id` and `emailVerified`. That's how `backend/prisma/schema.prisma` defines them (`model Session` → `session`, `model User` → `user`, no column renames). If anything differs, stop.
+
+5. Delete only the sessions of users whose `emailVerified` is false. Never delete all sessions. The SQL below is **illustrative**: it matches this repository's schema, but run it only after step 4, and read the count before committing:
+
+   ```sql
+   BEGIN;
+   SELECT count(*) FROM "session" s JOIN "user" u ON u.id = s."userId" WHERE u."emailVerified" = false;
+   DELETE FROM "session" WHERE "userId" IN (SELECT id FROM "user" WHERE "emailVerified" = false);
+   -- The DELETE should report the same count. If not, ROLLBACK; otherwise:
+   COMMIT;
+   ```
+
+   Deleting rows directly doesn't run Better Auth's session-revocation hook, which is what normally disconnects a revoked session's sockets. Stopping the backend in step 3 does that job instead: every connection closed when it stopped. On reconnect, the handshake's `getSession` finds no session and refuses the connection (`realtime/realtime.auth.ts`).
+
+6. Recreate both services:
+
+   ```bash
+   dc up -d --no-deps --force-recreate backend worker
+   dc logs --tail=20 backend worker    # no "REQUIRE_EMAIL_VERIFICATION must be" error
+   ```
+
+7. Verify:
+   - `dc exec backend printenv REQUIRE_EMAIL_VERIFICATION` prints `true`, or nothing if you deleted the line.
+   - Registering a new address at `$PUBLIC_ORIGIN/register` shows "Check your email" instead of signing you in.
+   - Signing in as an unverified account shows "Email not verified" with a resend option.
+   - If you revoked sessions, re-running the `SELECT count(*)` from step 5 returns `0`, and after a reload, a browser that was signed in as an unverified user lands on the login page.
+   - If the sending domain is verified, run the delivery smoke test below.
 
 ### Failure visibility
 

@@ -45,7 +45,17 @@ Intended only for a deployment that can't yet deliver email to arbitrary recipie
 
 **Invitation guard (always on).** The only place TeamOS authorizes on email is invitations. Listing your invitations (`GET /api/v1/invitations`) and accepting or declining one by id (`POST /api/v1/invitations/:id/accept|decline`) match on the session's email, so they return `403` for an unverified account, before any lookup (`assertEmailVerifiedForEmailMatch` in `invitation.service.ts`). The token routes (`/api/v1/invitations/token/:token/*`), which the frontend uses, stay open, because the token is only ever emailed to the invited address. They still require the session's email to match the invitation. With verification on, every signed-in account is verified, so the guard changes nothing.
 
-**Restoring verification.** Remove the variable (or set it to `"true"`) and recreate the backend and worker. No code or data changes are needed. Accounts created while it was off stay unverified and are blocked at sign-in until they use "Resend verification email" on the login screen; don't mark them verified in the database.
+**Invitation email while it's off.** An unverified account is a normal workspace owner, so it can send invitation email to any address, subject only to the per-account invitation rate limit. That's the abuse the demo-account rule in `createInvitation` blocks for `/try` accounts, and it isn't blocked here. It costs nothing while the sending domain is unverified, because Resend then delivers to no one but the account owner. Weigh it before enabling unrestricted email delivery with verification still off.
+
+**Restoring verification.** Remove the variable (or set it to `"true"`) and recreate the backend and worker. From then on, every sign-up needs verification again and every sign-in by an unverified account fails with `EMAIL_NOT_VERIFIED`. No code or data changes are needed for that.
+
+**Sessions issued while verification was off stay valid.** Better Auth checks `emailVerified` only when it creates a session (sign-in, sign-up), never when it reads one: `getSession`, which `requireAuth` and the Socket.IO handshake both use, accepts any unexpired session. Sessions also renew themselves while in use (`SESSION_UPDATE_AGE_SECONDS`), so an unverified user who keeps using the app is never asked to sign in again, and so never reaches the verification check. Changing the setting doesn't change that. Restoring verification alone means:
+
+- New sign-ups and sign-ins require verification.
+- Unverified users who are already signed in keep their access until their session lapses: 7 days without use, or signing out.
+- The invitation guard above keeps refusing them the email-matched invitation operations either way.
+
+To end that existing access, an operator has to invalidate those users' sessions deliberately. That's an operational step, separate from the sign-in flow: [deployment § Restoring verification](../development/deployment.md#restoring-verification). Once their sessions are gone, those users go through the normal flow: sign-in fails with `EMAIL_NOT_VERIFIED`, and the login screen offers "Resend verification email". Don't mark accounts verified in the database.
 
 ## Password and name rules
 

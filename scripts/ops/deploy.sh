@@ -487,11 +487,24 @@ deploy() {
   fi
   pending_count=$(sorted_lines "$pending" | wc -l)
 
-  "$BACKUP_SCRIPT" || reject "the pre-deployment backup failed"
-
-  # The rollback handle: whatever is running now, under its release name.
+  # The rollback handle: whatever is running now, under its release name -
+  # which must really be $PREVIOUS. A deployment interrupted after its
+  # containers were replaced (a VM restart, a killed process) leaves the new
+  # release running while current-release still names the old one; tagging
+  # that as release-$PREVIOUS would make a rollback restore the wrong
+  # release. Images built before the release pipeline carry no revision
+  # (docker prints `<no value>`), so they can't be checked.
   PREV_BACKEND_ID=$(running_image backend)
   PREV_WEB_ID=$(running_image caddy)
+  for ref in "$PREV_BACKEND_ID" "$PREV_WEB_ID"; do
+    [ -n "$ref" ] || continue
+    label=$(image_label "$ref" org.opencontainers.image.revision)
+    ! is_sha "$label" || [ "$label" = "$PREVIOUS" ] ||
+      reject "the running containers are release $label, but the recorded current release is $PREVIOUS (an earlier deployment was interrupted?) - see docs/development/deployment.md#recovering-from-a-failed-deployment"
+  done
+
+  "$BACKUP_SCRIPT" || reject "the pre-deployment backup failed"
+
   if [ -n "$PREV_BACKEND_ID" ] && [ -n "$PREV_WEB_ID" ]; then
     docker tag "$PREV_BACKEND_ID" "$LOCAL_BACKEND:release-$PREVIOUS"
     docker tag "$PREV_WEB_ID" "$LOCAL_WEB:release-$PREVIOUS"

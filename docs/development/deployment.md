@@ -301,7 +301,7 @@ Nothing in this path runs for a pull request or for any branch other than `main`
 
 `scripts/ops/deploy.sh <sha>` on the VM, holding a `flock` so only one runs at a time:
 
-1. **Refuses, changing nothing**, if: the SHA isn't a full commit SHA on `origin/main`; the checkout has local modifications; a release *newer* than `<sha>` is already live (result `stale`); the images can't be pulled; their `revision`/`source` labels don't match; the web image was built for a different `PUBLIC_ORIGIN`; a previous migration is marked failed; a pending migration is destructive (see [Database migrations](#database-migrations)); or the pre-deployment backup fails.
+1. **Refuses, changing nothing**, if: the SHA isn't a full commit SHA on `origin/main`; the checkout has local modifications; a release *newer* than `<sha>` is already live (result `stale`); the running containers are a different release than the one recorded as live (an earlier deployment was interrupted); the images can't be pulled; their `revision`/`source` labels don't match; the web image was built for a different `PUBLIC_ORIGIN`; a previous migration is marked failed; a pending migration is destructive (see [Database migrations](#database-migrations)); or the pre-deployment backup fails.
 2. Runs `scripts/ops/backup.sh`, as every production change starts with one.
 3. Tags what is running now as `release-<previous sha>` (the rollback handle), then retags `:prod` to the new images and moves the checkout (detached) to `<sha>`, so the compose file and ops scripts on disk always match the running release.
 4. `docker compose up -d --no-build`: `migrate` (new image) applies pending migrations while the previous release is still serving, then `backend` and `worker` are recreated, then `caddy`.
@@ -465,6 +465,12 @@ For the release that was running before this pipeline existed (not in GHCR), whi
 Start from the `TEAMOS_DEPLOY_RESULT` line and the `service state:` block in the deploy job's *VM output*, then read the full diagnostics on the VM: `ls -t ~/teamos-ops/deploys | head -1`, plus `grep ' deploy ' ~/teamos-ops/ops.log | tail`.
 
 - **`rejected`**: nothing changed. The reason is in the output (unpublished or private image, label mismatch, dirty checkout, unsafe migration, backup failure, lock held). Fix the cause; re-run the job, or merge a fix.
+- **`rejected` with *the running containers are release `<X>`, but the recorded current release is `<Y>`***: an earlier deployment of `<X>` was interrupted (VM restart, killed process) after it replaced the containers but before it was recorded. Nothing was changed. On the VM, check `<X>` is fully live, record it, then re-run the job:
+  ```bash
+  cd ~/TeamOS && scripts/ops/deploy.sh --verify <X>       # verified: <X> is running, healthy and on :prod
+  echo <X> > ~/teamos-ops/state/current-release
+  ```
+  If `--verify` reports `unhealthy`, treat it as a failed deployment: fix forward, or go back to `<Y>` with `scripts/ops/deploy.sh --allow-older <Y>` (images in GHCR) or the manual steps under [Rollback](#rollback).
 - **`rolled_back`**: production is on the previous release and healthy. Find the cause in the diagnostics file, fix it in a pull request; merging it deploys.
 - **`failed`, migration failed.** The previous release keeps serving (check the state block). Prisma refuses every further migration until the failed one is resolved:
   1. On the VM, find out what the failed migration did — Postgres may have applied part of it: `dc exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"` (values from `.env.production`), then inspect with `\d "<Table>"`. Undo partial changes by hand, or finish them if that's clearly right.

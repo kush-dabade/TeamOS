@@ -526,6 +526,44 @@ describe("deploy.sh", { timeout: 60_000 }, () => {
     expect(wrong.status).toBe(3);
   });
 
+  it("refuses to deploy over containers that are not the recorded release", () => {
+    publish("c2");
+    expect(deploy([commits.c2!]).result).toBe("success");
+    // c2's deployment interrupted after its containers were replaced, before
+    // it was recorded: c2 runs, but current-release still names c1.
+    writeFileSync(
+      path.join(dir, "state", "current-release"),
+      `${commits.c1}\n`,
+    );
+    const handle = readState().tags[`teamos-backend:release-${commits.c1}`];
+    const backups = readFileSync(path.join(dir, "backups.log"), "utf8");
+    publish("c3");
+    updateState((state) => state.unhealthy.push("sha256:backend-c3"));
+
+    const { status, result, output } = deploy([commits.c3!]);
+
+    expect(result).toBe("rejected");
+    expect(status).toBe(1);
+    expect(output).toContain(
+      `the running containers are release ${commits.c2}`,
+    );
+    expect(readState().tags[`teamos-backend:release-${commits.c1}`]).toBe(
+      handle,
+    );
+    expect(running("backend")).toBe("sha256:backend-c2");
+    expect(git(checkout, "rev-parse", "HEAD")).toBe(commits.c2);
+    expect(readFileSync(path.join(dir, "backups.log"), "utf8")).toBe(backups);
+
+    // The documented recovery: confirm what is live, record it, deploy again.
+    expect(deploy(["--verify", commits.c2!]).result).toBe("verified");
+    writeFileSync(
+      path.join(dir, "state", "current-release"),
+      `${commits.c2}\n`,
+    );
+    updateState((state) => (state.unhealthy = []));
+    expect(deploy([commits.c3!]).result).toBe("success");
+  });
+
   it("preflight reports readiness without changing anything", () => {
     const { result, output } = deploy(["--preflight"]);
 

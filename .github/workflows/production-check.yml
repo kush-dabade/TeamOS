@@ -1,0 +1,81 @@
+name: Production check
+
+# Manual and read-only: runs scripts/ops/deploy.sh --preflight or --verify on
+# the production VM through the same OIDC + Run Command path the Release
+# workflow deploys with, and changes nothing.
+#
+# - preflight: proves the whole path (federated credential, RBAC, Run
+#   Command, the VM's checkout, Docker access) works - run it once after
+#   the one-time setup, before PRODUCTION_AUTO_DEPLOY switches on the first
+#   automatic deployment. It is not gated by that variable.
+# - verify: checks the live release is the recorded one and healthy, and
+#   compares it with what the public /health endpoint reports.
+"on":
+  workflow_dispatch:
+    inputs:
+      check:
+        description: What to check
+        type: choice
+        options:
+          - verify
+          - preflight
+        default: verify
+
+permissions: {}
+
+jobs:
+  check:
+    name: Check production
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    environment:
+      name: production
+      url: ${{ vars.PUBLIC_ORIGIN }}
+
+    # Never alongside a deployment.
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check on the VM
+        id: vm
+        uses: ./.github/actions/vm-run
+        with:
+          action: ${{ inputs.check }}
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          resource-group: ${{ vars.AZURE_VM_RESOURCE_GROUP }}
+          vm-name: ${{ vars.AZURE_VM_NAME }}
+
+      - name: Report
+        env:
+          RESULT: ${{ steps.vm.outputs.result }}
+          RESULT_LINE: ${{ steps.vm.outputs.result-line }}
+          PUBLIC_ORIGIN: ${{ vars.PUBLIC_ORIGIN }}
+        run: |
+          public=$(curl -fsS --max-time 10 "$PUBLIC_ORIGIN/health" | jq -r '.revision // "none"' || echo unreachable)
+          {
+            echo "### Production check"
+            echo
+            echo "- VM: \`$RESULT_LINE\`"
+            echo "- $PUBLIC_ORIGIN/health reports revision \`$public\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "$RESULT_LINE"
+          echo "public /health revision: $public"
+          case "$RESULT" in
+            verified | ready) ;;
+            *) echo "::error::check result '$RESULT' - see the VM output above"; exit 1 ;;
+          esac

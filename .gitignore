@@ -18,3 +18,5 @@ frontend/node_modules
 
 backend/dist
 frontend/dist
+
+__pycache__/

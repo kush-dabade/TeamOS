@@ -42,28 +42,46 @@ ENV NODE_ENV=production
 
 WORKDIR /usr/src/app
 
-# Copy the production application from the builder image.
-COPY --from=builder /usr/src/app/package.json ./
-COPY --from=builder /usr/src/app/node_modules ./node_modules
-COPY --from=builder /usr/src/app/dist ./dist
-COPY --from=builder /usr/src/app/prisma ./prisma
+# Copy the production application from the builder image, owned by the
+# runtime user as it is written. A `chown -R` afterwards would copy every
+# file into a second layer (node_modules alone is ~430 MB).
+COPY --from=builder --chown=node:node /usr/src/app/package.json ./
+COPY --from=builder --chown=node:node /usr/src/app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /usr/src/app/dist ./dist
+COPY --from=builder --chown=node:node /usr/src/app/prisma ./prisma
 # Prisma 7 sources datasource.url from this config file rather than
 # schema.prisma directly - required at runtime for `prisma migrate deploy`
 # (run by the `migrate` service), not just at build time for `prisma generate`.
-COPY --from=builder /usr/src/app/prisma.config.ts ./
+COPY --from=builder --chown=node:node /usr/src/app/prisma.config.ts ./
 # prisma.config.ts imports this directly (as TS source, not through dist/)
 # to build DATABASE_URL - same reason as the line above: the migrate
 # service invokes the Prisma CLI against prisma.config.ts itself at
 # runtime, so its one dependency needs to exist alongside it here too.
-COPY --from=builder /usr/src/app/src/config/database.config.ts ./src/config/database.config.ts
+COPY --from=builder --chown=node:node /usr/src/app/src/config/database.config.ts ./src/config/database.config.ts
 
-# Create the uploads directory.
+# Create the uploads directory. Only the two directories themselves need a
+# new owner; everything copied above already belongs to node.
 RUN mkdir -p uploads \
-    && chown -R node:node /usr/src/app
+    && chown node:node /usr/src/app /usr/src/app/uploads
 
 # Run the application as the non-root Node.js user.
 USER node
 
 EXPOSE 3000
+
+# Release metadata, last so a new commit only changes these metadata layers.
+# The Release workflow passes all three; a local build leaves them empty and
+# the image reports no revision (src/config/release.config.ts).
+# scripts/ops/deploy.sh refuses an image whose revision label isn't the
+# commit it was asked to deploy.
+ARG APP_REVISION=""
+ARG IMAGE_SOURCE=""
+ARG IMAGE_CREATED=""
+LABEL org.opencontainers.image.title="TeamOS backend" \
+      org.opencontainers.image.description="TeamOS API, BullMQ worker and migration runner" \
+      org.opencontainers.image.source="${IMAGE_SOURCE}" \
+      org.opencontainers.image.revision="${APP_REVISION}" \
+      org.opencontainers.image.created="${IMAGE_CREATED}"
+ENV APP_REVISION=${APP_REVISION}
 
 CMD ["node", "dist/src/server.js"]

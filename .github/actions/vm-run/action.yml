@@ -1,0 +1,115 @@
+name: Run a release action on the production VM
+description: >-
+  Signs in to Azure with the job's short-lived OIDC token (no stored
+  credential), sends scripts/ops/run-deploy.sh to the production VM through
+  Azure Run Command, prints the VM's output, and returns the result from
+  deploy.sh's final TEAMOS_DEPLOY_RESULT line. The calling job needs
+  `id-token: write`, the `production` environment, and a checkout of the
+  repository.
+
+inputs:
+  action:
+    description: deploy, verify or preflight (see scripts/ops/run-deploy.sh)
+    required: true
+  sha:
+    description: Full commit SHA (required for deploy, optional for verify, unused by preflight)
+    required: false
+    default: ""
+  client-id:
+    description: Application (client) ID of the deployment identity
+    required: true
+  tenant-id:
+    description: Microsoft Entra tenant ID
+    required: true
+  subscription-id:
+    description: Subscription that contains the VM
+    required: true
+  resource-group:
+    description: Resource group of the VM
+    required: true
+  vm-name:
+    description: Name of the production VM
+    required: true
+
+outputs:
+  result:
+    description: success, stale, rolled_back, failed, rejected, verified, unhealthy, ready - or missing if the VM printed no result
+    value: ${{ steps.run.outputs.result }}
+  result-line:
+    description: The full TEAMOS_DEPLOY_RESULT line
+    value: ${{ steps.run.outputs.result-line }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check the deployment configuration
+      shell: bash
+      env:
+        ACTION: ${{ inputs.action }}
+        SHA: ${{ inputs.sha }}
+        AZURE_CLIENT_ID: ${{ inputs.client-id }}
+        AZURE_TENANT_ID: ${{ inputs.tenant-id }}
+        AZURE_SUBSCRIPTION_ID: ${{ inputs.subscription-id }}
+        AZURE_VM_RESOURCE_GROUP: ${{ inputs.resource-group }}
+        AZURE_VM_NAME: ${{ inputs.vm-name }}
+      run: |
+        missing=""
+        for name in AZURE_CLIENT_ID AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID AZURE_VM_RESOURCE_GROUP AZURE_VM_NAME; do
+          [ -n "${!name}" ] || missing="$missing $name"
+        done
+        if [ -n "$missing" ]; then
+          echo "::error title=Production deployment is not configured::Missing variables on the 'production' environment:$missing. See docs/development/deployment.md#one-time-setup."
+          exit 1
+        fi
+        case "$ACTION" in
+          deploy | verify | preflight) ;;
+          *) echo "::error::unknown action '$ACTION'"; exit 1 ;;
+        esac
+        if [ -n "$SHA" ] && [[ ! $SHA =~ ^[0-9a-f]{40}$ ]]; then
+          echo "::error::'$SHA' is not a full commit SHA"
+          exit 1
+        fi
+
+    - name: Sign in to Azure (OIDC)
+      uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+      with:
+        client-id: ${{ inputs.client-id }}
+        tenant-id: ${{ inputs.tenant-id }}
+        subscription-id: ${{ inputs.subscription-id }}
+
+    # Run Command reports the script's output, not its exit status, so the
+    # outcome is read from the result line deploy.sh always prints last.
+    - name: Run on the VM
+      id: run
+      shell: bash
+      env:
+        ACTION: ${{ inputs.action }}
+        SHA: ${{ inputs.sha }}
+        AZURE_VM_RESOURCE_GROUP: ${{ inputs.resource-group }}
+        AZURE_VM_NAME: ${{ inputs.vm-name }}
+      run: |
+        params=("$ACTION")
+        [ -z "$SHA" ] || params+=("$SHA")
+        az vm run-command invoke \
+          --resource-group "$AZURE_VM_RESOURCE_GROUP" \
+          --name "$AZURE_VM_NAME" \
+          --command-id RunShellScript \
+          --scripts "@$GITHUB_WORKSPACE/scripts/ops/run-deploy.sh" \
+          --parameters "${params[@]}" \
+          --output json > "$RUNNER_TEMP/run-command.json"
+
+        message=$(jq -r '[.value[]?.message // empty] | join("\n")' "$RUNNER_TEMP/run-command.json")
+        echo "::group::VM output"
+        printf '%s\n' "$message"
+        echo "::endgroup::"
+
+        line=$(printf '%s\n' "$message" | grep -oE 'TEAMOS_DEPLOY_RESULT=[a-z_]+ sha=[0-9a-z]+ previous=[0-9a-z]+' | tail -n 1 || true)
+        result=missing
+        if [ -n "$line" ]; then
+          result=${line#TEAMOS_DEPLOY_RESULT=}
+          result=${result%% *}
+        fi
+        {
+          echo "result=$result"
+          echo "result-line=$line"
+        } >> "$GITHUB_OUTPUT"

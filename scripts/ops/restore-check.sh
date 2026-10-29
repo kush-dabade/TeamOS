@@ -6,6 +6,7 @@
 # Usage: scripts/ops/restore-check.sh [path/to/teamos-db-<ts>.dump]
 #        (defaults to the newest dump in BACKUP_DIR)
 
+# shellcheck source=lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 SCRATCH_DB=teamos_restore_check

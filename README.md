@@ -178,7 +178,7 @@ A client that hears about a change before it's durable can render state that nev
 A workspace id in a URL is something the client typed, not something the server proved. Every workspace-scoped request reads the caller's real membership and role out of the database before business logic runs, and no authorization decision is ever derived from the request body.
 
 **Why local file storage instead of S3?**
-Uploads go through a four-method interface — `upload`, `delete`, `stream`, `exists` — and the only implementation today writes to the local filesystem, because nothing is deployed to a cloud yet. Moving to S3 means writing one class behind that interface. It doesn't mean touching a single module that stores a file.
+Uploads go through a four-method interface — `upload`, `delete`, `stream`, `exists` — and the only implementation today writes to the local filesystem. Production is a single Azure VM, where that filesystem is a persistent Docker volume backed up nightly with the database, so object storage would add cost and a second system without a current need. Moving to S3 means writing one class behind that interface. It doesn't mean touching a single module that stores a file.
 
 <br />
 
@@ -213,7 +213,7 @@ Uploads go through a four-method interface — `upload`, `delete`, `stream`, `ex
 | **Realtime** | Socket.IO |
 | **Auth & validation** | Better Auth · Zod |
 | **Storage** | Local filesystem provider behind a four-method interface |
-| **Infrastructure** | Docker · GitHub Actions |
+| **Infrastructure** | Docker · GitHub Actions · GHCR · Azure VM (Compose, Caddy) |
 
 <br />
 

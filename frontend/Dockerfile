@@ -35,3 +35,20 @@ FROM caddy:2.10-alpine AS runtime
 
 COPY Caddyfile /etc/caddy/Caddyfile
 COPY --from=builder /usr/src/app/dist /srv
+
+# Release metadata - same contract as backend/Dockerfile. These replace the
+# caddy base image's own title/source/revision labels, which describe Caddy,
+# not this image. teamos.public-origin records the origin baked into the
+# bundle: scripts/ops/deploy.sh refuses an image built for a different
+# PUBLIC_ORIGIN than the host it is deploying to.
+ARG VITE_API_URL
+ARG APP_REVISION=""
+ARG IMAGE_SOURCE=""
+ARG IMAGE_CREATED=""
+LABEL org.opencontainers.image.title="TeamOS web" \
+      org.opencontainers.image.description="TeamOS single-page app behind Caddy (TLS, static files, reverse proxy)" \
+      org.opencontainers.image.source="${IMAGE_SOURCE}" \
+      org.opencontainers.image.revision="${APP_REVISION}" \
+      org.opencontainers.image.created="${IMAGE_CREATED}" \
+      org.opencontainers.image.version="" \
+      teamos.public-origin="${VITE_API_URL}"

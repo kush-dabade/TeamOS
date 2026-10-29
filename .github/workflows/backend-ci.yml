@@ -13,7 +13,7 @@ permissions:
 jobs:
   backend-ci:
     name: Backend CI
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
 
     # A new push to a pull request supersedes its previous run. Runs called

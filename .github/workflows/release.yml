@@ -41,7 +41,7 @@ jobs:
   publish:
     name: Publish images
     needs: [backend, frontend, production]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     # The only job that can write packages. It never runs PR code: this
@@ -186,7 +186,7 @@ jobs:
   deploy:
     name: Deploy to production
     needs: publish
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
 
     # Required reviewers are deliberately not configured on this environment

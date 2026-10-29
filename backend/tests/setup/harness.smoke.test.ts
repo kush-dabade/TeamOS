@@ -32,7 +32,11 @@ describe("test harness", () => {
   it("boots a real server that responds to health checks", async () => {
     const response = await request(server.baseUrl).get("/health").expect(200);
 
-    expect(response.body).toEqual({ success: true, message: "TeamOS API is running" });
+    expect(response.body).toEqual({
+      success: true,
+      message: "TeamOS API is running",
+      revision: null,
+    });
   });
 
   it("signs up a real user through Better Auth and returns a usable session cookie", async () => {

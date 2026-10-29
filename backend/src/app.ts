@@ -4,6 +4,7 @@ import { toNodeHandler } from "better-auth/node";
 
 import { auth } from "./lib/auth.js";
 import { trustedOrigins, trustProxyHops } from "./config/security.config.js";
+import { appRevision } from "./config/release.config.js";
 import workspaceRoutes from "./modules/workspace/workspace.routes.js";
 import workspaceItemRoutes from "./modules/workspace/workspace-item.routes.js";
 import projectRoutes from "./modules/project/project.routes.js";
@@ -148,10 +149,14 @@ app.use("/api/v1/invitations", invitationRoutes);
 // notification resources
 app.use("/api/v1/notifications", notificationRoutes);
 
+// Liveness only - dependencies are /ready's job. `revision` is the deployed
+// commit (null outside a release image), which deploy.sh compares against
+// the release it expects to be serving.
 app.get("/health", (_req, res) => {
   res.status(200).json({
     success: true,
     message: "TeamOS API is running",
+    revision: appRevision,
   });
 });
 

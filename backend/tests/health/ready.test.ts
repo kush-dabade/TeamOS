@@ -7,7 +7,12 @@ describe("GET /health", () => {
   it("still returns the plain liveness response, unchanged by the /ready addition", async () => {
     const res = await request(app).get("/health").expect(200);
 
-    expect(res.body).toEqual({ success: true, message: "TeamOS API is running" });
+    // No APP_REVISION outside a release image, so the revision is null.
+    expect(res.body).toEqual({
+      success: true,
+      message: "TeamOS API is running",
+      revision: null,
+    });
   });
 });
 

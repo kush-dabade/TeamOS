@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 
 import app from "./app.js";
+import { appRevision } from "./config/release.config.js";
 import { registerFatalErrorHandlers } from "./lib/fatal-error-handler.js";
 import { logger } from "./lib/logger.js";
 import { prisma } from "./lib/prisma.js";
@@ -119,7 +120,7 @@ async function start() {
     });
 
     server.listen(PORT, () => {
-      logger.info({ port: PORT }, "TeamOS API running");
+      logger.info({ port: PORT, revision: appRevision }, "TeamOS API running");
     });
   } catch (error) {
     logger.error({ err: error }, "Failed to start server");

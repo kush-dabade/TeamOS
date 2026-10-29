@@ -7,12 +7,11 @@ interface EmailVerificationStatusProps {
   emailVerified: boolean;
 }
 
-// Better Auth's `requireEmailVerification` (backend/src/lib/auth.ts) blocks
-// sign-in for unverified accounts, so a normal authenticated session should
-// already have `emailVerified: true` by the time this renders. The
-// `!emailVerified` branch below is defensive/completeness UI for accounts
-// that predate that requirement, unusual existing sessions, or future auth
-// changes - not a state the current sign-up/sign-in flow can normally produce.
+// With mandatory email verification on (the backend default,
+// backend/src/lib/auth.ts), unverified accounts can't sign in, so this
+// normally renders "Verified". When the backend sets
+// REQUIRE_EMAIL_VERIFICATION=false, new accounts sign in unverified and the
+// `!emailVerified` branch below is how they can still verify voluntarily.
 export function EmailVerificationStatus({ email, emailVerified }: EmailVerificationStatusProps) {
   const resendVerification = useResendVerificationEmail();
 

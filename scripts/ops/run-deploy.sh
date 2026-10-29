@@ -67,6 +67,10 @@ git -C "$repo" fetch --quiet origin || reject "git fetch origin failed"
 source_rev=origin/main
 if [ "$action" = deploy ]; then
   git -C "$repo" cat-file -e "$sha^{commit}" 2> /dev/null || reject "unknown commit $sha"
+  # Checked here, before any of the commit's own code runs: a commit that
+  # never reached main is unreviewed, so its deploy.sh must not execute.
+  git -C "$repo" merge-base --is-ancestor "$sha" origin/main ||
+    reject "$sha is not a commit on origin/main"
   source_rev=$sha
 fi
 git -C "$repo" cat-file -e "$source_rev:scripts/ops/deploy.sh" 2> /dev/null ||

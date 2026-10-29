@@ -182,6 +182,11 @@ beforeEach(() => {
   git(seed, "push", "--quiet", "origin", "main");
   git(seed, "switch", "--quiet", "-c", "side", commits.c1!);
   writeFileSync(path.join(seed, "RELEASE"), "side\n");
+  // An unreviewed branch's deploy logic: it must never be executed.
+  writeFileSync(
+    path.join(seed, "scripts/ops/deploy.sh"),
+    `#!/usr/bin/env bash\ntouch "${dir}/side-branch-code-ran"\n`,
+  );
   git(seed, "commit", "--quiet", "-am", "side");
   commits.side = git(seed, "rev-parse", "HEAD");
   git(seed, "push", "--quiet", "origin", "side");
@@ -491,6 +496,15 @@ describe("run-deploy.sh", { timeout: 60_000 }, () => {
     expect(result).toBe("rejected");
     expect(status).toBe(1);
     expect(readState().calls).toEqual([]);
+  });
+
+  it("never executes code from a commit that is not on origin/main", () => {
+    const { status, result, output } = run(RUN_DEPLOY, ["deploy", commits.side!], asDeployUser());
+
+    expect(result).toBe("rejected");
+    expect(status).toBe(1);
+    expect(output).toContain("is not a commit on origin/main");
+    expect(existsSync(path.join(dir, "side-branch-code-ran"))).toBe(false);
   });
 
   it("runs the requested release's own deploy.sh against the production checkout", () => {

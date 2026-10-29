@@ -617,11 +617,34 @@ Until a domain is verified in Resend, the only usable sender is `onboarding@rese
 
 The consequences:
 
-- Self-service sign-up only completes for that one address.
+- Self-service sign-up only completes for that one address, while verification is required.
 - Invitations to other people don't arrive.
+- Password-reset email doesn't arrive either.
 - The `/try` demo is unaffected: demo provisioning marks its synthetic accounts verified itself and never enqueues verification email for them (see [`../features/demo.md`](../features/demo.md#provisioning)).
 
-Email verification stays required regardless. The fix is a verified sending domain, not relaxing verification.
+The fix is a verified sending domain (below). Until then, mandatory verification can be turned off so that people can register and sign in.
+
+### Turning verification off temporarily
+
+Read the trade-offs first: [`../features/authentication.md`](../features/authentication.md#when-verification-is-turned-off). In short, an email address stops proving who owns an account, and sign-up reveals which addresses are registered. Invitation and password-reset email still won't arrive; this only removes the sign-up dependency on email.
+
+1. Take a backup (see [Backups](#backups)). Nothing touches data, but every production change starts with one.
+2. On the VM, add this line to `backend/.env.production`:
+
+   ```bash
+   REQUIRE_EMAIL_VERIFICATION=false
+   ```
+
+3. Recreate both services that read the file:
+
+   ```bash
+   dc up -d --no-deps --force-recreate backend worker
+   dc logs --tail=20 backend worker    # no "REQUIRE_EMAIL_VERIFICATION must be" error
+   ```
+
+4. Check it: register at `$PUBLIC_ORIGIN/register` with a new address. You land in the app signed in, without a "Check your email" screen.
+
+To restore verification — normally right after a sending domain is verified — delete the line (or set it to `true`), recreate `backend worker` the same way, and run the delivery smoke test below. Any value other than `true` or `false` stops both services at startup, so a typo fails loudly instead of silently changing behavior.
 
 ### Failure visibility
 
@@ -673,7 +696,7 @@ Use a mailbox you control that is **not** the Resend account owner's address; th
 4. Request a password reset for the same address, follow the link, set a new password, and sign in with it.
 5. `dc logs --since 15m worker | grep -c EMAIL_DELIVERY_FAILED` prints `0`.
 
-Accounts that registered while the sandbox sender was in place stay unverified until they request a new link. "Resend verification email" on the login screen does that. Don't mark accounts verified in the database.
+Accounts that registered while the sandbox sender was in place, or while verification was turned off, stay unverified until they request a new link. "Resend verification email" on the login screen does that. Don't mark accounts verified in the database.
 
 ### Rolling back
 

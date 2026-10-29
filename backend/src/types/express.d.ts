@@ -8,6 +8,12 @@ declare global {
         id: string;
         email: string;
         name: string;
+        /**
+         * Can be false once REQUIRE_EMAIL_VERIFICATION=false lets unverified
+         * accounts sign in (see lib/auth.ts). Anything that authorizes on
+         * `email` must check this first.
+         */
+        emailVerified: boolean;
       };
       /** Set by request-id.ts, mounted first in app.ts - present on every request. */
       id: string;

@@ -54,7 +54,7 @@ function buildApp() {
     res.status(401).json({ code: "INVALID_EMAIL_OR_PASSWORD" });
   });
   app.get("/api/v1/tasks/:taskId", (req, _res, next) => {
-    req.user = { id: "user-42", email: "ada@example.com", name: "Ada" };
+    req.user = { id: "user-42", email: "ada@example.com", name: "Ada", emailVerified: true };
     next(new NotFoundError("Task not found"));
   });
   app.get("/api/v1/boom", () => {

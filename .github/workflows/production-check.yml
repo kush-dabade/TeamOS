@@ -6,7 +6,8 @@ name: Production check
 #
 # - preflight: proves the whole path (federated credential, RBAC, Run
 #   Command, the VM's checkout, Docker access) works - run it once after
-#   the one-time setup, before the first automatic deployment.
+#   the one-time setup, before PRODUCTION_AUTO_DEPLOY switches on the first
+#   automatic deployment. It is not gated by that variable.
 # - verify: checks the live release is the recorded one and healthy, and
 #   compares it with what the public /health endpoint reports.
 "on":

@@ -9,6 +9,14 @@ name: Release
 #                 scripts/ops/deploy.sh <sha> (pull, verify, migrate, health
 #                 gate, automatic rollback where safe)
 #
+# deploy only runs once the repository variable PRODUCTION_AUTO_DEPLOY is
+# `true`. It starts unset, so the merge that adds this pipeline publishes
+# images but deploys nothing until the path to the VM has been proven with
+# Production check -> preflight. Unset or `false` skips deploy; any other
+# value fails publish. This orders the first release; it is not the security
+# boundary - that is the production environment's main-only rule, the
+# federated credential bound to it, and the VM-scoped role.
+#
 # Nothing here runs for pull requests or for any other branch. See
 # docs/development/deployment.md#releases.
 "on":
@@ -52,18 +60,32 @@ jobs:
 
     env:
       PUBLIC_ORIGIN: ${{ vars.PUBLIC_ORIGIN }}
+      PRODUCTION_AUTO_DEPLOY: ${{ vars.PRODUCTION_AUTO_DEPLOY }}
 
     outputs:
+      deploy: ${{ steps.config.outputs.deploy }}
       backend-digest: ${{ steps.check.outputs.backend-digest }}
       web-digest: ${{ steps.check.outputs.web-digest }}
 
     steps:
+      # Compared exactly here: expressions compare strings case-insensitively,
+      # so deploy's condition reads this step's output, never the variable.
       - name: Check the release configuration
+        id: config
         run: |
           if [[ ! $PUBLIC_ORIGIN =~ ^https://[^/]+$ ]]; then
             echo "::error title=PUBLIC_ORIGIN is not set::Set the repository variable PUBLIC_ORIGIN to the production origin (https://<host>, no trailing slash). See docs/development/deployment.md#one-time-setup."
             exit 1
           fi
+          case "$PRODUCTION_AUTO_DEPLOY" in
+            true) echo "deploy=true" >> "$GITHUB_OUTPUT" ;;
+            "" | false)
+              echo "deploy=false" >> "$GITHUB_OUTPUT"
+              echo "::notice title=Automatic deployment is off::Images are published but not deployed. Run Production check -> preflight, then set the repository variable PRODUCTION_AUTO_DEPLOY to true. See docs/development/deployment.md#one-time-setup." ;;
+            *)
+              echo "::error title=PRODUCTION_AUTO_DEPLOY is invalid::It must be exactly true or false (or unset). Nothing was published or deployed."
+              exit 1 ;;
+          esac
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -186,6 +208,9 @@ jobs:
   deploy:
     name: Deploy to production
     needs: publish
+    # Skipped, never failed, while automatic deployment is off: no
+    # environment deployment is created and no OIDC token is requested.
+    if: needs.publish.outputs.deploy == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
 

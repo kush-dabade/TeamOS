@@ -112,12 +112,96 @@ class WorkflowPolicyTest(unittest.TestCase):
         )
         self.assertRejected("non-cancelling production-deploy concurrency group")
 
+    def test_deploy_cannot_lose_the_first_release_gate(self):
+        self.edit("release.yml", lambda w: w["jobs"]["deploy"].pop("if"))
+        self.assertRejected("must be gated by `if: needs.publish.outputs.deploy == 'true'`")
+
+    def test_deploy_gate_cannot_fail_open(self):
+        # A missing or misspelt variable must keep deploy off, not turn it on.
+        self.edit(
+            "release.yml",
+            lambda w: w["jobs"]["deploy"].update({"if": "needs.publish.outputs.deploy != 'false'"}),
+        )
+        self.assertRejected("must be gated by")
+
+    def test_deploy_gate_cannot_read_the_variable_directly(self):
+        # Expressions compare case-insensitively, so `TRUE` would pass this.
+        self.edit(
+            "release.yml",
+            lambda w: w["jobs"]["deploy"].update({"if": "vars.PRODUCTION_AUTO_DEPLOY == 'true'"}),
+        )
+        self.assertRejected("must be gated by")
+
+    def test_deploy_gate_must_come_from_the_config_step(self):
+        self.edit("release.yml", lambda w: w["jobs"]["publish"]["outputs"].update({"deploy": "true"}))
+        self.assertRejected("output `deploy` must come from the config step")
+
+    def test_production_check_only_runs_from_main(self):
+        self.edit("production-check.yml", lambda w: w["jobs"]["check"].pop("if"))
+        self.assertRejected("must only run from main")
+
+    def test_production_check_cannot_be_triggered_by_pushes(self):
+        self.edit("production-check.yml", lambda w: w["on"].update({"push": None}))
+        self.assertRejected("must only be started by hand")
+
     def test_actions_must_be_pinned_to_a_commit(self):
         def unpin(workflow):
             workflow["jobs"]["frontend-ci"]["steps"][0]["uses"] = "actions/checkout@v4"
 
         self.edit("frontend-ci.yml", unpin)
         self.assertRejected("is not pinned to a full commit SHA")
+
+
+class FirstReleaseGateTest(unittest.TestCase):
+    """Runs release.yml's real publish config step, as the runner would, for
+    each value PRODUCTION_AUTO_DEPLOY can have."""
+
+    ORIGIN = "https://teamos.example.test"
+
+    @classmethod
+    def setUpClass(cls):
+        release = yaml.safe_load((ROOT / ".github" / "workflows" / "release.yml").read_text())
+        steps = release["jobs"]["publish"]["steps"]
+        cls.script = next(step["run"] for step in steps if step.get("id") == "config")
+
+    def run_gate(self, value=None, origin=ORIGIN):
+        with tempfile.NamedTemporaryFile("r", suffix=".out") as output:
+            env = {"PATH": "/usr/bin:/bin", "GITHUB_OUTPUT": output.name, "PUBLIC_ORIGIN": origin}
+            # The runner sets an unset variable to the empty string.
+            env["PRODUCTION_AUTO_DEPLOY"] = "" if value is None else value
+            result = subprocess.run(
+                ["bash", "-e", "-c", self.script], env=env, capture_output=True, text=True
+            )
+            return result, output.read()
+
+    def test_unset_publishes_without_deploying(self):
+        result, output = self.run_gate()
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(output, "deploy=false\n")
+        self.assertIn("Automatic deployment is off", result.stdout)
+
+    def test_false_publishes_without_deploying(self):
+        result, output = self.run_gate("false")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(output, "deploy=false\n")
+
+    def test_true_deploys(self):
+        result, output = self.run_gate("true")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertEqual(output, "deploy=true\n")
+
+    def test_anything_else_fails_closed(self):
+        for value in ("TRUE", "True", "yes", "1", "on", " true", "true ", "true\n", "false-ish"):
+            with self.subTest(value=value):
+                result, output = self.run_gate(value)
+                self.assertEqual(result.returncode, 1, result.stdout)
+                self.assertNotIn("deploy=true", output)
+                self.assertIn("PRODUCTION_AUTO_DEPLOY is invalid", result.stdout)
+
+    def test_missing_origin_stops_before_the_gate(self):
+        result, output = self.run_gate("true", origin="")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertEqual(output, "")
 
 
 if __name__ == "__main__":

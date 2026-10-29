@@ -38,8 +38,18 @@ const PUBLIC_ORIGIN = "https://teamos.example.test";
 const SECRET = "redis-secret-value-123";
 const INIT = "20260101000000_init";
 
-type Image = { labels: Record<string, string>; migrations: string[]; sql: Record<string, string> };
-type Container = { image: string; status: string; health?: string; restarts?: number; exitCode?: number };
+type Image = {
+  labels: Record<string, string>;
+  migrations: string[];
+  sql: Record<string, string>;
+};
+type Container = {
+  image: string;
+  status: string;
+  health?: string;
+  restarts?: number;
+  exitCode?: number;
+};
 type HostState = {
   registry: Record<string, string>;
   images: Record<string, Image>;
@@ -57,7 +67,11 @@ let checkout: string;
 const commits: Record<string, string> = {};
 
 function git(cwd: string, ...args: string[]) {
-  return execFileSync("git", args, { cwd, env: gitEnv(), encoding: "utf8" }).trim();
+  return execFileSync("git", args, {
+    cwd,
+    env: gitEnv(),
+    encoding: "utf8",
+  }).trim();
 }
 
 function gitEnv() {
@@ -86,7 +100,12 @@ function publish(
     sql = {},
     revision = commits[commit],
     origin = PUBLIC_ORIGIN,
-  }: { migrations?: string[]; sql?: Record<string, string>; revision?: string; origin?: string } = {},
+  }: {
+    migrations?: string[];
+    sql?: Record<string, string>;
+    revision?: string;
+    origin?: string;
+  } = {},
 ) {
   const sha = commits[commit]!;
   const labels = {
@@ -100,12 +119,17 @@ function publish(
       migrations: [],
       sql: {},
     };
-    state.registry[`${REGISTRY}/teamos-backend:${sha}`] = `sha256:backend-${commit}`;
+    state.registry[`${REGISTRY}/teamos-backend:${sha}`] =
+      `sha256:backend-${commit}`;
     state.registry[`${REGISTRY}/teamos-web:${sha}`] = `sha256:web-${commit}`;
   });
 }
 
-function run(script: string, args: string[], overrides: Record<string, string> = {}) {
+function run(
+  script: string,
+  args: string[],
+  overrides: Record<string, string> = {},
+) {
   const result = spawnSync("bash", [script, ...args], {
     encoding: "utf8",
     env: {
@@ -130,12 +154,15 @@ function run(script: string, args: string[], overrides: Record<string, string> =
     },
   });
   const output = result.stdout + result.stderr;
-  const result_line = /TEAMOS_DEPLOY_RESULT=(\S+)/.exec(result.stdout.trim().split("\n").pop() ?? "");
+  const result_line = /TEAMOS_DEPLOY_RESULT=(\S+)/.exec(
+    result.stdout.trim().split("\n").pop() ?? "",
+  );
 
   return { status: result.status, output, result: result_line?.[1] };
 }
 
-const deploy = (args: string[], overrides?: Record<string, string>) => run(DEPLOY, args, overrides);
+const deploy = (args: string[], overrides?: Record<string, string>) =>
+  run(DEPLOY, args, overrides);
 
 function running(service: string) {
   return readState().containers[service]?.image;
@@ -170,7 +197,10 @@ beforeEach(() => {
   const seed = path.join(dir, "seed");
   mkdirSync(path.join(seed, "scripts"), { recursive: true });
   cpSync(OPS_DIR, path.join(seed, "scripts/ops"), { recursive: true });
-  writeFileSync(path.join(seed, "docker-compose.prod.yml"), "name: teamos-prod\n");
+  writeFileSync(
+    path.join(seed, "docker-compose.prod.yml"),
+    "name: teamos-prod\n",
+  );
   git(seed, "init", "--quiet");
   for (const name of ["c1", "c2", "c3", "c4"]) {
     writeFileSync(path.join(seed, "RELEASE"), `${name}\n`);
@@ -197,7 +227,12 @@ beforeEach(() => {
   git(dir, "clone", "--quiet", ORIGIN_URL, checkout);
   git(checkout, "checkout", "--quiet", "--detach", commits.c1!);
 
-  const live = (image: string): Container => ({ image, status: "running", health: "healthy", restarts: 0 });
+  const live = (image: string): Container => ({
+    image,
+    status: "running",
+    health: "healthy",
+    restarts: 0,
+  });
   const state: HostState = {
     registry: {},
     images: {
@@ -205,7 +240,10 @@ beforeEach(() => {
       "sha256:local-web": { labels: {}, migrations: [], sql: {} },
       "sha256:postgres": { labels: {}, migrations: [], sql: {} },
     },
-    tags: { "teamos-backend:prod": "sha256:local-backend", "teamos-web:prod": "sha256:local-web" },
+    tags: {
+      "teamos-backend:prod": "sha256:local-backend",
+      "teamos-web:prod": "sha256:local-web",
+    },
     containers: {
       migrate: { image: "sha256:local-backend", status: "exited", exitCode: 0 },
       backend: live("sha256:local-backend"),
@@ -244,7 +282,9 @@ describe("deploy.sh", { timeout: 60_000 }, () => {
 
     const { status, result, output } = deploy([commits.c2!]);
 
-    expect(output).toContain(`TEAMOS_DEPLOY_RESULT=success sha=${commits.c2} previous=${commits.c1}`);
+    expect(output).toContain(
+      `TEAMOS_DEPLOY_RESULT=success sha=${commits.c2} previous=${commits.c1}`,
+    );
     expect(result).toBe("success");
     expect(status).toBe(0);
     const state = readState();
@@ -252,13 +292,23 @@ describe("deploy.sh", { timeout: 60_000 }, () => {
     expect(state.tags["teamos-web:prod"]).toBe("sha256:web-c2");
     expect(state.containers.worker!.image).toBe("sha256:backend-c2");
     // The pre-pipeline release stays restorable under its release name.
-    expect(state.tags[`teamos-backend:release-${commits.c1}`]).toBe("sha256:local-backend");
+    expect(state.tags[`teamos-backend:release-${commits.c1}`]).toBe(
+      "sha256:local-backend",
+    );
     expect(git(checkout, "rev-parse", "HEAD")).toBe(commits.c2);
-    expect(readFileSync(path.join(dir, "state/current-release"), "utf8").trim()).toBe(commits.c2);
+    expect(
+      readFileSync(path.join(dir, "state/current-release"), "utf8").trim(),
+    ).toBe(commits.c2);
     const log = readFileSync(path.join(dir, "releases.log"), "utf8");
     expect(log).toMatch(new RegExp(`baseline sha=${commits.c1} `));
-    expect(log).toMatch(new RegExp(`success sha=${commits.c2} previous=${commits.c1} backend=${REGISTRY}/teamos-backend@sha256:`));
-    expect(readFileSync(path.join(dir, "backups.log"), "utf8")).toBe("backup\n");
+    expect(log).toMatch(
+      new RegExp(
+        `success sha=${commits.c2} previous=${commits.c1} backend=${REGISTRY}/teamos-backend@sha256:`,
+      ),
+    );
+    expect(readFileSync(path.join(dir, "backups.log"), "utf8")).toBe(
+      "backup\n",
+    );
   });
 
   it("redeploys the live release idempotently", () => {
@@ -282,7 +332,9 @@ describe("deploy.sh", { timeout: 60_000 }, () => {
     const stale = deploy([commits.c2!]);
     expect(stale.result).toBe("stale");
     expect(stale.status).toBe(4);
-    expect(readState().calls.some((call) => call.startsWith("docker pull"))).toBe(false);
+    expect(
+      readState().calls.some((call) => call.startsWith("docker pull")),
+    ).toBe(false);
     expect(running("backend")).toBe("sha256:backend-c3");
 
     const rollback = deploy(["--allow-older", commits.c2!]);
@@ -299,7 +351,11 @@ describe("deploy.sh", { timeout: 60_000 }, () => {
 
   it("allows one deployment at a time", async () => {
     mkdirSync(path.join(dir, "state"));
-    const holder = spawn("flock", [path.join(dir, "state/deploy.lock"), "sleep", "5"]);
+    const holder = spawn("flock", [
+      path.join(dir, "state/deploy.lock"),
+      "sleep",
+      "5",
+    ]);
     await new Promise((resolve) => setTimeout(resolve, 300));
 
     try {
@@ -316,19 +372,32 @@ describe("deploy.sh", { timeout: 60_000 }, () => {
 
   it.each([
     ["is not published", () => {}, "could not pull"],
-    ["carries the wrong revision label", () => publish("c2", { revision: commits.c1! }), "org.opencontainers.image.revision"],
-    ["was built for another origin", () => publish("c2", { origin: "https://other.example.test" }), "was built for"],
-  ])("rejects a release whose image %s, without changing anything", (_label, setup, message) => {
-    setup();
+    [
+      "carries the wrong revision label",
+      () => publish("c2", { revision: commits.c1! }),
+      "org.opencontainers.image.revision",
+    ],
+    [
+      "was built for another origin",
+      () => publish("c2", { origin: "https://other.example.test" }),
+      "was built for",
+    ],
+  ])(
+    "rejects a release whose image %s, without changing anything",
+    (_label, setup, message) => {
+      setup();
 
-    const { result, output } = deploy([commits.c2!]);
+      const { result, output } = deploy([commits.c2!]);
 
-    expect(result).toBe("rejected");
-    expect(output).toContain(message);
-    expect(readState().tags["teamos-backend:prod"]).toBe("sha256:local-backend");
-    expect(git(checkout, "rev-parse", "HEAD")).toBe(commits.c1);
-    expect(existsSync(path.join(dir, "backups.log"))).toBe(false);
-  });
+      expect(result).toBe("rejected");
+      expect(output).toContain(message);
+      expect(readState().tags["teamos-backend:prod"]).toBe(
+        "sha256:local-backend",
+      );
+      expect(git(checkout, "rev-parse", "HEAD")).toBe(commits.c1);
+      expect(existsSync(path.join(dir, "backups.log"))).toBe(false);
+    },
+  );
 
   it("aborts before any change when the pre-deployment backup fails", () => {
     publish("c2");
@@ -354,11 +423,15 @@ describe("deploy.sh", { timeout: 60_000 }, () => {
     expect(state.containers.backend!.image).toBe("sha256:local-backend");
     expect(git(checkout, "rev-parse", "HEAD")).toBe(commits.c1);
     expect(existsSync(path.join(dir, "state/current-release"))).toBe(false);
-    expect(readFileSync(path.join(dir, "releases.log"), "utf8")).toContain(`rolled_back sha=${commits.c2}`);
+    expect(readFileSync(path.join(dir, "releases.log"), "utf8")).toContain(
+      `rolled_back sha=${commits.c2}`,
+    );
     // Container logs stay on the host, never in the (public) workflow output.
     expect(output).not.toContain("fake container logs");
     const [diagnostics] = readdirSync(path.join(dir, "deploys"));
-    expect(readFileSync(path.join(dir, "deploys", diagnostics!), "utf8")).toContain("fake container logs");
+    expect(
+      readFileSync(path.join(dir, "deploys", diagnostics!), "utf8"),
+    ).toContain("fake container logs");
   });
 
   it("keeps expand migrations applied when it rolls the application back", () => {
@@ -397,7 +470,9 @@ describe("deploy.sh", { timeout: 60_000 }, () => {
     // Prisma won't apply anything else until the failure is resolved.
     const retry = deploy([commits.c2!]);
     expect(retry.result).toBe("rejected");
-    expect(retry.output).toContain("a previous migration failed and must be resolved first");
+    expect(retry.output).toContain(
+      "a previous migration failed and must be resolved first",
+    );
   });
 
   it("refuses unmarked destructive migrations before taking a backup", () => {
@@ -419,12 +494,17 @@ describe("deploy.sh", { timeout: 60_000 }, () => {
     const drop = "20260201000000_drop_task_color";
     publish("c2", {
       migrations: [INIT, drop],
-      sql: { [drop]: '-- teamos-migration: contract\nALTER TABLE "Task" DROP COLUMN "color";\n' },
+      sql: {
+        [drop]:
+          '-- teamos-migration: contract\nALTER TABLE "Task" DROP COLUMN "color";\n',
+      },
     });
 
     const automatic = deploy([commits.c2!]);
     expect(automatic.result).toBe("rejected");
-    expect(automatic.output).toContain("only applied by hand with --allow-contract");
+    expect(automatic.output).toContain(
+      "only applied by hand with --allow-contract",
+    );
 
     updateState((state) => state.unhealthy.push("sha256:backend-c2"));
     const manual = deploy(["--allow-contract", commits.c2!]);
@@ -451,7 +531,11 @@ describe("deploy.sh", { timeout: 60_000 }, () => {
 
     expect(result).toBe("ready");
     expect(output).toContain(`sha=${commits.c4} previous=${commits.c1}`);
-    expect(readState().calls.every((call) => !/^docker (pull|tag|compose .* up)/.test(call))).toBe(true);
+    expect(
+      readState().calls.every(
+        (call) => !/^docker (pull|tag|compose .* up)/.test(call),
+      ),
+    ).toBe(true);
   });
 
   it("keeps the current and two previous known-good releases", () => {
@@ -466,8 +550,12 @@ describe("deploy.sh", { timeout: 60_000 }, () => {
       .sort();
 
     expect(releaseTags).toEqual([commits.c2, commits.c3, commits.c4].sort());
-    expect(readState().tags[`${REGISTRY}/teamos-backend:${commits.c2}`]).toBeDefined();
-    expect(readState().tags[`${REGISTRY}/teamos-backend:${commits.c1}`]).toBeUndefined();
+    expect(
+      readState().tags[`${REGISTRY}/teamos-backend:${commits.c2}`],
+    ).toBeDefined();
+    expect(
+      readState().tags[`${REGISTRY}/teamos-backend:${commits.c1}`],
+    ).toBeUndefined();
   });
 
   it("never puts secrets from the env file into its output or the operations log", () => {
@@ -477,13 +565,18 @@ describe("deploy.sh", { timeout: 60_000 }, () => {
     const { output } = deploy([commits.c2!]);
 
     expect(output).not.toContain(SECRET);
-    expect(readFileSync(path.join(dir, "ops.log"), "utf8")).not.toContain(SECRET);
+    expect(readFileSync(path.join(dir, "ops.log"), "utf8")).not.toContain(
+      SECRET,
+    );
     expect(readState().calls.join("\n")).not.toContain(SECRET);
   });
 });
 
 describe("run-deploy.sh", { timeout: 60_000 }, () => {
-  const asDeployUser = () => ({ TEAMOS_DEPLOY_USER: userInfo().username, TEAMOS_DEPLOY_DIR: checkout });
+  const asDeployUser = () => ({
+    TEAMOS_DEPLOY_USER: userInfo().username,
+    TEAMOS_DEPLOY_DIR: checkout,
+  });
 
   it.each([
     [["deploy"]],
@@ -499,7 +592,11 @@ describe("run-deploy.sh", { timeout: 60_000 }, () => {
   });
 
   it("never executes code from a commit that is not on origin/main", () => {
-    const { status, result, output } = run(RUN_DEPLOY, ["deploy", commits.side!], asDeployUser());
+    const { status, result, output } = run(
+      RUN_DEPLOY,
+      ["deploy", commits.side!],
+      asDeployUser(),
+    );
 
     expect(result).toBe("rejected");
     expect(status).toBe(1);
@@ -510,17 +607,50 @@ describe("run-deploy.sh", { timeout: 60_000 }, () => {
   it("runs the requested release's own deploy.sh against the production checkout", () => {
     publish("c2");
 
-    const { status, result } = run(RUN_DEPLOY, ["deploy", commits.c2!], asDeployUser());
+    const { status, result } = run(
+      RUN_DEPLOY,
+      ["deploy", commits.c2!],
+      asDeployUser(),
+    );
 
     expect(result).toBe("success");
     expect(status).toBe(0);
-    expect(readState().calls[0]).toMatch(/^sudo -u \S+ -H -- bash -s -- deploy [0-9a-f]{40} /);
+    expect(readState().calls[0]).toMatch(
+      /^sudo -u \S+ -H -- bash -s -- deploy [0-9a-f]{40} /,
+    );
     expect(git(checkout, "rev-parse", "HEAD")).toBe(commits.c2);
+  });
+
+  it("preflight through the Run Command entry point deploys and restarts nothing", () => {
+    publish("c2");
+    const before = readState();
+
+    const { status, result } = run(RUN_DEPLOY, ["preflight"], asDeployUser());
+
+    expect(result).toBe("ready");
+    expect(status).toBe(0);
+    const after = readState();
+    expect(after.tags).toEqual(before.tags);
+    expect(after.containers).toEqual(before.containers);
+    expect(after.db).toEqual(before.db);
+    expect(
+      after.calls.filter((call) =>
+        /^docker (pull|tag|rmi|run|rm|stop|restart|start|compose .*\b(up|down|restart|stop|start|run|rm|pull|create)\b)/.test(
+          call,
+        ),
+      ),
+    ).toEqual([]);
+    expect(git(checkout, "rev-parse", "HEAD")).toBe(commits.c1);
+    expect(existsSync(path.join(dir, "backups.log"))).toBe(false);
+    expect(existsSync(path.join(dir, "releases.log"))).toBe(false);
+    expect(existsSync(path.join(dir, "state", "current-release"))).toBe(false);
   });
 
   it("verifies through origin/main's scripts without needing a SHA", () => {
     publish("c2");
-    expect(run(RUN_DEPLOY, ["deploy", commits.c2!], asDeployUser()).result).toBe("success");
+    expect(
+      run(RUN_DEPLOY, ["deploy", commits.c2!], asDeployUser()).result,
+    ).toBe("success");
 
     expect(run(RUN_DEPLOY, ["verify"], asDeployUser()).result).toBe("verified");
     expect(run(RUN_DEPLOY, ["preflight"], asDeployUser()).result).toBe("ready");
@@ -539,14 +669,23 @@ describe("check-migrations.sh", () => {
     ['CREATE INDEX "Task_color_idx" ON "Task"("color");', "expand"],
     ['DROP INDEX CONCURRENTLY "Sprint_search_idx";', "expand"],
     ["ALTER TYPE \"ActivityType\" ADD VALUE 'TASK_DELETED';", "expand"],
-    ['-- dropping nothing, DROP TABLE only appears in this comment\nSELECT 1;', "expand"],
+    [
+      "-- dropping nothing, DROP TABLE only appears in this comment\nSELECT 1;",
+      "expand",
+    ],
     ['ALTER TABLE "Task" DROP COLUMN "color";', "unsafe"],
     ['DROP TABLE "Legacy";', "unsafe"],
     ['ALTER TABLE "Task" RENAME COLUMN "color" TO "colour";', "unsafe"],
     ['ALTER TABLE "Task" ALTER COLUMN "color" SET NOT NULL;', "unsafe"],
-    ['ALTER TABLE "Task" ALTER COLUMN "points" SET DATA TYPE BIGINT;', "unsafe"],
+    [
+      'ALTER TABLE "Task" ALTER COLUMN "points" SET DATA TYPE BIGINT;',
+      "unsafe",
+    ],
     ['DELETE FROM "Notification";', "unsafe"],
-    ['-- teamos-migration: contract\nALTER TABLE "Task" DROP COLUMN "color";', "contract"],
+    [
+      '-- teamos-migration: contract\nALTER TABLE "Task" DROP COLUMN "color";',
+      "contract",
+    ],
   ])("classifies %j as %s", (sql, expected) => {
     const { stdout, status } = classify(`${sql}\n`);
 
@@ -560,9 +699,16 @@ describe("check-migrations.sh", () => {
       .filter((entry) => entry.isDirectory())
       .map((entry) => path.join(migrations, entry.name, "migration.sql"));
 
-    const { stdout, status } = spawnSync("bash", [CHECK_MIGRATIONS, ...files], { encoding: "utf8" });
+    const { stdout, status } = spawnSync("bash", [CHECK_MIGRATIONS, ...files], {
+      encoding: "utf8",
+    });
 
-    expect(stdout.trim().split("\n").filter((line) => !line.startsWith("expand "))).toEqual([]);
+    expect(
+      stdout
+        .trim()
+        .split("\n")
+        .filter((line) => !line.startsWith("expand ")),
+    ).toEqual([]);
     expect(status).toBe(0);
   });
 });

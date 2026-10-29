@@ -7,8 +7,9 @@ workflow and local action under .github/ (see docs/development/deployment.md#rel
   release.yml's `deploy` job and production-check.yml may request an OIDC
   token - all three only reachable from main, never from a pull request;
 - the deploy job targets the `production` environment, waits for publish,
-  and is serialised with production-check by a non-cancelling concurrency
-  group;
+  only runs once PRODUCTION_AUTO_DEPLOY is exactly `true` (the first-release
+  gate), and is serialised with production-check by a non-cancelling
+  concurrency group;
 - workflows a pull request can trigger use no secrets and push nothing;
 - every third-party action is pinned to a full commit SHA, and every
   checkout disables credential persistence.
@@ -27,6 +28,7 @@ ROOT = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().pare
 WORKFLOWS = ROOT / ".github" / "workflows"
 ACTIONS = ROOT / ".github" / "actions"
 PINNED = re.compile(r"^[^@\s]+@[0-9a-f]{40}$")
+GATE = "needs.publish.outputs.deploy == 'true'"
 
 problems: list[str] = []
 
@@ -137,6 +139,17 @@ if release:
         fail("release.yml publish", "must need backend, frontend and production CI")
     if deploy.get("needs") not in ("publish", ["publish"]):
         fail("release.yml deploy", "must need publish")
+    # The first-release gate: deploy waits for PRODUCTION_AUTO_DEPLOY, which
+    # publish's config step checks exactly. Anything looser could fail open.
+    if str(deploy.get("if", "")).replace("${{", "").replace("}}", "").strip() != GATE:
+        fail("release.yml deploy", f"must be gated by `if: {GATE}`")
+    if (publish.get("outputs") or {}).get("deploy") != "${{ steps.config.outputs.deploy }}":
+        fail("release.yml publish", "output `deploy` must come from the config step")
+    config = next((step for step in publish.get("steps", []) if step.get("id") == "config"), {})
+    if (publish.get("env") or {}).get("PRODUCTION_AUTO_DEPLOY") != "${{ vars.PRODUCTION_AUTO_DEPLOY }}" or (
+        'true) echo "deploy=true"' not in config.get("run", "")
+    ):
+        fail("release.yml publish", "the config step must decide `deploy` from PRODUCTION_AUTO_DEPLOY")
     environment = deploy.get("environment")
     if (environment or {}).get("name") != "production" and environment != "production":
         fail("release.yml deploy", "must use the production environment")

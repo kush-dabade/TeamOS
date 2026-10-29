@@ -334,10 +334,13 @@ These steps are owner actions in GitHub and Azure. Until they are done, `publish
 
 1. **Repository variable** (Settings → Secrets and variables → Actions → Variables): `PUBLIC_ORIGIN` = the production origin, e.g. `https://<dns-label>.centralindia.cloudapp.azure.com` (no trailing slash). Public, not a secret.
 2. **Environment** (Settings → Environments → New environment): `production`.
-   - Deployment branches and tags: **Selected branches** → `main` only.
+   - Deployment branches and tags: **Selected branches and tags** → add the rule `main` (branch). Nothing else.
+   - **Create it before step 3b, and check the branch rule is saved.** The environment, not the workflow files, is what limits OIDC tokens to `main`: a job on any branch can declare `environment: production`, and GitHub silently creates a missing environment with *no* branch rule. Until this rule exists, the federated credential in step 3b would accept tokens from jobs on any branch someone can push to — and those tokens can run commands as root on the VM.
    - **No required reviewers** — deployment is automatic; a reviewer gate would make it manual. The environment exists to scope the variables below and the OIDC subject.
-   - Environment variables: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_VM_RESOURCE_GROUP` (`rg-teamos-prod-cin`), `AZURE_VM_NAME` (`vm-teamos-prod-cin`). These are identifiers, not credentials. Fill the first three in step 3. No secrets are needed anywhere.
-3. **Azure deployment identity** (Azure CLI, signed in as the subscription owner). A dedicated app registration whose only credential is a federated trust in GitHub's OIDC tokens for the `production` environment, and whose only permission is Run Command on the one VM:
+   - Environment variables: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_VM_RESOURCE_GROUP` (`rg-teamos-prod-cin`), `AZURE_VM_NAME` (`vm-teamos-prod-cin`). These are identifiers, not credentials. Fill the first three from step 3a. No secrets are needed anywhere.
+3. **Azure deployment identity** (Azure CLI, signed in as the subscription owner). A dedicated app registration whose only credential is a federated trust in GitHub's OIDC tokens for the `production` environment, and whose only permission is Run Command on the one VM.
+
+   **3a. Identity and permission.** Inert on its own: the app has no credential of any kind, so nothing can sign in as it yet.
 
    ```bash
    RG=rg-teamos-prod-cin; VM=vm-teamos-prod-cin
@@ -346,14 +349,6 @@ These steps are owner actions in GitHub and Azure. Until they are done, `publish
 
    APP_ID=$(az ad app create --display-name teamos-github-deploy --query appId -o tsv)
    SP_ID=$(az ad sp create --id $APP_ID --query id -o tsv)
-
-   # Tokens are accepted only from jobs in this repository's `production` environment.
-   az ad app federated-credential create --id $APP_ID --parameters '{
-     "name": "github-production-environment",
-     "issuer": "https://token.actions.githubusercontent.com",
-     "subject": "repo:<github-owner>/TeamOS:environment:production",
-     "audiences": ["api://AzureADTokenExchange"]
-   }'
 
    # Custom role: read the VM and run a command on it - nothing else (no start/stop,
    # no delete, no disk, network or extension changes). Custom roles can't be
@@ -371,7 +366,20 @@ These steps are owner actions in GitHub and Azure. Until they are done, `publish
    echo "AZURE_CLIENT_ID=$APP_ID AZURE_TENANT_ID=$TENANT AZURE_SUBSCRIPTION_ID=$SUB"
    ```
 
-   Never create a client secret or certificate for this app, and don't grant it Owner, Contributor or Virtual Machine Contributor. The first Run Command installs Azure's Run Command VM extension, which the platform manages. If `preflight` (step 9) fails with `AuthorizationFailed` on `Microsoft.Compute/locations/operations/read` while polling, add that single read action in a second custom role assigned at subscription scope; the two actions above are the documented requirement for action Run Command.
+   **3b. Federated credential — only once step 2's branch rule is in place.** From then on, tokens are accepted only from jobs in this repository's `production` environment, which only `main` can use:
+
+   ```bash
+   az ad app federated-credential create --id $APP_ID --parameters '{
+     "name": "github-production-environment",
+     "issuer": "https://token.actions.githubusercontent.com",
+     "subject": "repo:<github-owner>/TeamOS:environment:production",
+     "audiences": ["api://AzureADTokenExchange"]
+   }'
+   ```
+
+   Check the result: `az ad app federated-credential list --id $APP_ID -o table` shows exactly that one subject, and `az role assignment list --assignee $APP_ID --all -o table` shows exactly one assignment — `TeamOS VM Run Command` on the VM.
+
+   Never create a client secret or certificate for this app, and don't grant it Owner, Contributor or Virtual Machine Contributor. The first Run Command installs Azure's Run Command VM extension, which the platform manages. If `preflight` (step 7) fails with `AuthorizationFailed` on `Microsoft.Compute/locations/operations/read` while polling, add that single read action in a second custom role assigned at subscription scope; the two actions above are the documented requirement for action Run Command.
 4. **Branch ruleset** (Settings → Rules → Rulesets → New branch ruleset), targeting the default branch, enforcement **Active**, empty bypass list:
    - Restrict deletions; Block force pushes.
    - Require a pull request before merging, **0** required approvals (a solo maintainer can't approve their own pull request).

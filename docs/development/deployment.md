@@ -254,7 +254,7 @@ alias dc='docker compose -f docker-compose.prod.yml --env-file .env.production'
 
 ## Releases
 
-Every merge to `main` is deployed automatically: CI runs again on the merge commit, GitHub Actions publishes images tagged with the commit SHA, and the VM pulls and deploys exactly those images. The VM never builds an image.
+Every merge to `main` is deployed automatically: CI runs again on the merge commit, GitHub Actions publishes images tagged with the commit SHA, and the VM pulls and deploys exactly those images. The VM never builds an image. Automatic deployment is switched on once, after the path to the VM has been proven (repository variable `PRODUCTION_AUTO_DEPLOY`, see [One-time setup](#one-time-setup)); until then, and whenever it is switched off, merges publish images but deploy nothing.
 
 ```text
 pull request ──▶ Backend CI · Frontend CI · Production images · Deploy tooling      (required checks)
@@ -280,7 +280,7 @@ Nothing in this path runs for a pull request or for any branch other than `main`
 | `backend-ci.yml` | pull request; called by `release.yml` | Backend CI: lint, typecheck, tests (incl. `tests/ops/deploy.test.ts`) | `contents: read` |
 | `frontend-ci.yml` | pull request; called by `release.yml` | Frontend CI: lint, tests, typecheck + production build | `contents: read` |
 | `production-ci.yml` | pull request; called by `release.yml` | Production images: build both images, run the real `docker-compose.prod.yml` stack with generated throwaway credentials, and apply the same health gate as a deployment (`deploy.sh --verify`) through Caddy. Deploy tooling: shellcheck, actionlint, workflow policy, migration safety | `contents: read` |
-| `release.yml` | push to `main` | the three above, then `publish`, then `deploy` | none by default; `publish`: `contents: read`, `packages: write`; `deploy`: `contents: read`, `id-token: write` |
+| `release.yml` | push to `main` | the three above, then `publish`, then `deploy` (skipped unless `PRODUCTION_AUTO_DEPLOY` is `true`) | none by default; `publish`: `contents: read`, `packages: write`; `deploy`: `contents: read`, `id-token: write` |
 | `production-check.yml` | manual (`workflow_dispatch`), `main` only | `preflight` or `verify` on the VM, changes nothing | `contents: read`, `id-token: write` |
 
 `.github/actions/vm-run` is the one place that signs in to Azure and calls Run Command; `release.yml` and `production-check.yml` both use it. Run Command reports a script's output, not its exit status, so the workflow reads the `TEAMOS_DEPLOY_RESULT=` line `deploy.sh` always prints last.
@@ -328,7 +328,7 @@ The workflow log is public for this repository, so `deploy.sh` prints only servi
 
 ### One-time setup
 
-These steps are owner actions in GitHub and Azure. Until they are done, `publish` or `deploy` fails with an error naming the missing piece — nothing deploys silently or partially. Do them in this order.
+These steps are owner actions in GitHub and Azure. Until they are done, `publish` or `deploy` fails with an error naming the missing piece — nothing deploys silently or partially — and `deploy` stays skipped until step 8 switches it on. Do them in this order.
 
 **Before merging the pull request that adds this pipeline**
 
@@ -366,18 +366,29 @@ These steps are owner actions in GitHub and Azure. Until they are done, `publish
    echo "AZURE_CLIENT_ID=$APP_ID AZURE_TENANT_ID=$TENANT AZURE_SUBSCRIPTION_ID=$SUB"
    ```
 
-   **3b. Federated credential — only once step 2's branch rule is in place.** From then on, tokens are accepted only from jobs in this repository's `production` environment, which only `main` can use:
+   **3b. Federated credential — only once step 2's branch rule is in place.** From then on, tokens are accepted only from jobs in this repository's `production` environment, which only `main` can use. The subject uses GitHub's **immutable** form, which names the owner and repository by their numeric IDs as well. A name-only subject would also match a token from a different account that later takes over the name `<github-owner>/TeamOS`:
 
    ```bash
-   az ad app federated-credential create --id $APP_ID --parameters '{
-     "name": "github-production-environment",
-     "issuer": "https://token.actions.githubusercontent.com",
-     "subject": "repo:<github-owner>/TeamOS:environment:production",
-     "audiences": ["api://AzureADTokenExchange"]
-   }'
+   OWNER_ID=$(curl -fsS https://api.github.com/repos/<github-owner>/TeamOS | python3 -c 'import json,sys; print(json.load(sys.stdin)["owner"]["id"])')
+   REPO_ID=$(curl -fsS https://api.github.com/repos/<github-owner>/TeamOS | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+   az ad app federated-credential create --id $APP_ID --parameters "{
+     \"name\": \"github-teamos-production\",
+     \"issuer\": \"https://token.actions.githubusercontent.com\",
+     \"subject\": \"repo:<github-owner>@$OWNER_ID/TeamOS@$REPO_ID:environment:production\",
+     \"audiences\": [\"api://AzureADTokenExchange\"]
+   }"
    ```
 
    Check the result: `az ad app federated-credential list --id $APP_ID -o table` shows exactly that one subject, and `az role assignment list --assignee $APP_ID --all -o table` shows exactly one assignment — `TeamOS VM Run Command` on the VM.
+
+   **3c. Make GitHub issue that subject.** Repositories created before 2026-07-15 still issue the name-only subject (`repo:<github-owner>/TeamOS:…`) unless they opt in, and Azure then rejects every sign-in (`AADSTS700213: No matching federated identity record found`). Opt the repository in under Settings → Actions → OIDC (**Use immutable subject claim**), then check the setting with a request that needs no token:
+
+   ```bash
+   curl -fsS https://api.github.com/repos/<github-owner>/TeamOS/actions/oidc/customization/sub
+   # "use_immutable_subject": true, "sub_claim_prefix": "repo:<github-owner>@<owner-id>/TeamOS@<repo-id>"
+   ```
+
+   The `sub_claim_prefix` followed by `:environment:production` must equal the subject in step 3b, character for character.
 
    Never create a client secret or certificate for this app, and don't grant it Owner, Contributor or Virtual Machine Contributor. The first Run Command installs Azure's Run Command VM extension, which the platform manages. If `preflight` (step 7) fails with `AuthorizationFailed` on `Microsoft.Compute/locations/operations/read` while polling, add that single read action in a second custom role assigned at subscription scope; the two actions above are the documented requirement for action Run Command.
 4. **Branch ruleset** (Settings → Rules → Rulesets → New branch ruleset), targeting the default branch, enforcement **Active**, empty bypass list:
@@ -386,14 +397,19 @@ These steps are owner actions in GitHub and Azure. Until they are done, `publish
    - Require status checks to pass, with *Require branches to be up to date*: `Backend CI`, `Frontend CI`, `Production images`, `Deploy tooling`. A check can only be selected after it has run once — the pipeline's own pull request runs all four.
 5. **Actions settings** (Settings → Actions → General): Workflow permissions **Read repository contents and packages permissions** (every workflow declares its own anyway); fork pull request workflows **Require approval for all external contributors**.
 
+Leave the repository variable `PRODUCTION_AUTO_DEPLOY` **unset** until step 8. `production-check.yml` only exists once it is on `main`, so the merge is also what makes `preflight` runnable — and the merge starts `release.yml` at the same time. Without this variable, nothing would stop that run from deploying before `preflight` had ever proved the path to the VM.
+
 **After merging**
 
-6. The merge starts `release.yml`. The first `publish` creates the two GHCR packages, which start **private**, so its anonymous-pull check fails with *Image is not publicly pullable* — and `deploy` doesn't run. For each of `teamos-backend` and `teamos-web` (your profile → Packages → the package → Package settings): confirm it is linked to the repository, then **Change visibility → Public**.
-7. **Actions → Production check → Run workflow → preflight.** Proves, without changing anything: the federated credential and role assignment, Run Command, the deploy user, the checkout and `git fetch`, Docker access, and that the stack is running. The result is `ready`. Fix anything it reports before going on.
-8. Back in the `release.yml` run, **Re-run failed jobs**. `publish` keeps the images it already pushed and now passes; `deploy` performs the first automatic deployment. It records the release that was running before (built on the VM, no revision label) as the baseline it can roll back to.
-9. **Production check → verify**, and `curl "$PUBLIC_ORIGIN/health"`: `revision` is the merge commit.
+6. The merge starts `release.yml`. CI runs, and the first `publish` creates the two GHCR packages. They start **private**, so its anonymous-pull check fails with *Image is not publicly pullable*. For each of `teamos-backend` and `teamos-web` (your profile → Packages → the package → Package settings): confirm it is linked to the repository, then **Change visibility → Public**. Then **Re-run failed jobs**. `publish` keeps the images it already pushed and now passes; `deploy` is **skipped**, with the notice *Automatic deployment is off*.
+7. **Actions → Production check → Run workflow** (branch `main`) **→ preflight.** This is the first real use of the GitHub → Azure path. Without changing anything, it proves: the OIDC sign-in (federated credential and subject), the role assignment, Run Command and its status polling, the deploy user, the checkout and `git fetch`, Docker access, and that the stack is running. The result is `ready`. Fix anything it reports and run it again before going on.
+8. **Activate automatic deployment:** set the repository variable `PRODUCTION_AUTO_DEPLOY` = `true` (exactly, lowercase). Unset or `false` keeps `deploy` skipped. Any other value fails `publish` with *PRODUCTION_AUTO_DEPLOY is invalid*, so a typo never deploys.
+9. **First deployment:** open the latest `release.yml` run on `main` and choose **Re-run all jobs** — not *Re-run failed jobs*, which would keep `publish`'s earlier decision not to deploy. `publish` keeps the published images, and `deploy` performs the first automatic deployment. It records the release that was running before (built on the VM, no revision label) as the baseline it can roll back to. If more pull requests were merged in the meantime, only the newest run needs this: `deploy.sh` refuses anything older than what is live.
+10. **Production check → verify**, and `curl "$PUBLIC_ORIGIN/health"`: `revision` is the deployed commit.
 
 From then on, merging a pull request is the deployment.
+
+**Pausing automatic deployment.** Set `PRODUCTION_AUTO_DEPLOY` to `false`. Merges still run CI and publish images, but nothing deploys. To resume, set it back to `true` and re-run all jobs of the newest `release.yml` run. The variable only orders and pauses releases. It is not what keeps other branches away from the VM: that is the environment's `main`-only rule, the federated credential bound to that environment, and the VM-scoped role.
 
 ### Deploying by hand
 

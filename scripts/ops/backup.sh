@@ -8,6 +8,7 @@
 # Env:   BACKUP_DIR (default ~/teamos-backups), BACKUP_RETENTION_DAYS (7),
 #        UPLOADS_VOLUME (teamos-prod_uploads-data)
 
+# shellcheck source=lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-7}"

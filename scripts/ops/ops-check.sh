@@ -10,6 +10,7 @@
 # Usage: scripts/ops/ops-check.sh
 # Env:   BACKUP_MAX_AGE_HOURS (26), MEM_MIN_AVAILABLE_MB (150), DISK_MAX_USED_PERCENT (85)
 
+# shellcheck source=lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 BACKUP_MAX_AGE_HOURS="${BACKUP_MAX_AGE_HOURS:-26}"

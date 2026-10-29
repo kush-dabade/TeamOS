@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared helpers for scripts/ops/*.sh. Sourced, never executed directly.
 #
 # Every script runs from the production checkout on the VM (see
@@ -11,6 +12,8 @@ umask 077
 OPS_REPO_DIR="${OPS_REPO_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 OPS_ENV_FILE="${OPS_ENV_FILE:-$OPS_REPO_DIR/.env.production}"
 OPS_LOG="${OPS_LOG:-$HOME/teamos-ops/ops.log}"
+# Used by the scripts that source this file, not here.
+# shellcheck disable=SC2034
 OPS_STATE_DIR="${OPS_STATE_DIR:-$HOME/teamos-ops/state}"
 BACKUP_DIR="${BACKUP_DIR:-$HOME/teamos-backups}"
 

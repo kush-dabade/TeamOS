@@ -1,0 +1,268 @@
+name: Release
+
+# Every push to main - in practice, every merged pull request - is a release
+# candidate:
+#
+#   Backend CI, Frontend CI, Production CI   (the same checks the PR passed)
+#     -> publish: build the images and push ghcr.io/<owner>/teamos-{backend,web}:<sha>
+#     -> deploy:  OIDC sign-in to Azure, Run Command on the VM, which runs
+#                 scripts/ops/deploy.sh <sha> (pull, verify, migrate, health
+#                 gate, automatic rollback where safe)
+#
+# Nothing here runs for pull requests or for any other branch. See
+# docs/development/deployment.md#releases.
+"on":
+  push:
+    branches:
+      - main
+
+# No default token permissions; each job asks for exactly what it needs.
+permissions: {}
+
+jobs:
+  backend:
+    name: Backend
+    uses: ./.github/workflows/backend-ci.yml
+    permissions:
+      contents: read
+
+  frontend:
+    name: Frontend
+    uses: ./.github/workflows/frontend-ci.yml
+    permissions:
+      contents: read
+
+  production:
+    name: Production
+    uses: ./.github/workflows/production-ci.yml
+    permissions:
+      contents: read
+
+  publish:
+    name: Publish images
+    needs: [backend, frontend, production]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    # The only job that can write packages. It never runs PR code: this
+    # workflow only triggers on pushes to main.
+    permissions:
+      contents: read
+      packages: write
+
+    env:
+      PUBLIC_ORIGIN: ${{ vars.PUBLIC_ORIGIN }}
+
+    outputs:
+      backend-digest: ${{ steps.check.outputs.backend-digest }}
+      web-digest: ${{ steps.check.outputs.web-digest }}
+
+    steps:
+      - name: Check the release configuration
+        run: |
+          if [[ ! $PUBLIC_ORIGIN =~ ^https://[^/]+$ ]]; then
+            echo "::error title=PUBLIC_ORIGIN is not set::Set the repository variable PUBLIC_ORIGIN to the production origin (https://<host>, no trailing slash). See docs/development/deployment.md#one-time-setup."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Release metadata
+        id: meta
+        run: |
+          owner=${GITHUB_REPOSITORY_OWNER,,}
+          {
+            echo "backend=ghcr.io/$owner/teamos-backend:$GITHUB_SHA"
+            echo "web=ghcr.io/$owner/teamos-web:$GITHUB_SHA"
+            echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Sign in to GHCR
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # SHA tags are immutable: a re-run of this job for a commit that is
+      # already published keeps the existing images instead of replacing
+      # them with a rebuild.
+      - name: Find already published images
+        id: existing
+        env:
+          BACKEND: ${{ steps.meta.outputs.backend }}
+          WEB: ${{ steps.meta.outputs.web }}
+        run: |
+          for image in backend web; do
+            ref=BACKEND
+            [ "$image" = web ] && ref=WEB
+            if docker buildx imagetools inspect "${!ref}" > /dev/null 2>&1; then
+              echo "${image}=true" >> "$GITHUB_OUTPUT"
+              echo "::notice::${!ref} is already published; keeping it"
+            else
+              echo "${image}=false" >> "$GITHUB_OUTPUT"
+            fi
+          done
+
+      - name: Build and push the backend image
+        if: steps.existing.outputs.backend != 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: backend
+          push: true
+          tags: ${{ steps.meta.outputs.backend }}
+          build-args: |
+            APP_REVISION=${{ github.sha }}
+            IMAGE_SOURCE=${{ steps.meta.outputs.source }}
+            IMAGE_CREATED=${{ steps.meta.outputs.created }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Build and push the web image
+        if: steps.existing.outputs.web != 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: frontend
+          push: true
+          tags: ${{ steps.meta.outputs.web }}
+          build-args: |
+            VITE_API_URL=${{ env.PUBLIC_ORIGIN }}
+            APP_REVISION=${{ github.sha }}
+            IMAGE_SOURCE=${{ steps.meta.outputs.source }}
+            IMAGE_CREATED=${{ steps.meta.outputs.created }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+      # Pull anonymously, as the VM does (it holds no GHCR credential), and
+      # check the labels deploy.sh will check. Fails here, with the fix,
+      # while the packages are still private.
+      - name: Check the published images as the VM will see them
+        id: check
+        env:
+          BACKEND: ${{ steps.meta.outputs.backend }}
+          WEB: ${{ steps.meta.outputs.web }}
+          SOURCE: ${{ steps.meta.outputs.source }}
+        run: |
+          docker logout ghcr.io
+          for ref in "$BACKEND" "$WEB"; do
+            if ! docker pull -q "$ref" > /dev/null; then
+              echo "::error title=Image is not publicly pullable::$ref - set the GHCR package's visibility to Public (one-time owner action, docs/development/deployment.md#one-time-setup), then re-run this job."
+              exit 1
+            fi
+            revision=$(docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$ref")
+            source=$(docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.source"}}' "$ref")
+            if [ "$revision" != "$GITHUB_SHA" ] || [ "$source" != "$SOURCE" ]; then
+              echo "::error::$ref has revision '$revision' and source '$source'"
+              exit 1
+            fi
+          done
+          origin=$(docker image inspect -f '{{index .Config.Labels "teamos.public-origin"}}' "$WEB")
+          if [ "$origin" != "$PUBLIC_ORIGIN" ]; then
+            echo "::error::$WEB was built for '$origin', not '$PUBLIC_ORIGIN'"
+            exit 1
+          fi
+          backend_digest=$(docker image inspect -f '{{index .RepoDigests 0}}' "$BACKEND")
+          web_digest=$(docker image inspect -f '{{index .RepoDigests 0}}' "$WEB")
+          {
+            echo "backend-digest=$backend_digest"
+            echo "web-digest=$web_digest"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### Published release \`$GITHUB_SHA\`"
+            echo
+            echo "| Image | Digest |"
+            echo "|---|---|"
+            echo "| \`$BACKEND\` | \`${backend_digest#*@}\` |"
+            echo "| \`$WEB\` | \`${web_digest#*@}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: Deploy to production
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    # Required reviewers are deliberately not configured on this environment
+    # (deployment is automatic); it scopes the Azure variables and the OIDC
+    # federated credential, and is restricted to main.
+    environment:
+      name: production
+      url: ${{ vars.PUBLIC_ORIGIN }}
+
+    # One deployment at a time. A newer push waiting here replaces an older
+    # one that hasn't started; deploy.sh additionally refuses any release
+    # older than the one already live.
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Deploy on the VM
+        id: vm
+        uses: ./.github/actions/vm-run
+        with:
+          action: deploy
+          sha: ${{ github.sha }}
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          resource-group: ${{ vars.AZURE_VM_RESOURCE_GROUP }}
+          vm-name: ${{ vars.AZURE_VM_NAME }}
+
+      - name: Check the deployment result
+        env:
+          RESULT: ${{ steps.vm.outputs.result }}
+          RESULT_LINE: ${{ steps.vm.outputs.result-line }}
+        run: |
+          echo "$RESULT_LINE"
+          case "$RESULT" in
+            success) echo "::notice title=Deployed::$GITHUB_SHA is live" ;;
+            stale) echo "::notice title=Superseded::a newer release is already live; nothing was changed" ;;
+            rolled_back)
+              echo "::error title=Rolled back::$GITHUB_SHA failed its health gate; the previous release was restored and is healthy"
+              exit 1 ;;
+            failed)
+              echo "::error title=Manual intervention required::$GITHUB_SHA failed and was not rolled back automatically - see the VM output above and docs/development/deployment.md#recovering-from-a-failed-deployment"
+              exit 1 ;;
+            *)
+              echo "::error title=Deployment refused::result '$RESULT' - see the VM output above"
+              exit 1 ;;
+          esac
+
+      # Independent of the VM's own checks: what the internet sees.
+      - name: Verify from outside the VM
+        if: steps.vm.outputs.result == 'success'
+        env:
+          PUBLIC_ORIGIN: ${{ vars.PUBLIC_ORIGIN }}
+          BACKEND_DIGEST: ${{ needs.publish.outputs.backend-digest }}
+          WEB_DIGEST: ${{ needs.publish.outputs.web-digest }}
+        run: |
+          curl -fsS --retry 5 --retry-all-errors --max-time 10 -o /dev/null "$PUBLIC_ORIGIN/ready"
+          revision=$(curl -fsS --retry 5 --retry-all-errors --max-time 10 "$PUBLIC_ORIGIN/health" | jq -r .revision)
+          if [ "$revision" != "$GITHUB_SHA" ]; then
+            echo "::error::$PUBLIC_ORIGIN/health reports revision '$revision', expected $GITHUB_SHA"
+            exit 1
+          fi
+          curl -fsS --retry 5 --retry-all-errors --max-time 10 -o /dev/null "$PUBLIC_ORIGIN/"
+          {
+            echo "### Deployed \`$GITHUB_SHA\`"
+            echo
+            echo "- $PUBLIC_ORIGIN/health reports revision \`$revision\`; /ready and / answer 200"
+            echo "- backend \`${BACKEND_DIGEST#*@}\`, web \`${WEB_DIGEST#*@}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,190 @@
+name: Production CI
+
+# What Backend CI and Frontend CI can't see: the production images and the
+# deployment tooling. Pull requests run this directly (both jobs are
+# required checks on main); release.yml calls it for every push to main
+# before anything is published or deployed.
+"on":
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  images:
+    name: Production images
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    concurrency:
+      group: production-images-${{ github.event.pull_request.number || github.run_id }}
+      cancel-in-progress: true
+
+    # Builds both images exactly as the Release workflow does and runs the
+    # real docker-compose.prod.yml stack on this runner: migrations against
+    # an empty database, the compiled API and worker, and Caddy in front.
+    # Everything is disposable and local to the runner - generated
+    # credentials, a throwaway database, and Caddy's internal CA for
+    # https://localhost. Nothing here can reach production.
+    env:
+      SMOKE_ORIGIN: https://localhost
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Write disposable production env files
+        run: |
+          umask 077
+          {
+            echo "PUBLIC_ORIGIN=$SMOKE_ORIGIN"
+            echo "POSTGRES_USER=teamos"
+            echo "POSTGRES_DB=teamos"
+            echo "POSTGRES_PASSWORD=$(openssl rand -hex 32)"
+            echo "REDIS_PASSWORD=$(openssl rand -hex 32)"
+          } > .env.production
+          {
+            echo "BETTER_AUTH_SECRET=$(openssl rand -base64 32)"
+            echo "RESEND_API_KEY=re_ci_dummy_not_a_real_key"
+            echo "EMAIL_FROM=\"TeamOS CI <ci@example.com>\""
+          } > backend/.env.production
+
+      - name: Validate the production Compose configuration
+        run: docker compose -f docker-compose.prod.yml --env-file .env.production config --quiet
+
+      - name: Build the backend image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: backend
+          load: true
+          tags: teamos-backend:prod
+          build-args: |
+            APP_REVISION=${{ github.sha }}
+            IMAGE_SOURCE=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Build the web image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: frontend
+          load: true
+          tags: teamos-web:prod
+          build-args: |
+            VITE_API_URL=${{ env.SMOKE_ORIGIN }}
+            APP_REVISION=${{ github.sha }}
+            IMAGE_SOURCE=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
+
+      - name: Start the production stack
+        run: docker compose -f docker-compose.prod.yml --env-file .env.production up -d --no-build
+
+      - name: Trust Caddy's local CA
+        run: |
+          for _ in $(seq 1 30); do
+            if docker compose -f docker-compose.prod.yml --env-file .env.production \
+              cp caddy:/data/caddy/pki/authorities/local/root.crt "$RUNNER_TEMP/caddy-root.crt" 2> /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Caddy never created its local CA"
+          exit 1
+
+      # The same health gate deploy.sh applies in production: migrate exited
+      # 0, every service healthy on the expected image, and /ready, /health
+      # (with this commit's revision) and the app answering through Caddy.
+      - name: Verify the stack like a deployment
+        env:
+          CURL_CA_BUNDLE: ${{ runner.temp }}/caddy-root.crt
+          OPS_REPO_DIR: ${{ github.workspace }}
+          OPS_ENV_FILE: ${{ github.workspace }}/.env.production
+          DEPLOY_HEALTH_TIMEOUT: "180"
+        run: scripts/ops/deploy.sh --verify "$GITHUB_SHA"
+
+      - name: Show the stack on failure
+        if: failure()
+        run: |
+          docker compose -f docker-compose.prod.yml --env-file .env.production ps -a
+          docker compose -f docker-compose.prod.yml --env-file .env.production logs --no-color --tail=200
+
+      - name: Remove the stack
+        if: always()
+        run: docker compose -f docker-compose.prod.yml --env-file .env.production down --volumes --remove-orphans
+
+  tooling:
+    name: Deploy tooling
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    concurrency:
+      group: deploy-tooling-${{ github.event.pull_request.number || github.run_id }}
+      cancel-in-progress: true
+
+    env:
+      ACTIONLINT_VERSION: 1.7.12
+      ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+
+    steps:
+      # Depth 2: the merge commit (or pushed commit) and its first parent,
+      # which is what the migration check below compares.
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+
+      - name: Lint shell scripts
+        run: shellcheck --version && shellcheck --severity=warning --external-sources --source-path=SCRIPTDIR scripts/ops/*.sh
+
+      - name: Lint workflows
+        run: |
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSLo "$RUNNER_TEMP/$archive" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/$archive"
+          echo "$ACTIONLINT_SHA256  $RUNNER_TEMP/$archive" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -color
+
+      # Pull-request workflows can't publish or deploy, and only main's
+      # release jobs hold package-write or OIDC permissions. The unit tests
+      # prove the checker rejects each way of breaking that.
+      - name: Check workflow security policy
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python3 -c 'import yaml' 2> /dev/null || sudo apt-get install -y --no-install-recommends python3-yaml
+          python3 scripts/ci/check-workflows.py
+          python3 -m unittest discover -s scripts/ci -p 'test_*.py'
+
+      # Merged migrations are immutable (an edit never reaches a database
+      # that already applied it), and new ones must keep the previously
+      # deployed release working (expand/contract). Deleting one is only
+      # right when it failed in production and was resolved as rolled back,
+      # so that is a warning, not an error. See
+      # docs/development/deployment.md#database-migrations.
+      - name: Check new and changed migrations
+        run: |
+          changed=$(git diff --name-only --diff-filter=MR HEAD^1 HEAD -- 'backend/prisma/migrations/*/migration.sql')
+          if [ -n "$changed" ]; then
+            echo "::error::Merged migrations must never be edited or renamed - add a new migration instead:"
+            echo "$changed"
+            exit 1
+          fi
+          deleted=$(git diff --name-only --diff-filter=D HEAD^1 HEAD -- 'backend/prisma/migrations/*/migration.sql')
+          if [ -n "$deleted" ]; then
+            echo "::warning::Migrations deleted - only correct for a migration that failed in production and was resolved as rolled back: $deleted"
+          fi
+          mapfile -t added < <(git diff --name-only --diff-filter=A HEAD^1 HEAD -- 'backend/prisma/migrations/*/migration.sql')
+          if [ "${#added[@]}" -eq 0 ]; then
+            echo "No new migrations."
+            exit 0
+          fi
+          scripts/ops/check-migrations.sh "${added[@]}"

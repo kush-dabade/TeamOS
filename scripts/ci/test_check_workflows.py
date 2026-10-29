@@ -1,0 +1,124 @@
+"""Proves check-workflows.py rejects the changes that would let untrusted code
+publish or deploy: each test copies .github/ to a scratch directory, breaks
+one rule, and expects the checker to fail with that rule's message.
+
+Run: python3 -m unittest discover -s scripts/ci -p 'test_*.py'
+"""
+
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+import yaml
+
+ROOT = Path(__file__).resolve().parents[2]
+CHECKER = ROOT / "scripts" / "ci" / "check-workflows.py"
+
+
+class WorkflowPolicyTest(unittest.TestCase):
+    def setUp(self):
+        self.scratch = Path(tempfile.mkdtemp())
+        shutil.copytree(ROOT / ".github", self.scratch / ".github")
+
+    def tearDown(self):
+        shutil.rmtree(self.scratch)
+
+    def edit(self, workflow, change):
+        path = self.scratch / ".github" / "workflows" / workflow
+        document = yaml.safe_load(path.read_text())
+        change(document)
+        path.write_text(yaml.safe_dump(document, sort_keys=False))
+
+    def check(self):
+        return subprocess.run(
+            [sys.executable, str(CHECKER), str(self.scratch)], capture_output=True, text=True
+        )
+
+    def assertRejected(self, message):
+        result = self.check()
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn(message, result.stdout)
+
+    def test_repository_workflows_pass(self):
+        result = self.check()
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_release_cannot_run_for_pull_requests(self):
+        self.edit("release.yml", lambda w: w["on"].update({"pull_request": None}))
+        self.assertRejected("must trigger only on push to main")
+
+    def test_release_cannot_run_for_other_branches(self):
+        self.edit("release.yml", lambda w: w["on"]["push"].update({"branches": ["main", "feature/*"]}))
+        self.assertRejected("must trigger only on push to main")
+
+    def test_pull_request_jobs_cannot_write_packages(self):
+        self.edit(
+            "production-ci.yml",
+            lambda w: w["jobs"]["images"].update({"permissions": {"contents": "read", "packages": "write"}}),
+        )
+        self.assertRejected("only release.yml's publish job may write packages")
+
+    def test_pull_request_workflows_cannot_push_images(self):
+        def push(workflow):
+            for step in workflow["jobs"]["images"]["steps"]:
+                if str(step.get("uses", "")).startswith("docker/build-push-action@"):
+                    step["with"]["push"] = True
+
+        self.edit("production-ci.yml", push)
+        self.assertRejected("is triggered by pull_request but pushes images")
+
+    def test_pull_request_workflows_cannot_deploy(self):
+        self.edit(
+            "production-ci.yml",
+            lambda w: w["jobs"]["tooling"]["steps"].append({"uses": "./.github/actions/vm-run"}),
+        )
+        self.assertRejected("is triggered by pull_request but runs a release action on the VM")
+
+    def test_pull_request_workflows_cannot_use_secrets(self):
+        self.edit(
+            "frontend-ci.yml",
+            lambda w: w["jobs"]["frontend-ci"]["env"].update({"TOKEN": "${{ secrets.SOME_TOKEN }}"}),
+        )
+        self.assertRejected("is triggered by pull_request but uses secrets")
+
+    def test_only_deploy_jobs_get_oidc_tokens(self):
+        self.edit(
+            "backend-ci.yml",
+            lambda w: w["jobs"]["backend-ci"].update({"permissions": {"contents": "read", "id-token": "write"}}),
+        )
+        self.assertRejected("only the deploy and production-check jobs may request OIDC tokens")
+
+    def test_pull_request_target_is_rejected(self):
+        self.edit("frontend-ci.yml", lambda w: w["on"].update({"pull_request_target": None}))
+        self.assertRejected("pull_request_target")
+
+    def test_deploy_needs_publish_and_production_environment(self):
+        def loosen(workflow):
+            deploy = workflow["jobs"]["deploy"]
+            deploy["needs"] = []
+            deploy.pop("environment")
+
+        self.edit("release.yml", loosen)
+        self.assertRejected("release.yml deploy: must need publish")
+        self.assertRejected("must use the production environment")
+
+    def test_deploys_are_never_cancelled_midway(self):
+        self.edit(
+            "release.yml",
+            lambda w: w["jobs"]["deploy"]["concurrency"].update({"cancel-in-progress": True}),
+        )
+        self.assertRejected("non-cancelling production-deploy concurrency group")
+
+    def test_actions_must_be_pinned_to_a_commit(self):
+        def unpin(workflow):
+            workflow["jobs"]["frontend-ci"]["steps"][0]["uses"] = "actions/checkout@v4"
+
+        self.edit("frontend-ci.yml", unpin)
+        self.assertRejected("is not pinned to a full commit SHA")
+
+
+if __name__ == "__main__":
+    unittest.main()

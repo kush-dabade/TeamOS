@@ -1,10 +1,11 @@
 name: Frontend CI
 
+# Pull requests run this directly (it is a required check on main). Pushes
+# to main run it through release.yml, which only publishes and deploys once
+# this, Backend CI and Production CI have all passed.
 "on":
   pull_request:
-  push:
-    branches:
-      - main
+  workflow_call:
 
 permissions:
   contents: read
@@ -13,6 +14,13 @@ jobs:
   frontend-ci:
     name: Frontend CI
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # A new push to a pull request supersedes its previous run. Runs called
+    # from release.yml have no PR number and are never cancelled.
+    concurrency:
+      group: frontend-ci-${{ github.event.pull_request.number || github.run_id }}
+      cancel-in-progress: true
 
     # Every `run:` step below is relative to frontend/ - this is a
     # frontend-only pipeline, not a repo-root one.
@@ -30,12 +38,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Set up Node.js 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "22"
           cache: npm

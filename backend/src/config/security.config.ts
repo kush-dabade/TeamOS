@@ -95,6 +95,30 @@ function parseTrustProxyHops(): number {
   return parsed;
 }
 
+// Unset means enabled - the safe default every environment gets unless it
+// deliberately opts out (e.g. a production deployment that can't deliver
+// email to arbitrary recipients yet). Only the exact strings "true" and
+// "false" are accepted: a typo like "flase" or "0" must stop startup rather
+// than silently resolve to either value, and an explicitly-set-but-empty
+// value is rejected the same way TRUST_PROXY_HOPS rejects one above.
+function parseRequireEmailVerification(): boolean {
+  const raw = process.env.REQUIRE_EMAIL_VERIFICATION;
+
+  if (raw === undefined) {
+    return true;
+  }
+
+  if (raw === "true") {
+    return true;
+  }
+
+  if (raw === "false") {
+    return false;
+  }
+
+  throw new Error('REQUIRE_EMAIL_VERIFICATION must be "true" or "false" (unset means "true").');
+}
+
 // Single source of truth for CORS/trustedOrigins config, consumed by
 // app.ts (Express CORS), lib/auth.ts (Better Auth), and
 // realtime/realtime.server.ts (Socket.IO CORS) - previously each parsed
@@ -102,3 +126,4 @@ function parseTrustProxyHops(): number {
 // independently, letting them silently diverge.
 export const trustedOrigins = parseTrustedOrigins();
 export const trustProxyHops = parseTrustProxyHops();
+export const requireEmailVerification = parseRequireEmailVerification();

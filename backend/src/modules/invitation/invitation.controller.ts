@@ -78,7 +78,7 @@ export async function resendInvitationHandler(req: Request, res: Response) {
 }
 
 export async function listUserInvitationsHandler(req: Request, res: Response) {
-  const invitations = await listUserInvitations(req.user!.email);
+  const invitations = await listUserInvitations(req.user!.email, req.user!.emailVerified);
 
   return res.status(200).json({
     success: true,
@@ -108,6 +108,7 @@ export async function acceptInvitationHandler(
     req.params.invitationId as string,
     req.user!.id,
     req.user!.email,
+    req.user!.emailVerified,
   );
 
   return res.status(200).json({
@@ -142,6 +143,7 @@ export async function declineInvitationHandler(
     req.params.invitationId as string,
     req.user!.id,
     req.user!.email,
+    req.user!.emailVerified,
   );
 
   return res.status(200).json({

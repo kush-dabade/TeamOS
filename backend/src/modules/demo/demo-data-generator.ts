@@ -425,9 +425,11 @@ async function ensurePermanentTeamMember(
   const existingUser = await prisma.user.findUnique({ where: { email } });
 
   let userId: string;
+  let emailVerified: boolean;
 
   if (existingUser) {
     userId = existingUser.id;
+    emailVerified = existingUser.emailVerified;
   } else {
     const signUpResult = await auth.api.signUpEmail({
       body: { name: spec.name, email, password: randomLocalPassword() },
@@ -436,6 +438,7 @@ async function ensurePermanentTeamMember(
     userId = signUpResult.user.id;
 
     await prisma.user.update({ where: { id: userId }, data: { emailVerified: true } });
+    emailVerified = true;
   }
 
   const existingMembership = await prisma.workspaceMember.findUnique({
@@ -453,7 +456,7 @@ async function ensurePermanentTeamMember(
     invitedById: inviterId,
   });
 
-  await acceptInvitation(invitation.id, userId, email);
+  await acceptInvitation(invitation.id, userId, email, emailVerified);
 
   return userId;
 }

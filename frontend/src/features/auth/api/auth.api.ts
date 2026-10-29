@@ -17,14 +17,20 @@ export async function login(data: LoginCredentials): Promise<void> {
   throwIfAuthError(error);
 }
 
-export async function register(data: RegisterCredentials): Promise<void> {
-  const { error } = await authClient.signUp.email({
+// Sign-up only returns a session token when the backend signed the new user
+// in - which it does exactly when mandatory email verification is turned off
+// (REQUIRE_EMAIL_VERIFICATION=false, backend/src/lib/auth.ts). Reporting that
+// lets the form handle both modes without a frontend setting of its own.
+export async function register(data: RegisterCredentials): Promise<{ sessionCreated: boolean }> {
+  const { data: result, error } = await authClient.signUp.email({
     name: data.name,
     email: data.email,
     password: data.password,
   });
 
   throwIfAuthError(error);
+
+  return { sessionCreated: Boolean(result?.token) };
 }
 
 export async function logout(): Promise<void> {

@@ -2,11 +2,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Mail } from "lucide-react";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { register } from "../api/auth.api";
 import { useResendVerificationEmail } from "../hooks/use-resend-verification-email";
+import { getPostAuthRedirect } from "../lib/redirect";
 import { registerSchema, type RegisterFormData } from "../validation/register";
 
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import { EmptyState } from "@/components/ux";
 import { getErrorMessage } from "@/utils";
 
 export function RegisterForm() {
+  const navigate = useNavigate();
   const location = useLocation();
 
   // Set only after a successful sign-up, from the submitted form data (not
@@ -41,16 +43,26 @@ export function RegisterForm() {
 
   async function onSubmit(data: RegisterFormData) {
     try {
-      await register({
+      const { sessionCreated } = await register({
         name: data.name,
         email: data.email,
         password: data.password,
       });
 
-      // Sign-up no longer creates a session (email verification is
-      // required first, backend/src/lib/auth.ts) - stay on this page and
-      // show an in-place confirmation instead of navigating to /login, so
-      // the "verify your email" step isn't a toast the user can miss.
+      // Email verification turned off on the backend: the user is already
+      // signed in, so continue exactly like a successful login - including
+      // back to an invitation link that sent them here.
+      if (sessionCreated) {
+        toast.success("Welcome to TeamOS!");
+
+        navigate(getPostAuthRedirect(location), { replace: true });
+        return;
+      }
+
+      // Verification required (the default): sign-up created no session.
+      // Stay on this page and show an in-place confirmation instead of
+      // navigating to /login, so the "verify your email" step isn't a toast
+      // the user can miss.
       setRegisteredEmail(data.email);
     } catch (error) {
       toast.error(getErrorMessage(error));

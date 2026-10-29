@@ -293,7 +293,7 @@ Sign in with the demo account above, or register your own — see [Email verific
 
 ### Email verification
 
-Local development automatically verifies new accounts on sign-up and skips sending the verification email, so signing up and signing in work immediately without a Resend account. This is a local-development convenience, not a security feature — production always runs the real email-verification flow, and this repository's own test suite exercises that real flow too.
+Local development automatically verifies new accounts on sign-up and skips sending the verification email, so signing up and signing in work immediately without a Resend account. This is a local-development convenience, not a security feature — production runs the real email-verification flow by default, and this repository's own test suite exercises that real flow too. A deployment that can't deliver email yet can turn mandatory verification off with `REQUIRE_EMAIL_VERIFICATION=false`; see [Authentication](./docs/features/authentication.md#when-verification-is-turned-off) for the trade-offs.
 
 `RESEND_API_KEY`/`EMAIL_FROM` are still what workspace invitations and password resets send through. Those stay unset by default and need a real Resend account before that mail can actually be delivered locally.
 

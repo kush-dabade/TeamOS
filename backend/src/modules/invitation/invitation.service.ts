@@ -160,6 +160,22 @@ function assertInvitationEligible(
   }
 }
 
+// The list, accept-by-id and decline-by-id operations identify the caller's
+// invitations by nothing but the session's email, which only proves
+// anything once that email is verified. With REQUIRE_EMAIL_VERIFICATION=false
+// (lib/auth.ts) anyone can register someone else's address, so these refuse
+// unverified accounts outright - checked before any lookup, so an unverified
+// caller can't probe which invitation ids exist either. The by-token
+// operations don't need this: holding the token, which is only ever emailed
+// to the invited address, is itself the proof of ownership.
+function assertEmailVerifiedForEmailMatch(emailVerified: boolean): void {
+  if (!emailVerified) {
+    throw new ForbiddenError(
+      "Verify your email address to view or respond to invitations by email",
+    );
+  }
+}
+
 type InvitationEntity = {
   id: string;
 
@@ -471,7 +487,10 @@ export async function resendInvitation(
 
 export async function listUserInvitations(
   email: string,
+  emailVerified: boolean,
 ): Promise<InvitationResponse[]> {
+  assertEmailVerifiedForEmailMatch(emailVerified);
+
   const normalizedEmail = email.toLowerCase();
   const invitations = await prisma.workspaceInvitation.findMany({
     where: {
@@ -591,7 +610,10 @@ export async function acceptInvitation(
   invitationId: string,
   userId: string,
   email: string,
+  emailVerified: boolean,
 ): Promise<InvitationResponse> {
+  assertEmailVerifiedForEmailMatch(emailVerified);
+
   const invitation = await findInvitationById(invitationId);
 
   if (!invitation) {
@@ -676,7 +698,10 @@ export async function declineInvitation(
   invitationId: string,
   userId: string,
   email: string,
+  emailVerified: boolean,
 ): Promise<InvitationResponse> {
+  assertEmailVerifiedForEmailMatch(emailVerified);
+
   const invitation = await findInvitationById(invitationId);
 
   if (!invitation) {

@@ -14,7 +14,12 @@ import {
 } from "./password-policy.js";
 import { prisma } from "./prisma.js";
 import { incrementRateLimitCounter, rateLimitRedis } from "./redis.js";
-import { isLocalDevelopment, isProduction, trustedOrigins } from "../config/security.config.js";
+import {
+  isLocalDevelopment,
+  isProduction,
+  requireEmailVerification,
+  trustedOrigins,
+} from "../config/security.config.js";
 import {
   enqueuePasswordResetEmail,
   enqueueVerificationEmail,
@@ -219,12 +224,24 @@ export const auth = betterAuth({
     enabled: true,
     minPasswordLength: PASSWORD_MIN_LENGTH,
     maxPasswordLength: PASSWORD_MAX_LENGTH,
-    // Without this, anyone can sign up with an email address they don't
-    // own and be signed in immediately - assertInvitationEligible
-    // (invitation.service.ts) only compares against the *session's*
-    // email, so an unverified account could accept a workspace invitation
-    // meant for the real owner of that address.
-    requireEmailVerification: true,
+    // On unless REQUIRE_EMAIL_VERIFICATION=false (config/security.config.ts).
+    // When on, sign-up never creates a session, sign-in 403s with
+    // EMAIL_NOT_VERIFIED until the emailed link is used, and sign-up for an
+    // existing email returns Better Auth's generic 200. When off (verified
+    // against the installed better-auth's api/routes/sign-up.mjs), sign-up
+    // signs the user in immediately, emailVerification.sendOnSignUp (unset
+    // below) falls back to this value so no verification email is queued,
+    // and sign-up for an existing email returns 422
+    // USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL.
+    //
+    // Turning it off means an email address no longer proves who owns the
+    // account. The one place TeamOS trusts the session's email for
+    // authorization - the invitation endpoints that match on email rather
+    // than token - additionally requires emailVerified
+    // (invitation.service.ts's assertEmailVerifiedForEmailMatch), so an
+    // account registered with someone else's address can't claim their
+    // invitations either way.
+    requireEmailVerification,
 
     // Presence of this callback alone is what turns on
     // POST /request-password-reset and POST /reset-password (see

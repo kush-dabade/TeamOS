@@ -213,7 +213,7 @@ Uploads go through a four-method interface — `upload`, `delete`, `stream`, `ex
 | **Realtime** | Socket.IO |
 | **Auth & validation** | Better Auth · Zod |
 | **Storage** | Local filesystem provider behind a four-method interface |
-| **Infrastructure** | Docker · GitHub Actions |
+| **Infrastructure** | Docker · GitHub Actions · GHCR · Azure VM (Compose, Caddy) |
 
 <br />
 

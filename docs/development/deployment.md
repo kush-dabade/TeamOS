@@ -20,7 +20,7 @@ Internet ──80/443──▶ Azure VM (Ubuntu 24.04, Docker Engine + Compose p
 - **One HTTPS origin.** The SPA, REST API, Better Auth, and Socket.IO are all served from the same `PUBLIC_ORIGIN`, so session cookies are first-party and no cross-origin CORS is involved in normal use.
 - **Only `caddy` publishes ports** (80, 443). Postgres and Redis are only on the `data` network, which is `internal: true` and which `caddy` is not attached to. `backend` and `worker` are on both networks: `data` for the databases, `edge` for Caddy's upstream and for outbound internet (the worker calls the Resend API).
 - **`migrate` runs before the app.** `backend` and `worker` depend on it with `service_completed_successfully`. A failed migration leaves them stopped and the failure visible in `docker compose ps -a`.
-- **`backend` and `worker` share one image** (`teamos-backend:prod`), built from `backend/Dockerfile`. `caddy` runs `teamos-web:prod`, built from `frontend/Dockerfile`: the Vite bundle plus `frontend/Caddyfile`.
+- **`backend` and `worker` share one image** (`teamos-backend:prod`), built from `backend/Dockerfile`. `caddy` runs `teamos-web:prod`, built from `frontend/Dockerfile`: the Vite bundle plus `frontend/Caddyfile`. Both are built by GitHub Actions and pulled from GHCR by commit SHA; the VM doesn't build them (see [Releases](#releases)).
 
 ### Azure resources
 
@@ -198,7 +198,7 @@ The checkout lives at `~/TeamOS`. Never re-clone over an existing deployment: it
 
 ```bash
 if [ -e ~/TeamOS ]; then
-  echo "~/TeamOS already exists - not cloning. Update it as described under Deploying."
+  echo "~/TeamOS already exists - not cloning. Releases update it; see Releases."
 else
   git clone https://github.com/<github-owner>/TeamOS.git ~/TeamOS
 fi
@@ -216,7 +216,7 @@ Data is unaffected: Docker volumes belong to the Compose project name (`teamos-p
 
 ### 8. Next
 
-Create the two env files as described in [Configuration](#configuration), then build and start the stack as described in [Deploying](#deploying).
+Create the two env files as described in [Configuration](#configuration). The checkout stays **detached** at the deployed commit from then on: `deploy.sh` moves it, so never `git pull` or switch branches in it. For the very first start of a new host, pull a published release's images and tag them as `:prod`, or build them once on the host (see [Deploying by hand](#deploying-by-hand)), and `dc up -d`; after that, [Releases](#releases) take over.
 
 ## Configuration
 
@@ -252,27 +252,208 @@ All commands below run from the repository root on the VM and use this alias:
 alias dc='docker compose -f docker-compose.prod.yml --env-file .env.production'
 ```
 
-## Deploying
+## Releases
 
-```bash
-dc build backend        # builds teamos-backend:prod (also used by migrate and worker)
-dc build caddy          # builds teamos-web:prod
-dc up -d
-dc ps -a                # migrate: Exited (0); every other service: healthy
-dc logs migrate         # "All migrations have been successfully applied." / "No pending migrations"
+Every merge to `main` is deployed automatically: CI runs again on the merge commit, GitHub Actions publishes images tagged with the commit SHA, and the VM pulls and deploys exactly those images. The VM never builds an image.
+
+```text
+pull request ──▶ Backend CI · Frontend CI · Production images · Deploy tooling      (required checks)
+                     │ merge
+                     ▼
+push to main ──▶ release.yml
+                  ├─ backend / frontend / production   the same three CI workflows, on the merge commit
+                  ├─ publish   (packages: write)       build → ghcr.io/<owner>/teamos-{backend,web}:<sha>
+                  │                                    → anonymous pull + label check, digests in the summary
+                  └─ deploy    (id-token: write, environment "production")
+                       azure/login (OIDC, no stored credential)
+                       → az vm run-command invoke … scripts/ops/run-deploy.sh deploy <sha>    (on the VM, as root)
+                         → sudo -u azureuser: scripts/ops/deploy.sh <sha>                    (from that release)
+                       → result line → external check of /ready, /health revision, /
 ```
 
-Build the two images one at a time. On a 1 GiB VM a parallel build competes for memory.
+Nothing in this path runs for a pull request or for any branch other than `main`. `scripts/ci/check-workflows.py` enforces that in CI (the **Deploy tooling** check), together with SHA-pinned actions and per-job least-privilege permissions; its unit tests prove each way of breaking those rules is caught.
 
-To deploy a new version:
+### Workflows
 
-1. Take a backup first: run `scripts/ops/backup.sh` on the VM, then `scripts/ops/pull-backups.sh` on your machine (see [Backups](#backups)).
-2. Update the checkout: `git pull --ff-only`.
-3. Run `dc build backend && dc build caddy && dc up -d`.
+| Workflow | Trigger | Jobs (check names) | Token permissions |
+|---|---|---|---|
+| `backend-ci.yml` | pull request; called by `release.yml` | Backend CI: lint, typecheck, tests (incl. `tests/ops/deploy.test.ts`) | `contents: read` |
+| `frontend-ci.yml` | pull request; called by `release.yml` | Frontend CI: lint, tests, typecheck + production build | `contents: read` |
+| `production-ci.yml` | pull request; called by `release.yml` | Production images: build both images, run the real `docker-compose.prod.yml` stack with generated throwaway credentials, and apply the same health gate as a deployment (`deploy.sh --verify`) through Caddy. Deploy tooling: shellcheck, actionlint, workflow policy, migration safety | `contents: read` |
+| `release.yml` | push to `main` | the three above, then `publish`, then `deploy` | none by default; `publish`: `contents: read`, `packages: write`; `deploy`: `contents: read`, `id-token: write` |
+| `production-check.yml` | manual (`workflow_dispatch`), `main` only | `preflight` or `verify` on the VM, changes nothing | `contents: read`, `id-token: write` |
 
-Compose recreates the containers whose image changed. `migrate` runs again and applies only pending migrations.
+`.github/actions/vm-run` is the one place that signs in to Azure and calls Run Command; `release.yml` and `production-check.yml` both use it. Run Command reports a script's output, not its exit status, so the workflow reads the `TEAMOS_DEPLOY_RESULT=` line `deploy.sh` always prints last.
 
-Never run `prisma migrate reset` or `prisma migrate dev` against production. Both can drop data.
+### Images
+
+| Image | Used by | Tag |
+|---|---|---|
+| `ghcr.io/<owner>/teamos-backend:<sha>` | `backend`, `worker`, `migrate` | full 40-character commit SHA |
+| `ghcr.io/<owner>/teamos-web:<sha>` | `caddy` | full 40-character commit SHA |
+
+- **Immutable.** There is no `latest`; a release is its commit SHA. Re-running `publish` for a commit that is already published keeps the existing images.
+- **Labels.** `org.opencontainers.image.source`, `.revision` (the commit) and `.created`; the web image also records `teamos.public-origin`, the origin baked into its bundle. The backend image also carries the commit as `APP_REVISION`, which `/health` reports as `revision`.
+- **Public packages.** The VM pulls anonymously and holds no registry credential. The images contain only what the public repository already contains; secrets are injected at runtime from the env files and are never in a layer.
+- **On the VM** each deployed release is also tagged locally as `teamos-backend:release-<sha>` / `teamos-web:release-<sha>`, and the live one as `teamos-backend:prod` / `teamos-web:prod` — the names `docker-compose.prod.yml` and the ops scripts already use. The current and two previous known-good releases are kept; older ones are pruned.
+
+### What a deployment does
+
+`scripts/ops/deploy.sh <sha>` on the VM, holding a `flock` so only one runs at a time:
+
+1. **Refuses, changing nothing**, if: the SHA isn't a full commit SHA on `origin/main`; the checkout has local modifications; a release *newer* than `<sha>` is already live (result `stale`); the images can't be pulled; their `revision`/`source` labels don't match; the web image was built for a different `PUBLIC_ORIGIN`; a previous migration is marked failed; a pending migration is destructive (see [Database migrations](#database-migrations)); or the pre-deployment backup fails.
+2. Runs `scripts/ops/backup.sh`, as every production change starts with one.
+3. Tags what is running now as `release-<previous sha>` (the rollback handle), then retags `:prod` to the new images and moves the checkout (detached) to `<sha>`, so the compose file and ops scripts on disk always match the running release.
+4. `docker compose up -d --no-build`: `migrate` (new image) applies pending migrations while the previous release is still serving, then `backend` and `worker` are recreated, then `caddy`.
+5. **Health gate** (3 consecutive passes within 5 minutes): `migrate` exited 0; `backend`, `worker` and `caddy` run the new image IDs, are healthy and haven't restarted; `postgres` and `redis` are healthy; `$PUBLIC_ORIGIN/ready` is 200, `/health` reports `revision: <sha>`, and the app answers through Caddy.
+6. Records the outcome in `~/teamos-ops/releases.log` and `~/teamos-ops/state/current-release`.
+
+Expect a few seconds of 502s and a Socket.IO reconnect while `backend` and `caddy` are recreated; this is a single instance.
+
+| Result (last line) | Exit | Meaning | Workflow |
+|---|---|---|---|
+| `success` | 0 | live and healthy | green |
+| `stale` | 4 | a newer release was already live; nothing changed | green, with a notice |
+| `rejected` | 1 | refused before changing anything | red |
+| `rolled_back` | 2 | failed the health gate; the previous release was restored and is healthy | red |
+| `failed` | 3 | needs a human — see [Recovering from a failed deployment](#recovering-from-a-failed-deployment) | red |
+
+The workflow log is public for this repository, so `deploy.sh` prints only service states, exit codes, image IDs and revisions. Container logs from a failed deployment go to `~/teamos-ops/deploys/<timestamp>-<sha>.log` on the VM (`0600`).
+
+### Verifying the live release
+
+- `curl -fsS "$PUBLIC_ORIGIN/health"` — `revision` is the deployed commit (`null` only for an image built without the release pipeline).
+- **Actions → Production check → Run workflow → verify**: on the VM, checks the recorded release is what is running and healthy, and compares it with the public `/health`.
+- On the VM: `tail ~/teamos-ops/releases.log`, `cat ~/teamos-ops/state/current-release`, `docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' teamos-backend:prod`.
+
+### One-time setup
+
+These steps are owner actions in GitHub and Azure. Until they are done, `publish` or `deploy` fails with an error naming the missing piece — nothing deploys silently or partially. Do them in this order.
+
+**Before merging the pull request that adds this pipeline**
+
+1. **Repository variable** (Settings → Secrets and variables → Actions → Variables): `PUBLIC_ORIGIN` = the production origin, e.g. `https://<dns-label>.centralindia.cloudapp.azure.com` (no trailing slash). Public, not a secret.
+2. **Environment** (Settings → Environments → New environment): `production`.
+   - Deployment branches and tags: **Selected branches** → `main` only.
+   - **No required reviewers** — deployment is automatic; a reviewer gate would make it manual. The environment exists to scope the variables below and the OIDC subject.
+   - Environment variables: `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_VM_RESOURCE_GROUP` (`rg-teamos-prod-cin`), `AZURE_VM_NAME` (`vm-teamos-prod-cin`). These are identifiers, not credentials. Fill the first three in step 3. No secrets are needed anywhere.
+3. **Azure deployment identity** (Azure CLI, signed in as the subscription owner). A dedicated app registration whose only credential is a federated trust in GitHub's OIDC tokens for the `production` environment, and whose only permission is Run Command on the one VM:
+
+   ```bash
+   RG=rg-teamos-prod-cin; VM=vm-teamos-prod-cin
+   SUB=$(az account show --query id -o tsv); TENANT=$(az account show --query tenantId -o tsv)
+   VM_ID=$(az vm show -g $RG -n $VM --query id -o tsv)
+
+   APP_ID=$(az ad app create --display-name teamos-github-deploy --query appId -o tsv)
+   SP_ID=$(az ad sp create --id $APP_ID --query id -o tsv)
+
+   # Tokens are accepted only from jobs in this repository's `production` environment.
+   az ad app federated-credential create --id $APP_ID --parameters '{
+     "name": "github-production-environment",
+     "issuer": "https://token.actions.githubusercontent.com",
+     "subject": "repo:<github-owner>/TeamOS:environment:production",
+     "audiences": ["api://AzureADTokenExchange"]
+   }'
+
+   # Custom role: read the VM and run a command on it - nothing else (no start/stop,
+   # no delete, no disk, network or extension changes). Custom roles can't be
+   # *assignable* below resource-group level, but the assignment itself is scoped
+   # to the VM.
+   az role definition create --role-definition "{
+     \"Name\": \"TeamOS VM Run Command\",
+     \"Description\": \"Run Command on the TeamOS production VM (GitHub Actions deploys).\",
+     \"Actions\": [\"Microsoft.Compute/virtualMachines/read\", \"Microsoft.Compute/virtualMachines/runCommand/action\"],
+     \"AssignableScopes\": [\"/subscriptions/$SUB/resourceGroups/$RG\"]
+   }"
+   az role assignment create --assignee-object-id $SP_ID --assignee-principal-type ServicePrincipal \
+     --role "TeamOS VM Run Command" --scope $VM_ID
+
+   echo "AZURE_CLIENT_ID=$APP_ID AZURE_TENANT_ID=$TENANT AZURE_SUBSCRIPTION_ID=$SUB"
+   ```
+
+   Never create a client secret or certificate for this app, and don't grant it Owner, Contributor or Virtual Machine Contributor. The first Run Command installs Azure's Run Command VM extension, which the platform manages. If `preflight` (step 9) fails with `AuthorizationFailed` on `Microsoft.Compute/locations/operations/read` while polling, add that single read action in a second custom role assigned at subscription scope; the two actions above are the documented requirement for action Run Command.
+4. **Branch ruleset** (Settings → Rules → Rulesets → New branch ruleset), targeting the default branch, enforcement **Active**, empty bypass list:
+   - Restrict deletions; Block force pushes.
+   - Require a pull request before merging, **0** required approvals (a solo maintainer can't approve their own pull request).
+   - Require status checks to pass, with *Require branches to be up to date*: `Backend CI`, `Frontend CI`, `Production images`, `Deploy tooling`. A check can only be selected after it has run once — the pipeline's own pull request runs all four.
+5. **Actions settings** (Settings → Actions → General): Workflow permissions **Read repository contents and packages permissions** (every workflow declares its own anyway); fork pull request workflows **Require approval for all external contributors**.
+
+**After merging**
+
+6. The merge starts `release.yml`. The first `publish` creates the two GHCR packages, which start **private**, so its anonymous-pull check fails with *Image is not publicly pullable* — and `deploy` doesn't run. For each of `teamos-backend` and `teamos-web` (your profile → Packages → the package → Package settings): confirm it is linked to the repository, then **Change visibility → Public**.
+7. **Actions → Production check → Run workflow → preflight.** Proves, without changing anything: the federated credential and role assignment, Run Command, the deploy user, the checkout and `git fetch`, Docker access, and that the stack is running. The result is `ready`. Fix anything it reports before going on.
+8. Back in the `release.yml` run, **Re-run failed jobs**. `publish` keeps the images it already pushed and now passes; `deploy` performs the first automatic deployment. It records the release that was running before (built on the VM, no revision label) as the baseline it can roll back to.
+9. **Production check → verify**, and `curl "$PUBLIC_ORIGIN/health"`: `revision` is the merge commit.
+
+From then on, merging a pull request is the deployment.
+
+### Deploying by hand
+
+The pipeline is the normal path. By hand, run the same entry point on the VM (over SSH, see [SSH access](#2-ssh-access)):
+
+```bash
+cd ~/TeamOS && git fetch
+sudo scripts/ops/run-deploy.sh deploy <sha>              # what the workflow runs
+git show origin/main:scripts/ops/run-deploy.sh | sudo sh -s deploy <sha>   # if the checkout predates run-deploy.sh
+scripts/ops/deploy.sh --verify                           # the live release, healthy?
+```
+
+`<sha>`'s images must already be published (its `release.yml` run's `publish` job passed).
+
+**Emergency only — GHCR or Actions unavailable:** build on the VM as before this pipeline existed, one image at a time (a parallel build competes for the 1 GiB of memory, and even a single build briefly degraded `/ready` on 2026-10-28): take a backup, `git checkout --detach <sha>`, `dc build backend && dc build caddy && dc up -d`. Such images report no revision. Afterwards record what is running, so the next `deploy.sh` run starts from the truth: `echo <sha> > ~/teamos-ops/state/current-release`.
+
+## Rollback
+
+**Automatic.** When a new release fails its health gate, `deploy.sh` restores the previous release's images (`:release-<previous sha>` → `:prod`), moves the checkout back, recreates the services and runs the health gate on the previous release (result `rolled_back`). It does this only when it is safe:
+
+| After the failure | Automatic rollback? |
+|---|---|
+| no migrations were applied | yes |
+| only expand migrations were applied | yes — the previous release was already serving against that schema while `migrate` ran; the migrations stay applied |
+| a migration **failed** | no — the previous release's containers were never replaced and keep serving; `:prod` and the checkout are pointed back at it (result `failed`) |
+| a **contract** migration was applied | no — the previous release may use what it removed (result `failed`) |
+| the migration state can't be read | no (result `failed`) |
+
+A database backup is **never** restored automatically.
+
+**By hand, to an earlier release** (images still in GHCR):
+
+```bash
+cd ~/TeamOS && scripts/ops/deploy.sh --allow-older <sha>
+```
+
+This bypasses only the "newer release is live" protection; every other check, the backup and the health gate still apply. While the faulty commit is the head of `main`, a re-run of its pipeline would deploy it again: prefer rolling forward with a revert pull request, which deploys like any other change.
+
+For the release that was running before this pipeline existed (not in GHCR), while it is still kept locally: `docker tag teamos-backend:release-<sha> teamos-backend:prod && docker tag teamos-web:release-<sha> teamos-web:prod && git checkout --detach <sha> && dc up -d --no-build`, then `echo <sha> > ~/teamos-ops/state/current-release`.
+
+## Database migrations
+
+`migrate` runs **before** `backend` and `worker` are replaced, so for a short window the **previous** release serves against the **new** schema — and a rollback runs it there indefinitely. Every migration that deploys automatically must therefore keep the previous release working: **expand/contract**.
+
+- **Expand** (automatic): add tables, nullable columns, columns with defaults, indexes, enum values; drop indexes or constraints. Ship the schema change first, or together with code that tolerates both shapes.
+- **Contract** (manual): drop or rename tables/columns/types, change a column's type, add `NOT NULL`, bulk-delete. Ship it in a **later** release than the code that stopped using what it removes, mark the migration file with the line `-- teamos-migration: contract`, and deploy it by hand once the release that no longer uses it is live: `scripts/ops/deploy.sh --allow-contract <sha>`. The pipeline refuses it (`rejected`), so `main` waits for that manual step.
+- `scripts/ops/check-migrations.sh` classifies migrations by pattern (drops, renames, type changes, `SET NOT NULL`, `TRUNCATE`, `DELETE FROM`). CI runs it on migrations a pull request adds and fails on unmarked destructive ones; `deploy.sh` runs it again on the migrations actually pending in production. It is a safety net, not a proof — review each migration for compatibility.
+- **Merged migrations are immutable.** CI fails if a pull request edits or renames one: a database that already applied it would never see the change. Add a new migration instead.
+- Never run `prisma migrate reset` or `prisma migrate dev` against production. Both can drop data.
+
+## Recovering from a failed deployment
+
+Start from the `TEAMOS_DEPLOY_RESULT` line and the `service state:` block in the deploy job's *VM output*, then read the full diagnostics on the VM: `ls -t ~/teamos-ops/deploys | head -1`, plus `grep ' deploy ' ~/teamos-ops/ops.log | tail`.
+
+- **`rejected`**: nothing changed. The reason is in the output (unpublished or private image, label mismatch, dirty checkout, unsafe migration, backup failure, lock held). Fix the cause; re-run the job, or merge a fix.
+- **`rolled_back`**: production is on the previous release and healthy. Find the cause in the diagnostics file, fix it in a pull request; merging it deploys.
+- **`failed`, migration failed.** The previous release keeps serving (check the state block). Prisma refuses every further migration until the failed one is resolved:
+  1. On the VM, find out what the failed migration did — Postgres may have applied part of it: `dc exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"` (values from `.env.production`), then inspect with `\d "<Table>"`. Undo partial changes by hand, or finish them if that's clearly right.
+  2. Record the outcome. The migration must exist in the image that runs the command, so use the failed release's backend image briefly — `migrate` is a one-off container and nothing that is serving is touched:
+     ```bash
+     docker tag ghcr.io/<owner>/teamos-backend:<failed-sha> teamos-backend:prod
+     dc run --rm --no-deps migrate npx prisma migrate resolve --rolled-back <migration_name>   # or --applied
+     docker tag teamos-backend:release-<live-sha> teamos-backend:prod
+     ```
+  3. Fix forward in a pull request. For a migration resolved as rolled back, delete it and add a corrected one with a new timestamp (CI warns on the deletion, by design). Merging deploys it.
+- **`failed`, contract migration applied, or the rollback didn't become healthy**: production may be degraded. Look at `dc ps -a` and the diagnostics, then either roll forward with a fix, or deploy a compatible earlier release with `--allow-older`. Restoring the pre-deployment backup ([Disaster recovery](#disaster-recovery-destructive-replaces-live-data)) loses every write since it was taken — it's the last resort, and a decision for the owner.
+- **`stale`**: a newer release was already live. Nothing to do.
+- **No result line / Azure error**: the workflow output shows the Azure CLI error. `AuthorizationFailed` → the role assignment (setup step 3); `AADSTS700213`/no matching federated identity → the federated credential's subject, or a job outside the `production` environment; `Conflict` → another Run Command is still running on the VM; a timeout → see `~/teamos-ops/deploys/` and `dc ps -a` on the VM (Run Command allows up to 90 minutes).
 
 ## Health and observability
 
@@ -286,6 +467,9 @@ Never run `prisma migrate reset` or `prisma migrate dev` against production. Bot
 | Requests (access log) | `dc logs backend \| grep '"msg":"Request'` |
 | One request, end to end | `dc logs backend \| grep '"requestId":"<id>"'`, where the id comes from the response's `X-Request-Id` header |
 | Scheduled checks | `tail -n 50 ~/teamos-ops/ops.log` |
+| Deployed release | `curl -fsS "$PUBLIC_ORIGIN/health"` (`revision`), `cat ~/teamos-ops/state/current-release` |
+| Release history | `tail ~/teamos-ops/releases.log` (`baseline`, `success`, `rolled_back`, `failed`, with image digests) |
+| A failed deployment | `ls -t ~/teamos-ops/deploys \| head -1` (container logs captured by `deploy.sh`) |
 
 Docker's daemon-level log rotation (`/etc/docker/daemon.json`, `local` driver with `max-size`/`max-file`) keeps container logs from filling the disk.
 

@@ -82,13 +82,20 @@ cd frontend && npx tsc -b                               # app, Vite config and e
 
 ## CI
 
-Two independent GitHub Actions workflows (`.github/workflows/`), both triggered on pull requests and on push to `main`:
+Three GitHub Actions workflows (`.github/workflows/`) run on every pull request and are required checks on `main`. On a push to `main`, `release.yml` calls the same three again on the merge commit before it publishes and deploys anything (see [`deployment.md` § Releases](./deployment.md#releases)).
 
 **`backend-ci.yml`**: Node 22, disposable `postgres:17` and `redis:8-alpine` service containers (the CI Redis runs without a password — GitHub Actions service containers can't be given startup arguments like `--requirepass`; `REDIS_PASSWORD` is still set to a non-empty dummy value because the app's own config requires one, and `ioredis` connects fine against an unauthenticated server). Steps: checkout → Node 22 setup (with npm cache) → `npm ci` → `npx prisma generate` → `npx prisma migrate deploy` → `npm run lint` → `npx tsc --noEmit -p tsconfig.test.json` → `npm test`.
 
 **`frontend-ci.yml`**: Node 22. Steps: checkout → Node 22 setup → `npm ci` → `npm run lint` → `npm run test` → `npm run build` (which is both the typecheck, via its `tsc -b` phase, and the production build — there's no separate frontend typecheck script).
 
-Both workflows require `contents: read` permissions only and use throwaway/dummy environment values (`BETTER_AUTH_SECRET`, `RESEND_API_KEY`, etc.) — never real secrets.
+**`production-ci.yml`**, two jobs:
+
+- **Production images**: builds `backend/Dockerfile` and `frontend/Dockerfile` exactly as the release does, validates `docker-compose.prod.yml`, and starts the real production stack on the runner with generated throwaway credentials and `PUBLIC_ORIGIN=https://localhost` (Caddy's internal CA). It then runs `scripts/ops/deploy.sh --verify` — the health gate a production deployment uses: `migrate` exited 0, every service healthy on the freshly built images, and `/ready`, `/health` (reporting this commit's revision) and the SPA answering through Caddy. This is the only check that exercises the compiled server and worker, the Prisma runtime config inside the image, and Caddy's routing.
+- **Deploy tooling**: shellcheck over `scripts/ops/*.sh`, actionlint (checksum-pinned download) over the workflows, `scripts/ci/check-workflows.py` plus its unit tests (pull-request workflows can't publish or deploy; least-privilege permissions; SHA-pinned actions), and `scripts/ops/check-migrations.sh` over migrations the pull request adds (merged migrations may not be edited).
+
+Every workflow declares its own permissions — `contents: read` for all of the above — and uses throwaway/dummy environment values (`BETTER_AUTH_SECRET`, `RESEND_API_KEY`, etc.), never real secrets.
+
+**Deployment scripts** are tested in Backend CI like the other ops scripts: `tests/ops/deploy.test.ts` runs `deploy.sh`, `run-deploy.sh` and `check-migrations.sh` against a real git repository and a fake host (`tests/ops/support/fake-host.mjs` stands in for docker/compose, curl, psql and sudo). It covers SHA validation, the deployment lock, stale-release rejection, provenance checks, health-gate failure and rollback, migration failure and contract migrations (no rollback), retention, and that no secret reaches the output. Locally: `cd backend && npx vitest run tests/ops/deploy.test.ts` (needs `git`, `flock` and `bash`); `python3 -m unittest discover -s scripts/ci -p 'test_*.py'` for the workflow policy.
 
 ## Test database
 
